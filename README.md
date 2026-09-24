@@ -33,6 +33,7 @@ pre-push hook that refuses to push.
 
 ## Running
 
+    .venv/bin/python scripts/00_sonar_catalog.py      # SonarQube metric keys/languages -> docs/
     .venv/bin/python scripts/01_inventory.py          # all repos in the 3 orgs -> results/repo_inventory_all.csv
     .venv/bin/python scripts/01_inventory.py --groups # print name-pattern groups (add --examples for sample names)
     bash scripts/02_clone.sh                          # clone/fetch repos in config/repo_selection.txt
@@ -41,6 +42,8 @@ pre-push hook that refuses to push.
     .venv/bin/python scripts/04_sonar_export.py       # SonarQube measures -> results/sonarqube_metrics.csv
     .venv/bin/python scripts/05_custom_metrics.py     # radon/pylint/bandit -> results/custom_metrics.csv
     .venv/bin/python scripts/06_build_results.py      # merged table -> results/results.csv
+
+`03_sonar_scan.py` and `05_custom_metrics.py` also take `--only <repo>` to redo one repo.
 
 Each script can be re-run; clones are fetched instead of re-cloned and SonarQube
 projects are re-analysed in place.
