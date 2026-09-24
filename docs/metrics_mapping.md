@@ -78,8 +78,117 @@ does not do.
 
 ## First scan check
 
-To be filled after the first project is scanned (Phase 4).
+Test project: `cosc448_2025_capstone-project-team-16`, a Python + JavaScript repo
+(`ncloc_language_distribution` = `css=309;docker=10;js=2131;py=7298;web=24`).
+
+Every mapped key returned a value for this project: `ncloc`, `lines`,
+`statements`, `functions`, `classes`, `files`, `comment_lines`,
+`comment_lines_density`, `complexity`, `cognitive_complexity`,
+`duplicated_lines_density`, `duplicated_blocks`, `bugs`, `vulnerabilities`,
+`security_hotspots`, `code_smells`, `violations`, `sqale_index`, `sqale_debt_ratio`,
+`sqale_rating`, `reliability_rating`, `security_rating`,
+`ncloc_language_distribution`, all `software_quality_*` issue counts and ratings,
+and `open_issues`. `coverage` came back as 0.0 and `tests` was not returned, because
+no test reports are imported. Neither is used.
+
+What I learned from it, and the resulting changes:
+
+- **Project-level measures cover every language.** `ncloc`, `comment_lines` and
+  `complexity` at project level mix Python with JS, CSS and so on. To compare with
+  Radon (Python only) the export also sums the per-file measures from
+  `/api/measures/component_tree?qualifiers=FIL` for files with `language = py`.
+  These become the `sq_py_*` columns. For this repo, Python gives ncloc 7298,
+  comment_lines 1333, complexity 1615 over 54 files and 334 functions.
+- **Test files are included.** SonarQube flagged tests with a path heuristic, but
+  `component_tree` returned no separate `UTS` components. All 54 tracked `.py` files
+  (31 of them test files) appear as `FIL` and count toward ncloc, the same file set
+  Radon sees.
+- **Per-file complexity works; per-function complexity does not.** The highest
+  per-file value here is `src/api.py` with complexity 386. So SonarQube can give a
+  maximum per *file* (`sq_py_file_complexity_max`), which is not the PDF's CCmax
+  (per function). CCmax stays Radon-only.
+- **Issue severities.** `/api/issues/search` facets return both the old
+  `severities` (BLOCKER/CRITICAL/MAJOR/MINOR/INFO) and the newer `impactSeverities`
+  (BLOCKER/HIGH/MEDIUM/LOW/INFO). The export stores both. The `software_quality_*`
+  issue-count measures match the `impactSeverities` facet, e.g. 111 HIGH.
+
+No mapping entries had to change. The only additions are the Python-only `sq_py_*`
+columns.
 
 ## ncloc vs Radon SLOC, comment_lines vs Radon comments
 
-To be filled after Phase 5.
+Compared on the 48 repos that contain Python, using the Python-only SonarQube sums
+(`sq_py_ncloc`, `sq_py_comment_lines`) against Radon's totals over the same tracked
+files.
+
+**File sets.** They match in 47 of 48 repos. In W2025 team 10, SonarQube skipped one
+test-data file stored under a folder named `.git(test)/`. Both tools use the same
+exclusions (node_modules, venv, site-packages, build, dist, ...).
+
+**SLOC vs ncloc: effectively the same.**
+- Ratio `sq_py_ncloc / py_sloc`: median 1.000, mean 1.003, range 0.972-1.055.
+  44 of 48 repos are within 2%.
+- Pearson correlation across repos: 1.00. Totals: Radon 577,179, SonarQube 577,987
+  (+0.14%).
+- The small differences come from how multi-line strings, line continuations and
+  docstring lines are counted. The largest gaps (+5%) are W2023 team 17 and
+  W2024 team 1-003.
+
+**Comment lines: clearly different.**
+- Ratio `sq_py_comment_lines / py_comments`: median 1.63, mean 1.84, range 0.91-6.76.
+  Totals: Radon 47,118, SonarQube 102,770, so SonarQube reports about 2.2 times as
+  many.
+- The main reason is that SonarQube counts docstring lines as comment lines, while
+  Radon's `comments` field only counts `#` comments (it reports docstrings separately
+  as `multi`). Repos that document heavily with docstrings show the biggest gap. For
+  example, W2025 team 2 has ratio 6.8.
+- Pearson correlation of the counts across repos is 0.91, but the rankings of
+  comment % differ more: Spearman between `py_comment_pct` and
+  `sq_py_comment_pct_pdf` is 0.74.
+
+**Comment % definitions side by side**, for example W2025 team 16:
+`py_comment_pct` (Radon, PDF formula) = 10.9, `sq_py_comment_pct_pdf` (SonarQube
+counts, PDF formula) = 18.3, `sq_comment_lines_density` (SonarQube's own, all
+languages) = 12.2. The three are not interchangeable.
+
+## Which source each reported number comes from
+
+| Reported metric | Column used in the report | Source |
+|---|---|---|
+| CCavg | `py_cc_avg` | Radon |
+| CCmax | `py_cc_max` | Radon |
+| MI | `py_mi_avg` | Radon |
+| Pylint score | `py_pylint_score` (see `py_pylint_score_excl_fatal` for repos where a fatal parse error forces 0) | Pylint |
+| SLOC | `py_sloc` (`sq_py_ncloc` agrees to within about 1%) | Radon |
+| Comment % | `py_comment_pct` (PDF definition, `#` comments only) | Radon |
+| Bandit high/medium/low | `py_bandit_high/medium/low` | Bandit |
+| Whole-repo size, all languages | `sq_ncloc`, `sq_ncloc_language_distribution` | SonarQube |
+| SonarQube quality context | `sq_bugs`, `sq_vulnerabilities`, `sq_code_smells`, `sq_security_hotspots`, ratings, `sq_software_quality_*` | SonarQube |
+
+The PDF metrics are only defined for Python, so they are NA for the 20 repos without
+tracked Python. For those repos, only the SonarQube columns are available. For C#
+code, not even those: the CLI scanner does not analyse C# (see `environment.md`).
+
+## UI check (SonarQube web UI, view only)
+
+- **Projects page, searched for `cosc448_`:** 68 projects found, all 68 selected
+  repos. The pre-existing `COSC-499-W2023_year-long-project-team-1` project was not
+  touched.
+- **Overview of `cosc448_2025_capstone-project-team-16`, "Overall Code" tab, compared
+  with `results/results.csv`:**
+
+  | UI | UI value | CSV column | CSV value |
+  |---|---|---|---|
+  | Security open issues / rating | 3 / E | sq_software_quality_security_issues / sq_security_rating | 3 / 5.0 (E) |
+  | Reliability open issues / rating | 25 / D | sq_software_quality_reliability_issues / sq_reliability_rating | 25 / 4.0 (D) |
+  | Maintainability open issues / rating | 203 / A | sq_software_quality_maintainability_issues / sq_sqale_rating | 203 / 1.0 (A) |
+  | Duplications | 1.9% on 13k lines | sq_duplicated_lines_density / sq_lines | 1.9 / 13280 |
+  | Security Hotspots | 0 | sq_security_hotspots | 0 |
+
+  No mismatches. The UI shows the newer `software_quality_*` issue counts
+  (203 maintainability issues), not the older `code_smells` (205), so when quoting
+  "issues" from the UI, use the `sq_software_quality_*` columns.
+- **Note on security.** The overview warns that Community Build does not scan for
+  injection vulnerabilities (SQL injection, XSS and similar). SonarQube's security
+  numbers are therefore a lower bound, which is one more reason not to compare them
+  directly with Bandit.

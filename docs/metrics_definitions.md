@@ -34,7 +34,12 @@ procedure, not as absolute judgements of a team's code.
 
 - One measurement is a repository at a specific commit (a "snapshot").
 - The Python file set is `git ls-files '*.py'` at that commit. Using tracked files
-  only keeps virtual environments, installed packages and other untracked files out.
+  only keeps untracked virtual environments and installed packages out.
+- A few teams committed a virtualenv or `node_modules` (W2023 teams 13 and 17,
+  W2024 team 12-003). Tracked files under `node_modules/`, `.venv/`, `venv/`,
+  `site-packages/`, `dist/`, `build/`, `target/` and `__pycache__/` are therefore
+  excluded too. This is the same list the SonarQube scan uses, so both tools
+  measure the same files. The number skipped is in `py_excluded_files`.
 - Repositories with no tracked Python files get NA for the Python metrics and
   `python_file_count = 0`.
 
@@ -119,6 +124,11 @@ tracked Python files of the repo instead of only the files touched by a patch.
   environment and import errors would otherwise dominate the score. All other
   settings stay at their defaults, and repo-level `.pylintrc` files are ignored so
   every repo is scored the same way.
+- **Fatal messages.** Pylint's default evaluation sets the score to 0 if any file
+  produces a fatal message, e.g. F0010 when it cannot parse a file. This happened in
+  one repo (W2025 team 6, one demo file saved as ISO-8859 instead of UTF-8). I keep
+  Pylint's own number in `py_pylint_score` and also store
+  `py_pylint_score_excl_fatal`, which re-runs Pylint without the fatal files.
 - **Limits.** The score mostly reflects style conventions, and a few noisy message
   types can dominate it. It is not calibrated across project sizes, and it cannot
   tell a deliberate style choice from a mistake.

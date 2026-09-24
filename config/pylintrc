@@ -1,0 +1,7 @@
+# Pylint settings for all repos: defaults, except the import checks that fail
+# because the projects' dependencies are not installed.
+[MESSAGES CONTROL]
+disable=import-error,
+        no-name-in-module,
+        wrong-import-position,
+        ungrouped-imports
