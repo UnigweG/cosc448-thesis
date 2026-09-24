@@ -34,7 +34,7 @@ pre-push hook that refuses to push.
 ## Running
 
     .venv/bin/python scripts/01_inventory.py          # all repos in the 3 orgs -> results/repo_inventory_all.csv
-    .venv/bin/python scripts/01_inventory.py --groups # print name-pattern groups from the saved inventory
+    .venv/bin/python scripts/01_inventory.py --groups # print name-pattern groups (add --examples for sample names)
     bash scripts/02_clone.sh                          # clone/fetch repos in config/repo_selection.txt
     .venv/bin/python scripts/02b_repo_stats.py        # commit stats -> results/repo_inventory.csv
     .venv/bin/python scripts/03_sonar_scan.py         # SonarQube scans -> results/sonar_scan_status.csv
