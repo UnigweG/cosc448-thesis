@@ -1,0 +1,69 @@
+cohort_year,org,repo,project_key,status,notes,head_sha
+2023,COSC-499-W2023,year-long-project-team-1,cosc448_2023_year-long-project-team-1,ok,,fa5080c7cb44f981330cb9afc022c70d95fd9de8
+2023,COSC-499-W2023,year-long-project-team-10,cosc448_2023_year-long-project-team-10,ok,,bc2628321b22f89af090876a25d7f978f8ec6f85
+2023,COSC-499-W2023,year-long-project-team-11,cosc448_2023_year-long-project-team-11,ok,,8348bac4c81b5562c61a1f3095e26dde1697744f
+2023,COSC-499-W2023,year-long-project-team-12,cosc448_2023_year-long-project-team-12,ok,,395810ffffcc26e2d77a676415086291e52bee81
+2023,COSC-499-W2023,year-long-project-team-13,cosc448_2023_year-long-project-team-13,ok,,a1c398906b52d8a461ae97b10ea496d53bfbdabd
+2023,COSC-499-W2023,year-long-project-team-14,cosc448_2023_year-long-project-team-14,ok,C# 95% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),cecc5dd43822cf28bcee1bda2ae37404d2fba6fe
+2023,COSC-499-W2023,year-long-project-team-15,cosc448_2023_year-long-project-team-15,ok,,ca01efde823b6353604921034c514d1bc63c17db
+2023,COSC-499-W2023,year-long-project-team-16,cosc448_2023_year-long-project-team-16,ok,,5729eb36e81c0c1031557dfd4b86419576d82098
+2023,COSC-499-W2023,year-long-project-team-17,cosc448_2023_year-long-project-team-17,ok,,ad836684ef505bc15705fccd550d590792efc5a3
+2023,COSC-499-W2023,year-long-project-team-18,cosc448_2023_year-long-project-team-18,ok,,82fa5c6b552b6a1d70fab749ca3338ae623c0645
+2023,COSC-499-W2023,year-long-project-team-19,cosc448_2023_year-long-project-team-19,ok,C# 95% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),4c988e18635735a086dbe390071caf77becc7835
+2023,COSC-499-W2023,year-long-project-team-2,cosc448_2023_year-long-project-team-2,ok,Dart 34% not supported by Community Edition,d5e74bfc090a638c2c8e0e8f34a3f8d03fa9fe81
+2023,COSC-499-W2023,year-long-project-team-20,cosc448_2023_year-long-project-team-20,ok,,834d931f804a0e387e2978bba43e4d3e22063d7d
+2023,COSC-499-W2023,year-long-project-team-21,cosc448_2023_year-long-project-team-21,ok,,a433a2dd933f1b1c5c9253e0af1d98594d8dd501
+2023,COSC-499-W2023,year-long-project-team-22,cosc448_2023_year-long-project-team-22,ok,,3c09911ad3ee94aafa7ddee91d807df2455ae5c5
+2023,COSC-499-W2023,year-long-project-team-3,cosc448_2023_year-long-project-team-3,ok,1 file(s) failed analysis (see log),90ef366da13bda98a11fdd7d7433ea8ff25d21e9
+2023,COSC-499-W2023,year-long-project-team-4,cosc448_2023_year-long-project-team-4,ok,,06ed5d07cb18c6a7870df78cfd07371b0af36152
+2023,COSC-499-W2023,year-long-project-team-5,cosc448_2023_year-long-project-team-5,ok,,b31d512b46c737d10ada0029f9eceb5bda29edc0
+2023,COSC-499-W2023,year-long-project-team-6,cosc448_2023_year-long-project-team-6,ok,,85acece8fa95bf7323a0480c02535b0149f672f3
+2023,COSC-499-W2023,year-long-project-team-7,cosc448_2023_year-long-project-team-7,ok,,ba7bbb2b8d1fbead2e70b2579f6dc66bb90798ba
+2023,COSC-499-W2023,year-long-project-team-8,cosc448_2023_year-long-project-team-8,ok,,b6e194eabf4dea90d67301853e21058674123da7
+2023,COSC-499-W2023,year-long-project-team-9,cosc448_2023_year-long-project-team-9,ok,,baa321ed6e2bf497cfb8edf1bec516a6e56577e4
+2024,COSC-499-W2024,Capstone-Team16-003,cosc448_2024_Capstone-Team16-003,ok,,c63f777511bafce82b3dee4c674b260cb410061b
+2024,COSC-499-W2024,capstone-project-best-looking-project-team-9-002,cosc448_2024_capstone-project-best-looking-project-team-9-002,ok,,d99dd187956fa1ec94945fd192e70220f42411e4
+2024,COSC-499-W2024,capstone-project-fellas2-002-team-1,cosc448_2024_capstone-project-fellas2-002-team-1,ok,,ab8aff93fd9c0928a11b9d2fdf39df391807beea
+2024,COSC-499-W2024,capstone-project-group-11-002,cosc448_2024_capstone-project-group-11-002,ok,,697003c9e56b3025b72b01b8c53bd8757b5b2b28
+2024,COSC-499-W2024,capstone-project-shingetsu-team-8-003,cosc448_2024_capstone-project-shingetsu-team-8-003,ok,,283fa94d7c991b012a87dfa2bf376d6525d262a9
+2024,COSC-499-W2024,capstone-project-team-04-003,cosc448_2024_capstone-project-team-04-003,ok,C# 64% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),1ed7bdf803087c69e47c85fd87758ab12f87bd05
+2024,COSC-499-W2024,capstone-project-team-1-003,cosc448_2024_capstone-project-team-1-003,ok,,7d0b0d9ec46756f02ef885dde3eb912ee9b2c81a
+2024,COSC-499-W2024,capstone-project-team-10-002,cosc448_2024_capstone-project-team-10-002,ok,C# 46% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),2bc77f83dcb30b2385603adc04148b16ceacd4df
+2024,COSC-499-W2024,capstone-project-team-11-003,cosc448_2024_capstone-project-team-11-003,ok,C# 41% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),e2728bc2f21fd6edf15b2e430229093600aed2aa
+2024,COSC-499-W2024,capstone-project-team-12-003,cosc448_2024_capstone-project-team-12-003,ok,,fa0ada75e118044031920d5ad872d647a91ecca3
+2024,COSC-499-W2024,capstone-project-team-13-youry-1-003,cosc448_2024_capstone-project-team-13-youry-1-003,ok,C# 38% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),c7574238609e910bdf27e20180bf3ab638f7c249
+2024,COSC-499-W2024,capstone-project-team-15-003-,cosc448_2024_capstone-project-team-15-003-,ok,C# 44% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),6d6a1de6456c3569636b98098b2d5a8a9277fe5b
+2024,COSC-499-W2024,capstone-project-team-2-002,cosc448_2024_capstone-project-team-2-002,ok,,9e62a1023c86501a6a233fc574337843779b1eef
+2024,COSC-499-W2024,capstone-project-team-2-003-1,cosc448_2024_capstone-project-team-2-003-1,ok,build/ not excluded (source code lives there),93dd67bd92ddd7b31112852adeb261c15879c116
+2024,COSC-499-W2024,capstone-project-team-3-002,cosc448_2024_capstone-project-team-3-002,ok,,28889e5e1af2bc84216a0fc8b4f770523079e2c5
+2024,COSC-499-W2024,capstone-project-team-3-003,cosc448_2024_capstone-project-team-3-003,ok,,df83f8ce13ae6a305a91c8380190744c1c863284
+2024,COSC-499-W2024,capstone-project-team-4-002,cosc448_2024_capstone-project-team-4-002,ok,,b20a5766e5245a0777eb615582015404dcc88eac
+2024,COSC-499-W2024,capstone-project-team-5-002,cosc448_2024_capstone-project-team-5-002,ok,,29e4b44d36bb0068990217dba39e2dbdee9508f7
+2024,COSC-499-W2024,capstone-project-team-5-003,cosc448_2024_capstone-project-team-5-003,ok,,6ee182a67e76e25c0066d7bccc8ba0638c7c57e3
+2024,COSC-499-W2024,capstone-project-team-6-003,cosc448_2024_capstone-project-team-6-003,ok,C# 55% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),390cfaf2f11707453467f54e18799a7cb21986f0
+2024,COSC-499-W2024,capstone-project-team-7-1,cosc448_2024_capstone-project-team-7-1,ok,,02b8f9ea1bd0c404572bc0e15293263589af9d6a
+2024,COSC-499-W2024,capstone-project-team-8-002,cosc448_2024_capstone-project-team-8-002,ok,,1f92ec9343cf3aa0591796167fdd9d5553962cbb
+2024,COSC-499-W2024,capstone-project-team-9-Order-Of-Aesthetics,cosc448_2024_capstone-project-team-9-Order-Of-Aesthetics,ok,,dfda5644aa460b7f0a9305672646497a7fdbf43a
+2024,COSC-499-W2024,capstone-project-team10-003,cosc448_2024_capstone-project-team10-003,ok,C# 35% not analysed (C# needs SonarScanner for .NET (not analysed by the CLI scanner)),a0c10bad782b894f7e07e04301be4196e871a2fc
+2024,COSC-499-W2024,capstone-project-team_6_section_002,cosc448_2024_capstone-project-team_6_section_002,ok,,a8599823a28f9bcb94fce002ecf5ee68d9c32612
+2024,COSC-499-W2024,capstone-project-team_7_003,cosc448_2024_capstone-project-team_7_003,ok,,d6696413fc6a28679e38e95fbac318a8dd55c816
+2025,COSC-499-W2025,capstone-project-team-1,cosc448_2025_capstone-project-team-1,ok,,c1f6d7fe510300cf2f24cff50a95367b9264c32f
+2025,COSC-499-W2025,capstone-project-team-10,cosc448_2025_capstone-project-team-10,ok,,a3cd949246d1bf1af382eab84e57acaac6123077
+2025,COSC-499-W2025,capstone-project-team-11,cosc448_2025_capstone-project-team-11,ok,,33b89cc9dab9d269e1b301a9c28c87efd5a494a4
+2025,COSC-499-W2025,capstone-project-team-12,cosc448_2025_capstone-project-team-12,ok,,a0e99146da7c199f324669a79bacb8d253fe6db5
+2025,COSC-499-W2025,capstone-project-team-13,cosc448_2025_capstone-project-team-13,ok,,13a169e0420d87f3841a7097a7cf441e45f99502
+2025,COSC-499-W2025,capstone-project-team-14,cosc448_2025_capstone-project-team-14,ok,,d69f6eced6beb074f97008befb69856bb5b508a2
+2025,COSC-499-W2025,capstone-project-team-15,cosc448_2025_capstone-project-team-15,ok,,228e5c564c1111c77669e2fa2fe89cf9c195ed72
+2025,COSC-499-W2025,capstone-project-team-16,cosc448_2025_capstone-project-team-16,ok,,9bddb299ba94f852d0b090b54494e1c778a36aa2
+2025,COSC-499-W2025,capstone-project-team-17-1,cosc448_2025_capstone-project-team-17-1,ok,,bb0aa42319bd05ff1aef6a9119b901c2b368f9e3
+2025,COSC-499-W2025,capstone-project-team-18,cosc448_2025_capstone-project-team-18,ok,,0e0c4f92cb3ae5dd95f59e3fdf1916e218e42547
+2025,COSC-499-W2025,capstone-project-team-19,cosc448_2025_capstone-project-team-19,ok,,c0ec5f88fac4de9a784ff86bdc95360c3a6a5b88
+2025,COSC-499-W2025,capstone-project-team-2,cosc448_2025_capstone-project-team-2,ok,,91400188e01713ae81b582d2506f39dc13371fb7
+2025,COSC-499-W2025,capstone-project-team-20,cosc448_2025_capstone-project-team-20,ok,,b61e3c34ed7e94a4e6a7bb2245ddb5593a162aa0
+2025,COSC-499-W2025,capstone-project-team-3,cosc448_2025_capstone-project-team-3,ok,,22b9f56662d5af71c4aba97c659de4cd080b16e1
+2025,COSC-499-W2025,capstone-project-team-4,cosc448_2025_capstone-project-team-4,ok,,775f414e0cf419e9bd076652758dcd1c192d364f
+2025,COSC-499-W2025,capstone-project-team-5,cosc448_2025_capstone-project-team-5,ok,,c17085e474f4b46f2eb6a5273e3eea1b1719b840
+2025,COSC-499-W2025,capstone-project-team-6,cosc448_2025_capstone-project-team-6,ok,,ab282000d68de5e15ff04179b69f358b5f9f60df
+2025,COSC-499-W2025,capstone-project-team-7,cosc448_2025_capstone-project-team-7,ok,,285ac72497e483e8bb508805fc4840e82e509410
+2025,COSC-499-W2025,capstone-project-team-8,cosc448_2025_capstone-project-team-8,ok,,32b9bbc7d76eec7d5a21b1d016f05a9ac262f5e5
+2025,COSC-499-W2025,capstone-project-team-9,cosc448_2025_capstone-project-team-9,ok,,5d47a8ffc8e90659e0fbceb637d9b2cb07a32de3
