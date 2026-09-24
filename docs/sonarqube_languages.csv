@@ -1,0 +1,28 @@
+language_key,language_name,rule_count
+azureresourcemanager,Azure Resource Manager,38
+cloudformation,CloudFormation,28
+cs,C#,456
+css,CSS,43
+docker,Docker,28
+flex,Flex,76
+go,Go,36
+ipynb,IPython Notebooks,444
+java,Java,768
+js,JavaScript,528
+json,JSON,0
+jsp,JSP,0
+kotlin,Kotlin,145
+kubernetes,Kubernetes,26
+php,PHP,245
+py,Python,444
+ruby,Ruby,42
+rust,Rust,85
+scala,Scala,41
+secrets,Secrets,30
+terraform,Terraform,54
+text,Text,3
+ts,TypeScript,546
+vbnet,VB.NET,197
+web,HTML,104
+xml,XML,39
+yaml,YAML,0

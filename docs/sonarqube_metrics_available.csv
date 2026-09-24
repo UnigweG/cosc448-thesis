@@ -1,0 +1,160 @@
+key,name,type,domain,description,hidden
+accepted_issues,Accepted Issues,INT,Issues,Accepted issues,False
+alert_status,Quality Gate Status,LEVEL,Releasability,The project status with regard to its quality gate.,False
+analysis_from_sonarqube_9_4,Analysis From SonarQube 9.4,BOOL,Issues,Indicates whether the analysis has been run after the upgrade to SonarQube 9.4. It affects how the issues will be detected for branches that use reference branch as the strategy for detecting new code.,True
+blocker_violations,Blocker Issues,INT,Issues,Blocker issues,False
+branch_coverage,Condition Coverage,PERCENT,Coverage,Condition coverage,False
+bugs,Bugs,INT,Reliability,Bugs,False
+classes,Classes,INT,Size,Classes,False
+code_smells,Code Smells,INT,Maintainability,Code Smells,False
+cognitive_complexity,Cognitive Complexity,INT,Complexity,Cognitive complexity,False
+comment_lines,Comment Lines,INT,Size,Number of comment lines,False
+comment_lines_data,comment_lines_data,DATA,Size,,True
+comment_lines_density,Comments (%),PERCENT,Size,Comments balanced by ncloc + comment lines,False
+complexity,Cyclomatic Complexity,INT,Complexity,Cyclomatic complexity,False
+conditions_to_cover,Conditions to Cover,INT,Coverage,Conditions to cover,False
+confirmed_issues,Confirmed Issues,INT,Issues,Confirmed issues,False
+coverage,Coverage,PERCENT,Coverage,Coverage by tests,False
+critical_violations,Critical Issues,INT,Issues,Critical issues,False
+development_cost,Development Cost,STRING,Maintainability,Development cost,True
+duplicated_blocks,Duplicated Blocks,INT,Duplications,Duplicated blocks,False
+duplicated_files,Duplicated Files,INT,Duplications,Duplicated files,False
+duplicated_lines,Duplicated Lines,INT,Duplications,Duplicated lines,False
+duplicated_lines_density,Duplicated Lines (%),PERCENT,Duplications,Duplicated lines balanced by statements,False
+duplications_data,Duplication Details,DATA,Duplications,Duplications details,False
+effort_to_reach_maintainability_rating_a,Effort to Reach Maintainability Rating A,WORK_DUR,Maintainability,Effort to reach maintainability rating A,False
+effort_to_reach_software_quality_maintainability_rating_a,Effort to Reach Maintainability Rating A,WORK_DUR,Maintainability,Effort to reach maintainability rating A,False
+executable_lines_data,executable_lines_data,DATA,Coverage,,True
+false_positive_issues,False Positive Issues,INT,Issues,False positive issues,False
+files,Files,INT,Size,Number of files,False
+functions,Functions,INT,Size,Functions,False
+generated_lines,Generated Lines,INT,Size,Number of generated lines,False
+generated_ncloc,Generated Lines of Code,INT,Size,Generated non Commenting Lines of Code,False
+high_impact_accepted_issues,Blocker and High Severity Accepted Issues,INT,Issues,Accepted issues with blocker or high impact,False
+info_violations,Info Issues,INT,Issues,Info issues,False
+issues_in_sandbox,Issues in Sandbox,INT,Issues,Count of issues that are in sandbox status.,True
+last_commit_date,Date of Last Commit,MILLISEC,SCM,,True
+line_coverage,Line Coverage,PERCENT,Coverage,Line coverage,False
+lines,Lines,INT,Size,Lines,False
+lines_to_cover,Lines to Cover,INT,Coverage,Lines to cover,False
+maintainability_issue_severity,Maintainability Issue Severity on Overall Code,INT,Maintainability,Worst severity of maintainability issues,False
+maintainability_issues,Maintainability Issues,DATA,Maintainability,Maintainability issues,False
+major_violations,Major Issues,INT,Issues,Major issues,False
+minor_violations,Minor Issues,INT,Issues,Minor issues,False
+ncloc,Lines of Code,INT,Size,Non commenting lines of code,False
+ncloc_data,ncloc_data,DATA,Size,,True
+ncloc_language_distribution,Lines of Code Per Language,DATA,Size,Non Commenting Lines of Code Distributed By Language,False
+new_accepted_issues,New Accepted Issues,INT,Issues,New accepted issues,False
+new_blocker_violations,New Blocker Issues,INT,Issues,New Blocker issues,False
+new_branch_coverage,Condition Coverage on New Code,PERCENT,Coverage,Condition coverage of new/changed code,False
+new_bugs,New Bugs,INT,Reliability,New Bugs,False
+new_bugs_severity,Bugs Severity on New Code,INT,Reliability,Worst severity of new bug issues,False
+new_code_smells,New Code Smells,INT,Maintainability,New Code Smells,False
+new_code_smells_severity,Code Smells Severity on New Code,INT,Maintainability,Worst severity of new code smell issues,False
+new_conditions_to_cover,Conditions to Cover on New Code,INT,Coverage,Conditions to cover on new code,False
+new_coverage,Coverage on New Code,PERCENT,Coverage,Coverage of new/changed code,False
+new_critical_violations,New Critical Issues,INT,Issues,New Critical issues,False
+new_development_cost,Development Cost on New Code,FLOAT,Maintainability,Development cost on new code,True
+new_duplicated_blocks,Duplicated Blocks on New Code,INT,Duplications,Duplicated blocks on new code,False
+new_duplicated_lines,Duplicated Lines on New Code,INT,Duplications,Duplicated Lines on New Code,False
+new_duplicated_lines_density,Duplicated Lines (%) on New Code,PERCENT,Duplications,Duplicated lines (%) on new code balanced by statements,False
+new_info_violations,New Info Issues,INT,Issues,New Info issues,False
+new_issues_in_sandbox,New Issues in Sandbox,INT,Issues,Count of new issues that are in sandbox status.,True
+new_line_coverage,Line Coverage on New Code,PERCENT,Coverage,Line coverage of added/changed code,False
+new_lines,New Lines,INT,Size,New lines,False
+new_lines_to_cover,Lines to Cover on New Code,INT,Coverage,Lines to cover on new code,False
+new_maintainability_issue_severity,Maintainability Issue Severity on New Code,INT,Maintainability,Worst severity of new maintainability issues,False
+new_maintainability_issues,New Maintainability Issues,DATA,Maintainability,New maintainability issues,False
+new_maintainability_rating,Maintainability Rating on New Code,RATING,Maintainability,Maintainability rating on new code,False
+new_major_violations,New Major Issues,INT,Issues,New Major issues,False
+new_minor_violations,New Minor Issues,INT,Issues,New Minor issues,False
+new_ncloc,New Lines of Code,INT,Size,Non commenting lines of code on new code,False
+new_reliability_issue_severity,Reliability Issue Severity on New Code,INT,Reliability,Worst severity of new reliability issues,False
+new_reliability_issues,New Reliability Issues,DATA,Reliability,New reliability issues,False
+new_reliability_rating,Reliability Rating on New Code,RATING,Reliability,Reliability rating on new code,False
+new_reliability_remediation_effort,Reliability Remediation Effort on New Code,WORK_DUR,Reliability,Reliability remediation effort on new code,False
+new_security_hotspots,New Security Hotspots,INT,SecurityReview,New Security Hotspots,False
+new_security_hotspots_reviewed,Security Hotspots Reviewed on New Code,PERCENT,SecurityReview,Percentage of Security Hotspots Reviewed on New Code,False
+new_security_hotspots_reviewed_status,Security Review Reviewed Status on New Code,INT,SecurityReview,Security Review Reviewed Status on New Code,True
+new_security_hotspots_to_review_status,Security Review To Review Status on New Code,INT,SecurityReview,Security Review To Review Status on New Code,True
+new_security_issue_severity,Security Issue Severity on New Code,INT,Security,Worst severity of new security issues,False
+new_security_issues,New Security Issues,DATA,Security,New security issues,False
+new_security_rating,Security Rating on New Code,RATING,Security,Security rating on new code,False
+new_security_remediation_effort,Security Remediation Effort on New Code,WORK_DUR,Security,Security remediation effort on new code,False
+new_security_review_rating,Security Review Rating on New Code,RATING,SecurityReview,Security Review Rating on New Code,False
+new_software_quality_blocker_issues,New Blocker Severity Issues,INT,Issues,New Blocker Severity issues,False
+new_software_quality_high_issues,New High Severity Issues,INT,Issues,New High Severity issues,False
+new_software_quality_info_issues,New Info Severity Issues,INT,Issues,New Info Severity issues,False
+new_software_quality_low_issues,New Low Severity Issues,INT,Issues,New Low Severity issues,False
+new_software_quality_maintainability_debt_ratio,Technical Debt Ratio on New Code,PERCENT,Maintainability,Technical Debt Ratio on New Code,False
+new_software_quality_maintainability_issues,New Maintainability Issues,INT,Maintainability,Number of open issues impacting the Maintainability software quality on new code,False
+new_software_quality_maintainability_rating,Maintainability Rating on New Code,RATING,Maintainability,Maintainability rating on new code,False
+new_software_quality_maintainability_remediation_effort,Added Technical Debt,WORK_DUR,Maintainability,Total effort (in minutes) to fix all the maintainability issues on new code on the component and therefore to comply to all the requirements.,False
+new_software_quality_medium_issues,New Medium Severity Issues,INT,Issues,New Medium Severity issues,False
+new_software_quality_reliability_issues,New Reliability Issues,INT,Reliability,Number of open issues impacting the Reliability software quality on new code,False
+new_software_quality_reliability_rating,Reliability Rating on New Code,RATING,Reliability,Reliability rating on new code,False
+new_software_quality_reliability_remediation_effort,Reliability Remediation Effort on New Code,WORK_DUR,Reliability,Reliability remediation effort on new code,False
+new_software_quality_security_issues,New Security Issues,INT,Security,Number of open issues impacting the Security software quality on new code,False
+new_software_quality_security_rating,Security Rating on New Code,RATING,Security,Security rating on new code,False
+new_software_quality_security_remediation_effort,Security Remediation Effort on New Code,WORK_DUR,Security,Security remediation effort on new code,False
+new_sqale_debt_ratio,Technical Debt Ratio on New Code,PERCENT,Maintainability,Technical Debt Ratio of new/changed code.,False
+new_technical_debt,Added Technical Debt,WORK_DUR,Maintainability,Added technical debt,False
+new_uncovered_conditions,Uncovered Conditions on New Code,INT,Coverage,Uncovered conditions on new code,False
+new_uncovered_lines,Uncovered Lines on New Code,INT,Coverage,Uncovered lines on new code,False
+new_violations,New Issues,INT,Issues,New issues,False
+new_vulnerabilities,New Vulnerabilities,INT,Security,New Vulnerabilities,False
+new_vulnerabilities_severity,Vulnerabilities Severity on New Code,INT,Security,Worst severity of new vulnerability issues,False
+open_issues,Open Issues,INT,Issues,Open issues,False
+prioritized_rule_issues,Issues from prioritized rules,INT,Issues,Count of issues that have a flag Prioritized Rule.,False
+projects,Project branches,INT,Size,Number of project branches,False
+public_api,Public API,INT,Documentation,Public API,True
+public_documented_api_density,Public Documented API (%),PERCENT,Documentation,Public documented classes and functions balanced by ncloc,True
+public_undocumented_api,Public Undocumented API,INT,Documentation,"Public undocumented classes, functions and variables",True
+pull_request_fixed_issues,Pull request fixed issues,INT,Issues,Count of issues that would be fixed by the pull request.,True
+quality_gate_details,Quality Gate Details,DATA,General,The project detailed status with regard to its quality gate,False
+quality_profiles,Profiles,DATA,General,Details of quality profiles used during analysis,True
+reliability_issue_severity,Reliability Issue Severity on Overall Code,INT,Reliability,Worst severity of reliability issues,False
+reliability_issues,Reliability Issues,DATA,Reliability,Reliability issues,False
+reliability_rating,Reliability Rating,RATING,Reliability,Reliability rating,False
+reliability_remediation_effort,Reliability Remediation Effort,WORK_DUR,Reliability,Reliability Remediation Effort,False
+reopened_issues,Reopened Issues,INT,Issues,Reopened issues,False
+security_hotspots,Security Hotspots,INT,SecurityReview,Security Hotspots,False
+security_hotspots_reviewed,Security Hotspots Reviewed,PERCENT,SecurityReview,Percentage of Security Hotspots Reviewed,False
+security_hotspots_reviewed_status,Security Review Reviewed Status,INT,SecurityReview,Security Review Reviewed Status,True
+security_hotspots_to_review_status,Security Review To Review Status,INT,SecurityReview,Security Review To Review Status,True
+security_issue_severity,Security Issue Severity on Overall Code,INT,Security,Worst severity of security issues,False
+security_issues,Security Issues,DATA,Security,Security issues,False
+security_rating,Security Rating,RATING,Security,Security rating,False
+security_remediation_effort,Security Remediation Effort,WORK_DUR,Security,Security remediation effort,False
+security_review_rating,Security Review Rating,RATING,SecurityReview,Security Review Rating,False
+skipped_tests,Skipped Unit Tests,INT,Coverage,Number of skipped unit tests,False
+software_quality_blocker_issues,Blocker Severity Issues,INT,Issues,Blocker Severity issues,False
+software_quality_high_issues,High Severity Issues,INT,Issues,High Severity issues,False
+software_quality_info_issues,Info Severity Issues,INT,Issues,Info Severity issues,False
+software_quality_low_issues,Low Severity Issues,INT,Issues,Low Severity issues,False
+software_quality_maintainability_debt_ratio,Technical Debt Ratio,PERCENT,Maintainability,Ratio of the actual technical debt compared to the estimated cost to develop the whole source code from scratch,False
+software_quality_maintainability_issues,Maintainability Issues,INT,Maintainability,Number of open issues impacting the Maintainability software quality,False
+software_quality_maintainability_rating,Maintainability Rating,RATING,Maintainability,Maintainability rating,False
+software_quality_maintainability_remediation_effort,Technical Debt,WORK_DUR,Maintainability,Total effort (in minutes) to fix all the maintainability issues on the component and therefore to comply to all the requirements.,False
+software_quality_medium_issues,Medium Severity Issues,INT,Issues,Medium Severity issues,False
+software_quality_reliability_issues,Reliability Issues,INT,Reliability,Number of open issues impacting the Reliability software quality,False
+software_quality_reliability_rating,Reliability Rating,RATING,Reliability,Reliability rating,False
+software_quality_reliability_remediation_effort,Reliability Remediation Effort,WORK_DUR,Reliability,Reliability remediation effort,False
+software_quality_security_issues,Security Issues,INT,Security,Number of open issues impacting the Security software quality,False
+software_quality_security_rating,Security Rating,RATING,Security,Security rating,False
+software_quality_security_remediation_effort,Security Remediation Effort,WORK_DUR,Security,Security remediation effort,False
+sqale_debt_ratio,Technical Debt Ratio,PERCENT,Maintainability,Ratio of the actual technical debt compared to the estimated cost to develop the whole source code from scratch,False
+sqale_index,Technical Debt,WORK_DUR,Maintainability,Total effort (in minutes) to fix all the issues on the component and therefore to comply to all the requirements.,False
+sqale_rating,Maintainability Rating,RATING,Maintainability,A-to-E rating based on the technical debt ratio,False
+statements,Statements,INT,Size,Number of statements,False
+test_errors,Unit Test Errors,INT,Coverage,Number of unit test errors,False
+test_execution_time,Unit Test Duration,MILLISEC,Coverage,Execution duration of unit tests,False
+test_failures,Unit Test Failures,INT,Coverage,Number of unit test failures,False
+test_success_density,Unit Test Success (%),PERCENT,Coverage,Density of successful unit tests,False
+tests,Unit Tests,INT,Coverage,Number of unit tests,False
+unanalyzed_c,Number of unanalyzed c files,INT,Size,,True
+unanalyzed_cpp,Number of unanalyzed c++ files,INT,Size,,True
+uncovered_conditions,Uncovered Conditions,INT,Coverage,Uncovered conditions,False
+uncovered_lines,Uncovered Lines,INT,Coverage,Uncovered lines,False
+violations,Issues,INT,Issues,Issues,False
+vulnerabilities,Vulnerabilities,INT,Security,Vulnerabilities,False
