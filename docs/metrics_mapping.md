@@ -158,12 +158,18 @@ languages) = 12.2. The three are not interchangeable.
 | CCavg | `py_cc_avg` | Radon |
 | CCmax | `py_cc_max` | Radon |
 | MI | `py_mi_avg` | Radon |
-| Pylint score | `py_pylint_score` (see `py_pylint_score_excl_fatal` for repos where a fatal parse error forces 0) | Pylint |
-| SLOC | `py_sloc` (`sq_py_ncloc` agrees to within about 1%) | Radon |
+| Pylint score | `py_pylint_score` (see note below) | Pylint |
+| SLOC | `py_sloc` (`sq_py_ncloc` agrees within 1% in 41 of 48 repos, within 2% in 44, range 0.972-1.055) | Radon |
 | Comment % | `py_comment_pct` (PDF definition, `#` comments only) | Radon |
 | Bandit high/medium/low | `py_bandit_high/medium/low` | Bandit |
 | Whole-repo size, all languages | `sq_ncloc`, `sq_ncloc_language_distribution` | SonarQube |
 | SonarQube quality context | `sq_bugs`, `sq_vulnerabilities`, `sq_code_smells`, `sq_security_hotspots`, ratings, `sq_software_quality_*` | SonarQube |
+
+**Pylint note.** The headline column is `py_pylint_score`, Pylint's own score as the
+PDF defines it. One repo is affected by Pylint's fatal-message rule: W2025 team 6 gets
+0.0 because one file cannot be parsed, and 8.37 in `py_pylint_score_excl_fatal`
+without that file. This lowers the W2025 cohort mean from 7.63 to 7.21 (by 0.42,
+over 20 repos). I report the headline column and give both numbers for this repo.
 
 The PDF metrics are only defined for Python, so they are NA for the 20 repos without
 tracked Python. For those repos, only the SonarQube columns are available. For C#

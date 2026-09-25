@@ -19,12 +19,12 @@ clone them, and produce one metrics table per repo snapshot.
 
 ## Setup
 
-Needs git, gh (logged in with read access to the three orgs), jq, sonar-scanner and a
+Needs git, gh (logged in with read access to the three orgs), sonar-scanner and a
 SonarQube server on localhost:9000.
 
     python3 -m venv .venv
     .venv/bin/pip install -r requirements.txt
-    cp .env.example .env     # then fill in SONAR_TOKEN (a SonarQube user token)
+    cp .env.example .env     # then fill in SONAR_TOKEN (a SonarQube user token, not a global analysis token)
 
 The scripts read .env themselves, so there is no need to export the token.
 
@@ -46,7 +46,18 @@ pre-push hook that refuses to push.
 `03_sonar_scan.py` and `05_custom_metrics.py` also take `--only <repo>` to redo one repo.
 
 Each script can be re-run; clones are fetched instead of re-cloned and SonarQube
-projects are re-analysed in place.
+projects are re-analysed in place. A fetch does not move a clone's checked-out HEAD, so
+a re-run measures the same snapshot as the first clone. To measure a different commit,
+check it out in `data/repos/<year>/<repo>` first.
+
+What each step needs from earlier steps:
+
+- `02b_repo_stats.py` reads `results/repo_inventory_all.csv` (git-ignored, from 01) and
+  the clones. `results/results.csv` therefore can't be rebuilt from the committed files
+  alone.
+- `04_sonar_export.py` reads from the SonarQube server, so the analyses from 03 must
+  still be on it.
+- `06_build_results.py` reads the four result CSVs and the clones (for snapshot dates).
 
 ## Notes
 

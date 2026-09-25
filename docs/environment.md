@@ -22,7 +22,12 @@ needed.
 
 SonarQube notes:
 - The server requires authentication for every API call. The scripts use a user token
-  from `.env` (basic auth, token as username, empty password).
+  from `.env` (basic auth, token as username, empty password). It must be a user token:
+  a global analysis token (`sqa_...`) can run scans but gets 403 on
+  `/api/ce/activity`, which `03_sonar_scan.py` needs to check each scan.
+- The server keeps every analysis in its own data directory. If it runs in Docker,
+  use named volumes (or back them up); anonymous volumes are deleted with the
+  container, and `04_sonar_export.py` can only export what the server still holds.
 - The UI shows a warning that the embedded database is for evaluation only. That is
   fine for this project but it means the server can't be upgraded in place.
 - The Community Build does not scan for injection vulnerabilities (SQL injection, XSS,
@@ -43,60 +48,33 @@ Swift, Dart, PL/SQL) are not analysed.
 
 | Key | Language | Rules |
 |---|---|---|
-| azureresourcemanager | Azure Resource Manager | 38
- |
-| cloudformation | CloudFormation | 28
- |
-| cs | C# | 456
- |
-| css | CSS | 43
- |
-| docker | Docker | 28
- |
-| flex | Flex | 76
- |
-| go | Go | 36
- |
-| ipynb | IPython Notebooks | 444
- |
-| java | Java | 768
- |
-| js | JavaScript | 528
- |
-| json | JSON | 0
- |
-| jsp | JSP | 0
- |
-| kotlin | Kotlin | 145
- |
-| kubernetes | Kubernetes | 26
- |
-| php | PHP | 245
- |
-| py | Python | 444
- |
-| ruby | Ruby | 42
- |
-| rust | Rust | 85
- |
-| scala | Scala | 41
- |
-| secrets | Secrets | 30
- |
-| terraform | Terraform | 54
- |
-| text | Text | 3
- |
-| ts | TypeScript | 546
- |
-| vbnet | VB.NET | 197
- |
-| web | HTML | 104
- |
-| xml | XML | 39
- |
-| yaml | YAML | 0
- |
+| azureresourcemanager | Azure Resource Manager | 38 |
+| cloudformation | CloudFormation | 28 |
+| cs | C# | 456 |
+| css | CSS | 43 |
+| docker | Docker | 28 |
+| flex | Flex | 76 |
+| go | Go | 36 |
+| ipynb | IPython Notebooks | 444 |
+| java | Java | 768 |
+| js | JavaScript | 528 |
+| json | JSON | 0 |
+| jsp | JSP | 0 |
+| kotlin | Kotlin | 145 |
+| kubernetes | Kubernetes | 26 |
+| php | PHP | 245 |
+| py | Python | 444 |
+| ruby | Ruby | 42 |
+| rust | Rust | 85 |
+| scala | Scala | 41 |
+| secrets | Secrets | 30 |
+| terraform | Terraform | 54 |
+| text | Text | 3 |
+| ts | TypeScript | 546 |
+| vbnet | VB.NET | 197 |
+| web | HTML | 104 |
+| xml | XML | 39 |
+| yaml | YAML | 0 |
 
 ## Metric keys
 

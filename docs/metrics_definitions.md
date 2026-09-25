@@ -39,9 +39,17 @@ procedure, not as absolute judgements of a team's code.
   W2024 team 12-003). Tracked files under `node_modules/`, `.venv/`, `venv/`,
   `site-packages/`, `dist/`, `build/`, `target/` and `__pycache__/` are therefore
   excluded too. This is the same list the SonarQube scan uses, so both tools
-  measure the same files. The number skipped is in `py_excluded_files`.
+  measure the same files. The one difference: the scan keeps `build/` for
+  capstone-project-team-2-003-1, which kept its source there; that repo has no Python. The number skipped is in `py_excluded_files`.
 - Repositories with no tracked Python files get NA for the Python metrics and
   `python_file_count = 0`.
+- Jupyter notebooks (`.ipynb`) are not part of the file set, so notebook code is
+  outside every `py_*` metric. In most repos this is minor, but in W2024 team 1-003
+  SonarQube counts 2,183 lines of notebook code against 1,333 lines of `.py` code.
+- The repo inventory's `commit_count` and `first_commit_date` include the starter
+  template's history. Every W2024 repo reports a first commit of
+  2024-09-05T18:56:49Z and every W2025 repo 2025-08-26T22:28:55Z, which is the
+  template, not the team's first commit.
 
 ## Aggregation rules (repo level)
 
@@ -74,24 +82,32 @@ tracked Python files of the repo instead of only the files touched by a patch.
   D (21-30), E (31-40), F (41+).
 - **Tool.** Radon 6.0.1 (`radon cc`), default settings.
 - **Aggregation.** Pooled blocks across all files (see above). Radon's default output
-  lists functions, methods and classes. Nested functions (closures) are folded into
-  their parent function and not listed separately. This matches the PDF's "functions,
-  methods, or classes".
+  lists top-level functions, classes and their methods, which matches the PDF's
+  "functions, methods, or classes". Radon drops nested blocks entirely: a closure
+  (a function defined inside another function), a class nested in a class, and a
+  class defined inside a function do not appear in the list, and their complexity is
+  not added to the enclosing block either. For example, a function with CC 2 that
+  contains a closure with CC 3 contributes one block with CC 2.
 - **Limits.** A class block in Radon is derived from its methods' complexity, so
   including classes counts those methods twice in the pooled list. I keep it because
   the PDF lists classes as blocks. CC counts paths, not how hard the code is to read.
   A flat 30-case dispatch scores high but is easy to follow. CC also ignores naming,
-  nesting depth and data complexity.
+  nesting depth and data complexity. Radon counts each `assert` as a decision point,
+  so test functions with many asserts score higher than their logic suggests.
 
 ### Maintainability index (MI)
 
 - **What it measures.** Oman and Hagemeister (1992) proposed MI as a single score
   for how easy code is to maintain. It combines size, complexity and comment density.
 - **Formula (Radon's variant).**
-  MI = max(0, 100 * (171 - 5.2 ln V - 0.23 G - 16.2 ln L + 50 sin(sqrt(2.4 C))) / 171),
-  where V is Halstead volume, G is total cyclomatic complexity, L is SLOC and C is the
-  percentage of comment lines. Radon counts multi-line strings (docstrings) as
-  comments by default, and I keep that default.
+  MI = min(100, max(0, 100 * (171 - 5.2 ln V - 0.23 G - 16.2 ln L
+  + 50 sin(sqrt(2.46 * radians(C)))) / 171)),
+  where V is Halstead volume, G is total cyclomatic complexity, L is LLOC (logical
+  lines, not SLOC) and C is the comment percentage,
+  C = (comment lines + multi-line string lines) / SLOC * 100. Radon passes C through
+  `radians()` as if it were an angle in degrees. Radon counts multi-line strings (docstrings)
+  as comments by default, and I keep that default. A file with zero SLOC or zero
+  Halstead volume gets 100.
 - **How to read it.** Higher is better, on a 0-100 scale. Radon ranks A (> 19),
   B (10-19) and C (<= 9).
 - **Tool.** Radon 6.0.1 (`radon mi`), default settings.
@@ -99,7 +115,10 @@ tracked Python files of the repo instead of only the files touched by a patch.
   same regardless of size.
 - **Limits.** The coefficients were fitted on 1990s industrial C and Pascal systems.
   Short files score near 100 whatever their quality. The mean over files lets many
-  tiny files (for example empty `__init__.py`) push the repo score up.
+  tiny files (for example empty `__init__.py`) push the repo score up. The effect is
+  large in a few repos: in W2023 team 7 the repo MI is 90.9, but the mean over files
+  with at least 10 logical lines is 64.4 (W2023 team 11: 90.9 vs 66.5). Across the
+  48 Python repos the median difference is 4.1 points.
 
 ### Pylint score
 
@@ -175,8 +194,11 @@ tracked Python files of the repo instead of only the files touched by a patch.
 - **Aggregation.** Summed over all Python files.
 - **Limits.** Detection is rule-based pattern matching. It misses logic flaws and
   cross-file data flow, and it reports false positives (`assert` in test files is a
-  very common low finding). Bandit's severity levels are its own and do not
-  correspond to SonarQube's severities.
+  very common low finding: B101 accounts for 29,830 of the 31,835 low findings, 94%,
+  across the 48 Python repos). Bandit's severity levels are its own and do not
+  correspond to SonarQube's severities. Bandit honours `# nosec` comments and
+  SonarQube honours `NOSONAR`, so a team can suppress findings; I do not record how
+  many suppressions each repo has.
 
 ### Functional correctness
 

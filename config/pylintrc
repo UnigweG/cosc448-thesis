@@ -1,5 +1,7 @@
-# Pylint settings for all repos: defaults, except the import checks that fail
-# because the projects' dependencies are not installed.
+# Pylint settings for all repos: defaults, except the four import checks that the
+# supervisor's metrics document (docs/references/Metrics.pdf) disables. import-error and
+# no-name-in-module fire because the projects' dependencies are not installed; the two
+# import-order checks are disabled only to match the document.
 [MESSAGES CONTROL]
 disable=import-error,
         no-name-in-module,
