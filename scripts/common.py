@@ -1,5 +1,6 @@
-"""Shared helpers: project paths, .env loading and a SonarQube API session."""
+"""Shared helpers: project paths, .env loading, git and a SonarQube API session."""
 import os
+import subprocess
 from pathlib import Path
 
 import pandas as pd
@@ -67,6 +68,19 @@ def read_selection():
 
 def repo_dir(year, repo):
     return DATA / str(year) / repo
+
+
+def git(path, *args):
+    return subprocess.run(["git", "-C", str(path), *args], check=True,
+                          capture_output=True, text=True).stdout.strip()
+
+
+def select(items, only):
+    """Items matching --only (repo name or org/repo); stop if there are none."""
+    items = [i for i in items if only in (i[1], f"{i[0]}/{i[1]}")]
+    if not items:
+        raise SystemExit(f"{only} is not in config/repo_selection.txt")
+    return items
 
 
 # metric columns that can hold fractions; every other sq_/py_ metric is a count or a rating

@@ -6,19 +6,15 @@ are replaced, and rows for repos no longer in config/repo_selection.txt are drop
 A repo can therefore have several rows, so repo-level averages must pick one snapshot
 per repo.
 """
-import subprocess
-
 import pandas as pd
 
-from common import RESULTS, counts_as_int, read_selection, repo_dir
+from common import RESULTS, counts_as_int, git, read_selection, repo_dir
 
 KEY = ["cohort_year", "org", "repo", "commit_sha"]
 
 
 def commit_date(year, repo, sha):
-    return subprocess.run(["git", "-C", str(repo_dir(year, repo)), "show", "-s",
-                           "--format=%cI", sha], check=True, capture_output=True,
-                          text=True).stdout.strip()
+    return git(repo_dir(year, repo), "show", "-s", "--format=%cI", sha)
 
 
 def ratio(num, den, scale=100):

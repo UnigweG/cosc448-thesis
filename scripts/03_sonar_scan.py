@@ -14,9 +14,10 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import pandas as pd
 import requests
 
-from common import (LOGS, RESULTS, load_env, project_key, read_selection, repo_dir,
+from common import (LOGS, RESULTS, git, project_key, read_selection, repo_dir, select,
                     sonar_get, sonar_session)
 
 # site-packages catches virtualenvs committed under other names (e.g. myenv/Lib/site-packages)
@@ -40,14 +41,8 @@ STATUS_FIELDS = ["cohort_year", "org", "repo", "project_key", "status", "notes",
 KEEP_BUILD = {"capstone-project-team-2-003-1"}
 
 
-def head_sha(path):
-    return subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], check=True,
-                          capture_output=True, text=True).stdout.strip()
-
-
 def language_flags(org, repo):
     """Note languages (>= 5% of the repo's bytes) this setup cannot analyse."""
-    import pandas as pd
     inv = pd.read_csv(RESULTS / "repo_inventory.csv")
     row = inv[(inv.org == org) & (inv.repo == repo)]
     if row.empty or pd.isna(row.iloc[0].language_bytes):
@@ -90,7 +85,7 @@ def scan(item):
     key = project_key(year, repo)
     log_file = LOG_DIR / f"{key}.log"
     notes = language_flags(org, repo)
-    sha = head_sha(path)
+    sha = git(path, "rev-parse", "HEAD")
     exclusions = EXCLUSIONS
     if repo in KEEP_BUILD:
         exclusions = ",".join(p for p in EXCLUSIONS.split(",") if p != "**/build/**")
@@ -104,11 +99,12 @@ def scan(item):
                              exclusions)
             notes.append("retried with sonar.java.binaries=.")
     status = "ok" if rc == 0 else "failed"
-    failed_files = log_file.read_text(errors="replace").count("Failed to analyze file")
+    text = log_file.read_text(errors="replace")
+    failed_files = text.count("Failed to analyze file")
     if failed_files:
         notes.append(f"{failed_files} file(s) failed analysis (see log)")
     if rc != 0:
-        err = [l for l in log_file.read_text(errors="replace").splitlines() if "ERROR" in l]
+        err = [l for l in text.splitlines() if "ERROR" in l]
         notes.append("error: " + (err[0][:200] if err else f"exit {rc}"))
     print(f"{status:6} {key} ({time.time() - started:.0f}s)", flush=True)
     return {"cohort_year": year, "org": org, "repo": repo, "project_key": key,
@@ -186,15 +182,12 @@ def main():
     ap.add_argument("--parallel", type=int, default=3)
     args = ap.parse_args()
 
-    load_env()
-    session = sonar_session()
+    session = sonar_session()  # also loads .env, which run_scanner needs
     LOG_DIR.mkdir(parents=True, exist_ok=True)
     EMPTY_SETTINGS.write_text("")
     items = read_selection()
     if args.only:
-        items = [i for i in items if args.only in (i[1], f"{i[0]}/{i[1]}")]
-        if not items:
-            raise SystemExit(f"{args.only} is not in config/repo_selection.txt")
+        items = select(items, args.only)
 
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         results = list(pool.map(scan, items))

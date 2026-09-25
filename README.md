@@ -12,9 +12,10 @@ clone them, and produce one metrics table per repo snapshot.
 
     config/            repo_selection.txt (the repos used in every later step)
     scripts/           pipeline scripts, numbered in run order
+    tests/             pytest suite (fixture repos, mocked SonarQube)
     data/repos/<year>/ full clones (git-ignored)
     results/           CSV outputs
-    docs/              metric definitions, SonarQube mapping, environment notes
+    docs/              metric definitions, SonarQube mapping (.md and .csv), environment notes
     logs/              clone and scan logs (git-ignored)
 
 ## Setup
@@ -47,7 +48,8 @@ pre-push hook that refuses to push.
     .venv/bin/python scripts/05_custom_metrics.py     # radon/pylint/bandit -> results/custom_metrics.csv
     .venv/bin/python scripts/06_build_results.py      # merged table -> results/results.csv
 
-`03_sonar_scan.py` and `05_custom_metrics.py` also take `--only <repo>` to redo one repo.
+`03_sonar_scan.py` and `05_custom_metrics.py` also take `--only <repo>` (or
+`--only <org>/<repo>`) to redo one repo.
 
 Each script can be re-run; clones are fetched instead of re-cloned and SonarQube
 projects are re-analysed in place. A fetch does not move a clone's checked-out HEAD, so

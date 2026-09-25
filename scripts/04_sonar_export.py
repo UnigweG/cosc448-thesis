@@ -1,4 +1,4 @@
-"""Export SonarQube measures for every cosc448_ project to results/sonarqube_metrics.csv."""
+"""Export SonarQube measures for every selected repo to results/sonarqube_metrics.csv."""
 import csv
 
 import pandas as pd

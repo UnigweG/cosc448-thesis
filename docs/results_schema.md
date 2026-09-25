@@ -29,7 +29,7 @@ measures cover **all analysed languages** unless the name says `sq_py_`.
 
 | Column | SonarQube key / formula | Notes |
 |---|---|---|
-| sq_scan_status, sq_scan_notes | from `sonar_scan_status.csv` | `ok` or `failed`, plus language warnings |
+| sq_scan_status, sq_scan_notes | from `sonar_scan_status.csv` | `ok`, `failed`, or `pending` (server queue timed out, task not checked), plus language warnings |
 | sq_analysis_date | `/api/project_analyses/search` | when the analysis ran (not the commit date) |
 | sq_ncloc, sq_lines, sq_statements, sq_functions, sq_classes, sq_files | same keys | size |
 | sq_comment_lines | `comment_lines` | |

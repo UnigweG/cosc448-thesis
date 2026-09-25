@@ -4,16 +4,10 @@ Writes results/repo_inventory.csv and prints the language mix.
 """
 import json
 import re
-import subprocess
 
 import pandas as pd
 
-from common import RESULTS, read_selection, repo_dir
-
-
-def git(path, *args):
-    return subprocess.run(["git", "-C", str(path), *args], check=True,
-                          capture_output=True, text=True).stdout.strip()
+from common import RESULTS, git, read_selection, repo_dir
 
 
 def section_of(repo, description):
