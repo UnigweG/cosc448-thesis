@@ -2,6 +2,7 @@
 import os
 from pathlib import Path
 
+import pandas as pd
 import requests
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -66,3 +67,21 @@ def read_selection():
 
 def repo_dir(year, repo):
     return DATA / str(year) / repo
+
+
+# metric columns that can hold fractions; every other sq_/py_ metric is a count or a rating
+FRACTIONAL = ("_density", "_ratio", "_avg", "_pct", "_pct_pdf", "_per_function",
+              "_per_kloc", "_score", "_score_excl_fatal")
+
+
+def counts_as_int(df):
+    """Write counts and ratings as 7298 rather than 7298.0 (pandas turns an integer
+    column with any NA into floats). Columns with non-numeric or fractional values
+    are left as they are."""
+    for c in df.columns:
+        if not (c.startswith(("sq_", "py_")) or c == "python_file_count") or c.endswith(FRACTIONAL):
+            continue
+        v = pd.to_numeric(df[c], errors="coerce")
+        if v.notna().sum() == df[c].notna().sum() and (v.dropna() % 1 == 0).all():
+            df[c] = v.astype("Int64")
+    return df

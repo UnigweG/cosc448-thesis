@@ -16,7 +16,7 @@ def main():
         page += 1
     metrics.sort(key=lambda m: m["key"])
     with open(DOCS / "sonarqube_metrics_available.csv", "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["key", "name", "type", "domain", "description", "hidden"])
         for m in metrics:
             w.writerow([m["key"], m.get("name", ""), m.get("type", ""), m.get("domain", ""),
@@ -25,7 +25,7 @@ def main():
 
     langs = sonar_get(s, "/api/languages/list")["languages"]
     with open(DOCS / "sonarqube_languages.csv", "w", newline="") as f:
-        w = csv.writer(f)
+        w = csv.writer(f, lineterminator="\n")
         w.writerow(["language_key", "language_name", "rule_count"])
         for lang in sorted(langs, key=lambda x: x["key"]):
             total = sonar_get(s, "/api/rules/search", languages=lang["key"], ps=1)["total"]

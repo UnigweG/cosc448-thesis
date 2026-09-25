@@ -23,12 +23,13 @@ from radon.complexity import cc_visit
 from radon.metrics import mi_visit
 from radon.raw import analyze
 
-from common import ROOT, RESULTS, read_selection, repo_dir
+from common import RESULTS, ROOT, counts_as_int, read_selection, repo_dir
 
 BIN = Path(sys.executable).parent
 PYLINTRC = ROOT / "config" / "pylintrc"
 PYLINT_TIMEOUT = 600
-# same exclusions as the SonarQube scan, so both tools see the same files
+# same exclusions as the SonarQube scan, so both tools see the same files. 03 keeps
+# build/ for one repo (KEEP_BUILD); that repo has no Python, so it is not mirrored here.
 EXCLUDE = ["*/node_modules/*", "*/.venv/*", "*/venv/*", "*/dist/*", "*/build/*",
            "*/target/*", "*/__pycache__/*", "*/site-packages/*"]
 
@@ -169,7 +170,7 @@ def main():
     if args.only and out.exists():
         old = pd.read_csv(out)
         df = pd.concat([old[old.repo != args.only], df]).sort_values(["cohort_year", "repo"])
-    df.to_csv(out, index=False)
+    counts_as_int(df).to_csv(out, index=False)
     print(f"wrote results/custom_metrics.csv ({len(df)} rows)")
 
 

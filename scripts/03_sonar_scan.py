@@ -21,10 +21,6 @@ from common import (LOGS, RESULTS, load_env, project_key, read_selection, repo_d
 EXCLUSIONS = ("**/node_modules/**,**/.venv/**,**/venv/**,**/dist/**,**/build/**,"
               "**/target/**,**/*.min.js,**/__pycache__/**,**/site-packages/**")
 
-# Community Edition language keys, from docs/sonarqube_languages.csv
-SUPPORTED = {"Python", "JavaScript", "TypeScript", "HTML", "CSS", "Java", "Jupyter Notebook",
-             "PHP", "Go", "Kotlin", "Ruby", "Scala", "Rust", "Dockerfile", "XML", "Vue",
-             "SCSS", "Shell", "EJS"}
 NEEDS_OTHER_SCANNER = {"C#": "C# needs SonarScanner for .NET (not analysed by the CLI scanner)",
                        "VB.NET": "VB.NET needs SonarScanner for .NET"}
 NOT_IN_EDITION = {"C", "C++", "Objective-C", "Objective-C++", "Swift", "Dart", "PLpgSQL",
@@ -174,7 +170,7 @@ def main():
         old[r["project_key"]] = r
     fields = ["cohort_year", "org", "repo", "project_key", "status", "notes", "head_sha"]
     with open(out, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields)
+        w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
         w.writeheader()
         w.writerows(sorted(old.values(), key=lambda r: (str(r["cohort_year"]), r["repo"])))
     ok = sum(r["status"] == "ok" for r in results)

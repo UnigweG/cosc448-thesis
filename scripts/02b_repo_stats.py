@@ -40,15 +40,19 @@ def main():
         desc = meta.pop("description", "")
         desc = "" if pd.isna(desc) else desc
         path = repo_dir(year, repo)
-        dates = git(path, "log", "--format=%cI", "HEAD").splitlines()
+        # compare epoch seconds: the ISO strings carry different UTC offsets, so string
+        # order is not time order. The chosen commits keep their original ISO dates.
+        commits = [line.split(" ", 1) for line in
+                   git(path, "log", "--format=%ct %cI", "HEAD").splitlines()]
+        dates = sorted((int(ts), iso) for ts, iso in commits)
         section = section_of(repo, desc)
         num = team_number(repo, desc)
         meta.update({
             "section": section,
             "team_key": f"{year}-t{num}" + (f"-{section}" if section else "") if num else "",
             "commit_count": len(dates),
-            "first_commit_date": min(dates),
-            "last_commit_date": max(dates),
+            "first_commit_date": dates[0][1],
+            "last_commit_date": dates[-1][1],
             "head_sha": git(path, "rev-parse", "HEAD"),
             "tracked_file_count": len(git(path, "ls-files").splitlines()),
         })

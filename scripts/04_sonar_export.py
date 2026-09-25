@@ -3,7 +3,8 @@ import csv
 
 import pandas as pd
 
-from common import DOCS, RESULTS, project_key, read_selection, sonar_get, sonar_session
+from common import (DOCS, RESULTS, counts_as_int, project_key, read_selection, sonar_get,
+                    sonar_session)
 
 # keys marked usable in docs/metrics_mapping.md, plus ncloc and comment_lines for the
 # derived PDF comment %
@@ -107,7 +108,7 @@ def main():
     df = pd.DataFrame(rows)
     for c in [c for c in df.columns if c.startswith("sq_issues_")]:
         df[c] = df[c].fillna(0).astype(int)
-    df.to_csv(RESULTS / "sonarqube_metrics.csv", index=False)
+    counts_as_int(df).to_csv(RESULTS / "sonarqube_metrics.csv", index=False)
     print(f"wrote results/sonarqube_metrics.csv ({len(df)} rows, {df.sq_ncloc.notna().sum()} with data)")
 
     lines = ["", "### Export run: keys not returned", ""]

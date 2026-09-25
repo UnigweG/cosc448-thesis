@@ -8,7 +8,7 @@ import subprocess
 
 import pandas as pd
 
-from common import RESULTS, repo_dir
+from common import RESULTS, counts_as_int, repo_dir
 
 KEY = ["cohort_year", "org", "repo", "commit_sha"]
 
@@ -63,7 +63,7 @@ def main():
         keep = keep[keep["_merge"] == "left_only"].drop(columns="_merge")
         df = pd.concat([keep, df], ignore_index=True)
     df = df.sort_values(["cohort_year", "repo", "snapshot_date"])
-    df.to_csv(out, index=False)
+    counts_as_int(df).to_csv(out, index=False)
     print(f"wrote results/results.csv ({len(df)} rows, {len(df.columns)} columns)")
 
 
