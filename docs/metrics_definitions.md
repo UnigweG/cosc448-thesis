@@ -7,8 +7,8 @@ definitions on student capstone repositories, so wherever the unit of analysis
 changes (a whole repository instead of a single solution or patch) I state how I
 adapted it. Where this file and the PDF disagree, the PDF is the reference.
 
-Tool versions used (pinned in `requirements.txt`, transitive dependencies in
-`requirements.lock`): Radon 6.0.1, Pylint 4.0.9, Bandit 1.9.4, running on Python 3.14.0.
+Tool versions used (pinned, with all their dependencies, in `requirements.txt`):
+Radon 6.0.1, Pylint 4.0.9, Bandit 1.9.4, running on Python 3.14.0.
 
 ## Why these metrics
 

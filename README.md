@@ -24,14 +24,14 @@ Needs git, gh (logged in with read access to the three orgs), sonar-scanner and 
 SonarQube server on localhost:9000.
 
     python3 -m venv .venv
-    .venv/bin/pip install -r requirements.lock   # exact versions used for results/
+    .venv/bin/pip install -r requirements.txt    # exact versions used for results/
     cp .env.example .env     # then fill in SONAR_TOKEN (a SonarQube user token, not a global analysis token)
 
 The scripts read .env themselves, so there is no need to export the token.
 
-`requirements.txt` pins only the direct dependencies; `requirements.lock` also pins
-the transitive ones (for example astroid, which decides Pylint's parsing). The results
-were produced with Python 3.14.0 and the lock file.
+`requirements.txt` pins every package, including the transitive ones (for example
+astroid, which decides Pylint's parsing). The results were produced with Python 3.14.0
+and exactly these versions.
 
 GitHub access is read only. Every clone gets its push URL set to DISABLED and a
 pre-push hook that refuses to push.
@@ -67,7 +67,6 @@ What each step needs from earlier steps:
 
 ## Tests
 
-    .venv/bin/pip install -r requirements-dev.txt
     .venv/bin/python -m pytest -q tests
 
 The tests use small fixture repos and a mocked SonarQube API, so they need neither the
