@@ -7,8 +7,8 @@ definitions on student capstone repositories, so wherever the unit of analysis
 changes (a whole repository instead of a single solution or patch) I state how I
 adapted it. Where this file and the PDF disagree, the PDF is the reference.
 
-Tool versions used (pinned in `requirements.txt`): Radon 6.0.1, Pylint 4.0.9,
-Bandit 1.9.4, running on Python 3.14.0.
+Tool versions used (pinned, with all their dependencies, in `requirements.txt`):
+Radon 6.0.1, Pylint 4.0.9, Bandit 1.9.4, running on Python 3.14.0.
 
 ## Why these metrics
 
@@ -40,7 +40,8 @@ procedure, not as absolute judgements of a team's code.
   `site-packages/`, `dist/`, `build/`, `target/` and `__pycache__/` are therefore
   excluded too. This is the same list the SonarQube scan uses, so both tools
   measure the same files. The one difference: the scan keeps `build/` for
-  capstone-project-team-2-003-1, which kept its source there; that repo has no Python. The number skipped is in `py_excluded_files`.
+  capstone-project-team-2-003-1, which kept its source there; that repo has no
+  Python. The number skipped is in `py_excluded_files`.
 - Repositories with no tracked Python files get NA for the Python metrics and
   `python_file_count = 0`.
 - Jupyter notebooks (`.ipynb`) are not part of the file set, so notebook code is

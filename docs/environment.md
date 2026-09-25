@@ -11,7 +11,7 @@ Recorded 2026-09-23.
 | Python | 3.14.0 (venv in .venv) |
 | radon | 6.0.1 |
 | pylint | 4.0.9 |
-| astroid | 4.0.4 (Pylint's parser; all versions in `requirements.lock`) |
+| astroid | 4.0.4 (Pylint's parser; all versions in `requirements.txt`) |
 | bandit | 1.9.4 |
 | pandas | 3.0.6 |
 | requests | 2.34.2 |

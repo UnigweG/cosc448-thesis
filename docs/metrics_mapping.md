@@ -3,7 +3,7 @@
 Server: SonarQube 26.9.0.129388 Community Edition. The full list of metric keys on
 this server is in `docs/sonarqube_metrics_available.csv` (159 keys, pulled from
 `/api/metrics/search`). I only relied on keys confirmed in that list. The machine-readable
-version of this table is `results/metrics_mapping.csv`.
+version of this table is `docs/metrics_mapping.csv`.
 
 ## Summary
 

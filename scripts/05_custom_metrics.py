@@ -24,7 +24,7 @@ from radon.complexity import cc_visit
 from radon.metrics import mi_visit
 from radon.raw import analyze
 
-from common import RESULTS, ROOT, counts_as_int, read_selection, repo_dir
+from common import RESULTS, ROOT, counts_as_int, git, read_selection, repo_dir, select
 
 BIN = Path(sys.executable).parent
 PYLINTRC = ROOT / "config" / "pylintrc"
@@ -130,8 +130,7 @@ def bandit_counts(path, files):
 def measure(item):
     org, repo, year = item
     path = repo_dir(year, repo)
-    sha = subprocess.run(["git", "-C", str(path), "rev-parse", "HEAD"], check=True,
-                         capture_output=True, text=True).stdout.strip()
+    sha = git(path, "rev-parse", "HEAD")
     files, excluded = python_files(path)
     row = {"cohort_year": year, "org": org, "repo": repo, "commit_sha": sha,
            "python_file_count": len(files), "py_excluded_files": excluded}
@@ -156,14 +155,12 @@ def measure(item):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--only", help="one repo name")
+    ap.add_argument("--only", help="one repo (repo name or org/repo)")
     ap.add_argument("--workers", type=int, default=4)
     args = ap.parse_args()
     items = read_selection()
     if args.only:
-        items = [i for i in items if i[1] == args.only]
-        if not items:
-            raise SystemExit(f"{args.only} is not in config/repo_selection.txt")
+        items = select(items, args.only)
     rows = []
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for row in pool.map(measure, items):
@@ -181,7 +178,8 @@ def main():
         old = pd.read_csv(out)
         # keep the selection order that a full run writes
         order = {repo: i for i, (_, repo, _) in enumerate(read_selection())}
-        df = pd.concat([old[old.repo != args.only], df]).sort_values(
+        redone = old.org.eq(items[0][0]) & old.repo.eq(items[0][1])
+        df = pd.concat([old[~redone], df]).sort_values(
             "repo", key=lambda s: s.map(order), kind="stable")
     counts_as_int(df).to_csv(out, index=False)
     print(f"wrote results/custom_metrics.csv ({len(df)} rows)")

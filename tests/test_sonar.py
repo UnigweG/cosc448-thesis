@@ -19,7 +19,6 @@ def s03(scripts, tmp_path, monkeypatch):
     monkeypatch.setattr(m, "EMPTY_SETTINGS", tmp_path / "sonar" / "empty.properties")
     monkeypatch.setattr(m, "read_selection", lambda: ITEMS)
     monkeypatch.setattr(m, "sonar_session", lambda: None)
-    monkeypatch.setattr(m, "load_env", lambda: None)
     monkeypatch.setattr(m.time, "sleep", lambda s: None)
     monkeypatch.setattr(m, "scan", lambda item: {
         "cohort_year": item[2], "org": item[0], "repo": item[1], "project_key": f"k_{item[1]}",
