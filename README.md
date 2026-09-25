@@ -63,6 +63,14 @@ What each step needs from earlier steps:
   still be on it.
 - `06_build_results.py` reads the four result CSVs and the clones (for snapshot dates).
 
+## Tests
+
+    .venv/bin/pip install -r requirements-dev.txt
+    .venv/bin/python -m pytest -q tests
+
+The tests use small fixture repos and a mocked SonarQube API, so they need neither the
+clones nor a running server.
+
 ## Notes
 
 - docs/metrics_definitions.md - the metrics from the supervisor's document and how I compute them

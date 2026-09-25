@@ -32,6 +32,16 @@ def team_number(repo, description):
     return None
 
 
+def first_last(log):
+    """Earliest and latest commit dates from `git log --format='%ct %cI'` lines.
+
+    Compared by epoch seconds: the ISO strings carry different UTC offsets, so string
+    order is not time order. The chosen commits keep their original ISO dates.
+    """
+    dates = sorted((int(ts), iso) for ts, iso in (line.split(" ", 1) for line in log))
+    return dates[0][1], dates[-1][1]
+
+
 def main():
     inv = pd.read_csv(RESULTS / "repo_inventory_all.csv")
     rows = []
@@ -40,19 +50,16 @@ def main():
         desc = meta.pop("description", "")
         desc = "" if pd.isna(desc) else desc
         path = repo_dir(year, repo)
-        # compare epoch seconds: the ISO strings carry different UTC offsets, so string
-        # order is not time order. The chosen commits keep their original ISO dates.
-        commits = [line.split(" ", 1) for line in
-                   git(path, "log", "--format=%ct %cI", "HEAD").splitlines()]
-        dates = sorted((int(ts), iso) for ts, iso in commits)
+        log = git(path, "log", "--format=%ct %cI", "HEAD").splitlines()
+        first, last = first_last(log)
         section = section_of(repo, desc)
         num = team_number(repo, desc)
         meta.update({
             "section": section,
             "team_key": f"{year}-t{num}" + (f"-{section}" if section else "") if num else "",
-            "commit_count": len(dates),
-            "first_commit_date": dates[0][1],
-            "last_commit_date": dates[-1][1],
+            "commit_count": len(log),
+            "first_commit_date": first,
+            "last_commit_date": last,
             "head_sha": git(path, "rev-parse", "HEAD"),
             "tracked_file_count": len(git(path, "ls-files").splitlines()),
         })
