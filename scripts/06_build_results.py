@@ -2,13 +2,15 @@
 
 One row per (repo, commit_sha) snapshot. Rows already in results.csv for other
 commits (added later, e.g. for D3) are kept; rows for the same (repo, commit_sha)
-are replaced.
+are replaced, and rows for repos no longer in config/repo_selection.txt are dropped.
+A repo can therefore have several rows, so repo-level averages must pick one snapshot
+per repo.
 """
 import subprocess
 
 import pandas as pd
 
-from common import RESULTS, counts_as_int, repo_dir
+from common import RESULTS, counts_as_int, read_selection, repo_dir
 
 KEY = ["cohort_year", "org", "repo", "commit_sha"]
 
@@ -23,6 +25,18 @@ def ratio(num, den, scale=100):
     num = pd.to_numeric(num, errors="coerce")
     den = pd.to_numeric(den, errors="coerce")
     return (scale * num / den.where(den > 0)).round(4)
+
+
+def check_shas(base, other, source):
+    """Stop if a metrics file describes a different commit than the inventory; the
+    left join on commit_sha would otherwise leave that repo's metrics blank."""
+    m = base[KEY].merge(other[KEY], on=["cohort_year", "org", "repo"], suffixes=("", "_src"))
+    bad = m[m.commit_sha != m.commit_sha_src]
+    if len(bad):
+        lines = [f"  {r.repo}: inventory {r.commit_sha}, {source} {r.commit_sha_src}"
+                 for r in bad.itertuples()]
+        raise SystemExit(f"{source} describes a different commit than repo_inventory.csv "
+                         f"for {len(bad)} repo(s):\n" + "\n".join(lines))
 
 
 def main():
@@ -42,6 +56,8 @@ def main():
                             "notes": "sq_scan_notes"})
     sq = sq.drop(columns=["project_key"])
     sq["cohort_year"] = sq.cohort_year.astype(int)
+    check_shas(base, sq, "sonar_scan_status.csv")
+    check_shas(base, py, "custom_metrics.csv")
 
     df = base.merge(sq, on=KEY, how="left").merge(py, on=KEY, how="left")
 
@@ -61,7 +77,11 @@ def main():
         old = pd.read_csv(out, dtype={"section": str})
         keep = old.merge(df[KEY], on=KEY, how="left", indicator=True)
         keep = keep[keep["_merge"] == "left_only"].drop(columns="_merge")
-        df = pd.concat([keep, df], ignore_index=True)
+        selected = {(org, repo) for org, repo, _ in read_selection()}
+        is_selected = [(o, r) in selected for o, r in zip(keep.org, keep.repo)]
+        print(f"kept {sum(is_selected)} row(s) for other snapshots; dropped "
+              f"{len(keep) - sum(is_selected)} row(s) for repos no longer selected")
+        df = pd.concat([keep[is_selected], df], ignore_index=True)
     df = df.sort_values(["cohort_year", "repo", "snapshot_date"])
     counts_as_int(df).to_csv(out, index=False)
     print(f"wrote results/results.csv ({len(df)} rows, {len(df.columns)} columns)")

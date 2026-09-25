@@ -36,7 +36,11 @@ clone_one() {
   dest="$ROOT/data/repos/$year/$repo"
   if [ -d "$dest/.git" ]; then
     lock_push "$dest"
-    out="$(git -C "$dest" fetch --all --tags --prune 2>&1)" || { echo "$full fetch failed: $out" | tail -1 >> "$FAIL_LOG"; echo "FAIL $full"; return 0; }
+    out="$(git -C "$dest" fetch --all --tags --prune 2>&1)" || {
+      echo "$full fetch failed: $(echo "$out" | tail -1)" >> "$FAIL_LOG"
+      echo "FAIL $full"
+      return 0
+    }
     echo "fetched $full"
   else
     mkdir -p "$(dirname "$dest")"
@@ -60,7 +64,11 @@ run_list() {
 grep -vE '^\s*(#|$)' "$SELECTION" | run_list
 
 if [ -s "$FAIL_LOG" ]; then
-  if grep -qiE 'auth|permission denied|could not read username|403|401' "$FAIL_LOG"; then
+  # private repos the account can't read: git says "Repository not found", gh says
+  # "Could not resolve to a Repository"
+  auth='auth|permission denied|could not read username|repository not found'
+  auth="$auth|could not resolve to a repository|403|401"
+  if grep -qiE "$auth" "$FAIL_LOG"; then
     echo "authentication problem, stopping (see logs/clone_failures.log)" >&2
     exit 2
   fi
@@ -79,4 +87,6 @@ if [ -s "$FAIL_LOG" ]; then
   printf '%s\n' $failed | run_list
 fi
 
-echo "failures after retry: $(grep -c . "$FAIL_LOG" || true)"
+failures="$(grep -c . "$FAIL_LOG" || true)"
+echo "failures after retry: $failures"
+[ "$failures" -eq 0 ] || exit 1

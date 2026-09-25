@@ -14,6 +14,8 @@ import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
 
+import requests
+
 from common import (LOGS, RESULTS, load_env, project_key, read_selection, repo_dir,
                     sonar_get, sonar_session)
 
@@ -25,8 +27,13 @@ NEEDS_OTHER_SCANNER = {"C#": "C# needs SonarScanner for .NET (not analysed by th
                        "VB.NET": "VB.NET needs SonarScanner for .NET"}
 NOT_IN_EDITION = {"C", "C++", "Objective-C", "Objective-C++", "Swift", "Dart", "PLpgSQL",
                   "TSQL", "ShaderLab", "HLSL", "Cython"}
+# GitHub languages with no SonarQube analyser (SCSS and Vue are covered by the CSS and JS ones)
+NO_ANALYSER = {"EJS"}
 
 LOG_DIR = LOGS / "sonar"
+# passed as project.settings so a team's own sonar-project.properties is never read
+EMPTY_SETTINGS = LOG_DIR / "empty-sonar-project.properties"
+STATUS_FIELDS = ["cohort_year", "org", "repo", "project_key", "status", "notes", "head_sha"]
 
 # The starter template's build/ folder is meant for compiled output, but this team kept
 # all of its source code there, so build/ is not excluded for this repo.
@@ -56,6 +63,8 @@ def language_flags(org, repo):
             notes.append(f"{lang} {share:.0f}% not analysed ({NEEDS_OTHER_SCANNER[lang]})")
         elif lang in NOT_IN_EDITION:
             notes.append(f"{lang} {share:.0f}% not supported by Community Edition")
+        elif lang in NO_ANALYSER:
+            notes.append(f"{lang} {share:.0f}% not analysed (no SonarQube analyser)")
     return notes
 
 
@@ -67,6 +76,7 @@ def run_scanner(path, key, name, log_file, extra=(), exclusions=EXCLUSIONS):
            "-Dsonar.sources=.",
            "-Dsonar.scm.disabled=true",
            f"-Dsonar.exclusions={exclusions}",
+           f"-Dproject.settings={EMPTY_SETTINGS}",
            *extra]
     with open(log_file, "w") as log:
         proc = subprocess.run(cmd, cwd=path, stdout=log, stderr=subprocess.STDOUT,
@@ -117,6 +127,50 @@ def wait_for_queue(session, timeout=3600):
     return False
 
 
+def add_note(r, note):
+    r["notes"] = "; ".join(filter(None, [r["notes"], note]))
+
+
+def check_server(session, results):
+    """Update scan results with what the server did after the upload."""
+    print("waiting for SonarQube background tasks...")
+    if not wait_for_queue(session):
+        # the latest task per project may still be an older analysis, so don't read it
+        for r in results:
+            if r["status"] == "ok":
+                r["status"] = "pending"
+                add_note(r, "queue timeout, task status not checked")
+        return
+    # the server can also fail a task after the scanner uploads successfully
+    for r in results:
+        if r["status"] != "ok":
+            continue
+        task = sonar_get(session, "/api/ce/activity", component=r["project_key"], ps=1)["tasks"]
+        if task and task[0]["status"] != "SUCCESS":
+            r["status"] = "failed"
+            add_note(r, "server task " + task[0]["status"] + ": "
+                     + task[0].get("errorMessage", "")[:200])
+    missing = check_analyses(session, [r["project_key"] for r in results if r["status"] == "ok"])
+    for r in results:
+        if r["project_key"] in missing:
+            r["status"] = "failed"
+            add_note(r, "no analysis on server")
+
+
+def write_status(results, only):
+    out = RESULTS / "sonar_scan_status.csv"
+    old = {}
+    if only and out.exists():
+        with open(out) as f:
+            old = {row["project_key"]: row for row in csv.DictReader(f)}
+    for r in results:
+        old[r["project_key"]] = r
+    with open(out, "w", newline="") as f:
+        w = csv.DictWriter(f, fieldnames=STATUS_FIELDS, lineterminator="\n")
+        w.writeheader()
+        w.writerows(sorted(old.values(), key=lambda r: (str(r["cohort_year"]), r["repo"])))
+
+
 def check_analyses(session, keys):
     missing = []
     for key in keys:
@@ -135,6 +189,7 @@ def main():
     load_env()
     session = sonar_session()
     LOG_DIR.mkdir(parents=True, exist_ok=True)
+    EMPTY_SETTINGS.write_text("")
     items = read_selection()
     if args.only:
         items = [i for i in items if args.only in (i[1], f"{i[0]}/{i[1]}")]
@@ -144,35 +199,18 @@ def main():
     with ThreadPoolExecutor(max_workers=args.parallel) as pool:
         results = list(pool.map(scan, items))
 
-    print("waiting for SonarQube background tasks...")
-    wait_for_queue(session)
-    # the server can also fail a task after the scanner uploads successfully
-    for r in results:
-        if r["status"] != "ok":
-            continue
-        task = sonar_get(session, "/api/ce/activity", component=r["project_key"], ps=1)["tasks"]
-        if task and task[0]["status"] != "SUCCESS":
-            r["status"] = "failed"
-            r["notes"] = "; ".join(filter(None, [r["notes"], "server task " + task[0]["status"]
-                                               + ": " + task[0].get("errorMessage", "")[:200]]))
-    missing = check_analyses(session, [r["project_key"] for r in results if r["status"] == "ok"])
-    for r in results:
-        if r["project_key"] in missing:
-            r["status"] = "failed"
-            r["notes"] = "; ".join(filter(None, [r["notes"], "no analysis on server"]))
-
-    out = RESULTS / "sonar_scan_status.csv"
-    old = {}
-    if args.only and out.exists():
-        with open(out) as f:
-            old = {row["project_key"]: row for row in csv.DictReader(f)}
-    for r in results:
-        old[r["project_key"]] = r
-    fields = ["cohort_year", "org", "repo", "project_key", "status", "notes", "head_sha"]
-    with open(out, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=fields, lineterminator="\n")
-        w.writeheader()
-        w.writerows(sorted(old.values(), key=lambda r: (str(r["cohort_year"]), r["repo"])))
+    # written before the server checks, so a failing check still leaves the scan results
+    write_status(results, args.only)
+    try:
+        check_server(session, results)
+    except requests.HTTPError as e:
+        if e.response is None or e.response.status_code != 403:
+            raise
+        raise SystemExit("SonarQube returned 403 on " + e.response.url.split("?")[0] + ". "
+                         "SONAR_TOKEN must be a user token; a global analysis token (sqa_...) "
+                         "can scan but not read /api/ce/activity. Scanner results are in "
+                         "results/sonar_scan_status.csv without the server checks.")
+    write_status(results, args.only)
     ok = sum(r["status"] == "ok" for r in results)
     print(f"{ok}/{len(results)} scanned ok; wrote results/sonar_scan_status.csv")
 

@@ -106,8 +106,10 @@ def main():
         print(f"exported {key}", flush=True)
 
     df = pd.DataFrame(rows)
+    # a facet value the server omits means 0 issues, but only for projects that were exported
+    exported = df.project_key.isin(ok)
     for c in [c for c in df.columns if c.startswith("sq_issues_")]:
-        df[c] = df[c].fillna(0).astype(int)
+        df.loc[exported, c] = df.loc[exported, c].fillna(0)
     counts_as_int(df).to_csv(RESULTS / "sonarqube_metrics.csv", index=False)
     print(f"wrote results/sonarqube_metrics.csv ({len(df)} rows, {df.sq_ncloc.notna().sum()} with data)")
 

@@ -14,6 +14,7 @@ import json
 import re
 import subprocess
 import sys
+import tokenize
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from statistics import mean
@@ -50,8 +51,10 @@ def radon_metrics(path, files):
             raw = analyze(code)
             items = cc_visit(code)
             mi = mi_visit(code, True)  # radon mi default: docstrings count as comments
-        except Exception:
-            errors += 1  # radon cannot parse it (e.g. Python 2 syntax)
+        # what radon raises on unparsable code (e.g. Python 2 syntax, null bytes, deep
+        # nesting); anything else is a bug and should stop the run
+        except (SyntaxError, ValueError, tokenize.TokenError, RecursionError):
+            errors += 1
             continue
         sloc += raw.sloc
         comments += raw.comments
@@ -81,7 +84,9 @@ def run_pylint(path, files):
                     if re.search(r":\d+:\d+: F\d{4}:", line)})
     if not m:
         tail = (proc.stderr or proc.stdout).strip().splitlines()[-1:] or [""]
-        return None, fatal, f"pylint no score (exit {proc.returncode}): {tail[0][:150]}"
+        # keep local paths out of the committed CSV
+        msg = tail[0].replace(f"{path}/", "").replace(str(ROOT) + "/", "")
+        return None, fatal, f"pylint no score (exit {proc.returncode}): {msg[:150]}"
     return float(m.group(1)), fatal, ""
 
 
@@ -93,14 +98,17 @@ def pylint_score(path, files):
     """
     try:
         score, fatal, note = run_pylint(path, files)
-        rest = [f for f in files if f not in fatal]
-        if fatal and rest:
-            excl, _, _ = run_pylint(path, rest)
-            note = f"pylint fatal in {len(fatal)} file(s): {', '.join(fatal)[:150]}"
-        else:
-            excl = score
     except subprocess.TimeoutExpired:
         return None, None, 0, "pylint timeout"
+    rest = [f for f in files if f not in fatal]
+    if fatal and rest:
+        note = f"pylint fatal in {len(fatal)} file(s): {', '.join(fatal)[:150]}"
+        try:
+            excl, _, _ = run_pylint(path, rest)
+        except subprocess.TimeoutExpired:
+            excl, note = None, note + "; pylint timeout on rerun"
+    else:
+        excl = score
     return score, excl, len(fatal), note
 
 
@@ -154,6 +162,8 @@ def main():
     items = read_selection()
     if args.only:
         items = [i for i in items if i[1] == args.only]
+        if not items:
+            raise SystemExit(f"{args.only} is not in config/repo_selection.txt")
     rows = []
     with ProcessPoolExecutor(max_workers=args.workers) as pool:
         for row in pool.map(measure, items):
@@ -169,7 +179,10 @@ def main():
     out = RESULTS / "custom_metrics.csv"
     if args.only and out.exists():
         old = pd.read_csv(out)
-        df = pd.concat([old[old.repo != args.only], df]).sort_values(["cohort_year", "repo"])
+        # keep the selection order that a full run writes
+        order = {repo: i for i, (_, repo, _) in enumerate(read_selection())}
+        df = pd.concat([old[old.repo != args.only], df]).sort_values(
+            "repo", key=lambda s: s.map(order), kind="stable")
     counts_as_int(df).to_csv(out, index=False)
     print(f"wrote results/custom_metrics.csv ({len(df)} rows)")
 
