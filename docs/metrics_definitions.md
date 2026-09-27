@@ -1,250 +1,311 @@
 # Metric definitions
 
-Source: my supervisor's metrics document, *Metrics* (May 20, 2026), stored at
-`docs/references/Metrics.pdf`. That document was written for an evaluation of
-LLM-generated Python code (LiveCodeBench and SWE-bench Verified). I reuse the same
-definitions on student capstone repositories, so wherever the unit of analysis
-changes (a whole repository instead of a single solution or patch) I state how I
-adapted it. Where this file and the PDF disagree, the PDF is the reference.
+**Source:** the supervisor's metrics document, *Metrics* (May 20, 2026), stored at [`docs/references/Metrics.pdf`](references/Metrics.pdf).
 
-Tool versions used (pinned, with all their dependencies, in `requirements.txt`):
-Radon 6.0.1, Pylint 4.0.9, Bandit 1.9.4, running on Python 3.14.0.
+That document was written to evaluate LLM-generated Python code from LiveCodeBench and SWE-bench Verified. The same definitions are applied to student capstone repositories. Wherever the unit of analysis changes (a whole repository instead of a single solution or patch), it is mentioned how the definitions are adapted. If this file and the PDF ever disagree, the PDF is the reference.
+
+**Tools:** Radon 6.0.1, Pylint 4.0.9 and Bandit 1.9.4 on Python 3.14.0. All versions, including dependencies, are pinned in `requirements.txt`.
+
+## Contents
+
+- [Why these metrics](#why-these-metrics)
+- [Unit of analysis and file set](#unit-of-analysis-and-file-set)
+- [Aggregation rules](#aggregation-rules)
+- [Metrics](#metrics)
+  - [Cyclomatic complexity (CCavg, CCmax)](#cyclomatic-complexity-ccavg-and-ccmax)
+  - [Maintainability index (MI)](#maintainability-index-mi)
+  - [Pylint score](#pylint-score)
+  - [Source lines of code (SLOC)](#source-lines-of-code-sloc)
+  - [Comment percentage](#comment-percentage)
+  - [Bandit security findings](#bandit-security-findings)
+  - [Functional correctness](#functional-correctness)
+  - [Pre/post deltas](#prepost-deltas)
+- [Limitations](#limitations)
+- [References](#references)
+
+---
 
 ## Why these metrics
 
-The PDF groups the metrics into four quality dimensions: functional correctness,
-code quality, maintainability and security. All of them can be computed
-automatically with open-source tools, so they are reproducible and cheap to run on
-many repositories. The case for using them comes from two lines of work. Chowdhury
-et al. (2022) found, across roughly 730K Java methods in 47 projects, that code
-metrics help predict which methods will change later, even after controlling for
-method size, so they carry information beyond plain size. Antinyan et al. (2017)
-report that practitioners see complexity as hurting readability, understandability,
-modifiability and maintenance time.
+The PDF groups the metrics into four quality dimensions: **functional correctness**, **code quality**, **maintainability** and **security**. Every one of them can be computed automatically with open-source tools, so they are reproducible and cheap to run across many repositories.
 
-The PDF is also clear that these are indicators for relative comparison and not a
-replacement for expert review. Pantiuchina et al. (2018) show that metric changes
-do not always line up with what developers perceive as quality improvements, and
-Börstler et al. (2023) show that properties developers care about (readability,
-structure, comprehensibility) are hard to capture with static metrics. I use the
-metrics the same way: to compare repositories and cohorts measured with the same
-procedure, not as absolute judgements of a team's code.
+Two lines of research support using them:
+
+- **Chowdhury et al. (2022)** studied about 730K Java methods in 47 projects and found that code metrics help predict which methods will change later, even after controlling for method size. So they carry information beyond plain size.
+- **Antinyan et al. (2017)** report that practitioners see complexity as hurting readability, understandability, modifiability and maintenance time.
+
+The PDF is also clear that these metrics are indicators for relative comparison, not a replacement for expert review. Pantiuchina et al. (2018) show that metric changes don't always match what developers see as quality improvements. Börstler et al. (2023) show that the properties developers care about (readability, structure, comprehensibility) are hard to capture with static metrics.
+
+We use the metrics the same way: to compare repositories and cohorts measured with the same procedure, not to pass absolute judgement on any team's code.
+
+---
 
 ## Unit of analysis and file set
 
-- One measurement is a repository at a specific commit (a "snapshot").
-- The Python file set is `git ls-files '*.py'` at that commit. Using tracked files
-  only keeps untracked virtual environments and installed packages out.
-- A few teams committed a virtualenv or `node_modules` (W2023 teams 13 and 17,
-  W2024 team 12-003). Tracked files under `node_modules/`, `.venv/`, `venv/`,
-  `site-packages/`, `dist/`, `build/`, `target/` and `__pycache__/` are therefore
-  excluded too. This is the same list the SonarQube scan uses, so both tools
-  measure the same files. The one difference: the scan keeps `build/` for
-  capstone-project-team-2-003-1, which kept its source there; that repo has no
-  Python. The number skipped is in `py_excluded_files`.
-- Repositories with no tracked Python files get NA for the Python metrics and
-  `python_file_count = 0`.
-- Jupyter notebooks (`.ipynb`) are not part of the file set, so notebook code is
-  outside every `py_*` metric. In most repos this is minor, but in W2024 team 1-003
-  SonarQube counts 2,183 lines of notebook code against 1,333 lines of `.py` code.
-- The repo inventory's `commit_count` and `first_commit_date` include the starter
-  template's history. Every W2024 repo reports a first commit of
-  2024-09-05T18:56:49Z and every W2025 repo 2025-08-26T22:28:55Z, which is the
-  template, not the team's first commit.
+- **One measurement = one snapshot**, meaning a repository at a specific commit.
+- **Python file set:** `git ls-files '*.py'` at that commit. Using only tracked files keeps untracked virtual environments and installed packages out.
+- **Vendored code is excluded.** A few teams committed a virtualenv or `node_modules` (W2023 teams 13 and 17, W2024 team 12-003), so tracked files under these folders are also skipped:
 
-## Aggregation rules (repo level)
+  ```text
+  node_modules/  .venv/  venv/  site-packages/  dist/  build/  target/  __pycache__/
+  ```
 
-These follow the PDF's multi-file rules for SWE-bench Verified, applied to all
-tracked Python files of the repo instead of only the files touched by a patch.
+  The SonarQube scan uses the same list, so both tools measure the same files. The one exception is that the scan keeps `build/` for `capstone-project-team-2-003-1`, because that team kept its source there. That repo has no Python, so it doesn't affect the Python metrics. The number of skipped files is recorded in `py_excluded_files`.
+- **Repos without Python** get `NA` for every Python metric and `python_file_count = 0`.
+- **Jupyter notebooks are not included.** `.ipynb` files are outside the file set, so notebook code doesn't count toward any `py_*` metric. In most repos this barely matters, but in W2024 team 1-003 SonarQube counts 2,183 lines of notebook code against 1,333 lines of `.py` code.
+- **Commit history includes the starter template.** The inventory's `commit_count` and `first_commit_date` include the template's history. Every W2024 repo reports a first commit of `2024-09-05T18:56:49Z` and every W2025 repo `2025-08-26T22:28:55Z`. Those are the template's commits, not each team's first commit.
 
-| Metric | Rule |
-|---|---|
-| CC | Pool every per-block value (functions, methods, classes) from all files into one list; CCavg = mean of the list, CCmax = maximum of the list |
-| MI | Compute MI per file; repo MI = mean over files |
-| Pylint | One Pylint run over all Python files together; take the overall score |
-| Bandit | Sum the high, medium and low severity findings over all files |
-| SLOC, comments | Sum over all files; comment % computed from the sums |
+---
+
+## Aggregation rules
+
+These follow the PDF's multi-file rules for SWE-bench Verified, applied to all tracked Python files in the repo rather than only the files a patch touched.
+
+| Metric         | Repo-level rule                                                                                         |
+|----------------|---------------------------------------------------------------------------------------------------------|
+| CC             | Pool every per-block value (functions, methods, classes) from all files into one list. CCavg is the mean of that list and CCmax is its maximum. |
+| MI             | Compute MI per file, then take the mean over files.                                                     |
+| Pylint         | One Pylint run over all Python files together; use the overall score.                                   |
+| Bandit         | Sum the high, medium and low severity findings over all files.                                          |
+| SLOC, comments | Sum over all files. Comment % is computed from the sums.                                                |
+
+---
 
 ## Metrics
 
 ### Cyclomatic complexity: CCavg and CCmax
 
-- **What it measures.** McCabe's (1976) cyclomatic complexity counts the linearly
-  independent paths through a piece of code. In practice it is 1 plus the number of
-  decision points (if/elif, loops, boolean operators, except clauses,
-  comprehension conditions, and so on).
-- **Formula.** For one block, CC = E - N + 2P on the control-flow graph, which Radon
-  computes as 1 + number of decision points. At repo level, with B the pooled set of
-  blocks:
-  CCavg = (1/|B|) * sum over b in B of CC_b, and CCmax = max over b in B of CC_b.
-- **How to read it.** Lower is better. CCavg describes the typical function. CCmax
-  points at the single most complex block, which the PDF describes as the likely
-  maintenance bottleneck. Radon's letter ranks are A (1-5), B (6-10), C (11-20),
-  D (21-30), E (31-40), F (41+).
-- **Tool.** Radon 6.0.1 (`radon cc`), default settings.
-- **Aggregation.** Pooled blocks across all files (see above). Radon's default output
-  lists top-level functions, classes and their methods, which matches the PDF's
-  "functions, methods, or classes". Radon drops nested blocks entirely: a closure
-  (a function defined inside another function), a class nested in a class, and a
-  class defined inside a function do not appear in the list, and their complexity is
-  not added to the enclosing block either. For example, a function with CC 2 that
-  contains a closure with CC 3 contributes one block with CC 2.
-- **Limits.** A class block in Radon is derived from its methods' complexity, so
-  including classes counts those methods twice in the pooled list. I keep it because
-  the PDF lists classes as blocks. CC counts paths, not how hard the code is to read.
-  A flat 30-case dispatch scores high but is easy to follow. CC also ignores naming,
-  nesting depth and data complexity. Radon counts each `assert` as a decision point,
-  so test functions with many asserts score higher than their logic suggests.
+**What it measures.** McCabe's (1976) cyclomatic complexity counts the linearly independent paths through a piece of code. In practice, it's 1 plus the number of decision points: `if`/`elif`, loops, boolean operators, `except` clauses, comprehension conditions and so on.
+
+**Formula.** For a single block, on its control-flow graph:
+
+```math
+CC = E - N + 2P
+```
+
+Radon computes this as 1 + the number of decision points. At repo level, with $B$ the pooled set of blocks:
+
+```math
+CC_{avg} = \frac{1}{|B|} \sum_{b \in B} CC_b
+\qquad
+CC_{max} = \max_{b \in B} CC_b
+```
+
+**How to read it.** Lower is better. CCavg describes the typical function. CCmax points to the single most complex block, which the PDF describes as the likely maintenance bottleneck.
+
+| Radon rank | CC range |
+|:----------:|:--------:|
+| A          | 1-5      |
+| B          | 6-10     |
+| C          | 11-20    |
+| D          | 21-30    |
+| E          | 31-40    |
+| F          | 41+      |
+
+**Tool.** Radon 6.0.1 (`radon cc`), default settings.
+
+**Aggregation.** Blocks are pooled across all files (see [Aggregation rules](#aggregation-rules)). Radon's default output lists top-level functions, classes and their methods, which matches the PDF's "functions, methods, or classes".
+
+Radon leaves out nested blocks entirely. A closure (a function defined inside another function), a class nested in a class, and a class defined inside a function are not listed, and their complexity is not added to the enclosing block either. For example, a function with CC 2 that contains a closure with CC 3 contributes a single block with CC 2.
+
+**Limits.**
+
+- Radon derives a class block's complexity from its methods, so including classes counts those methods twice in the pooled list. I keep classes in because the PDF lists them as blocks.
+- CC counts paths, not how hard code is to read. A flat 30-case dispatch scores high but is easy to follow.
+- CC ignores naming, nesting depth and data complexity.
+- Radon counts every `assert` as a decision point, so test functions with many asserts score higher than their logic suggests.
+
+---
 
 ### Maintainability index (MI)
 
-- **What it measures.** Oman and Hagemeister (1992) proposed MI as a single score
-  for how easy code is to maintain. It combines size, complexity and comment density.
-- **Formula (Radon's variant).**
-  MI = min(100, max(0, 100 * (171 - 5.2 ln V - 0.23 G - 16.2 ln L
-  + 50 sin(sqrt(2.46 * radians(C)))) / 171)),
-  where V is Halstead volume, G is total cyclomatic complexity, L is LLOC (logical
-  lines, not SLOC) and C is the comment percentage,
-  C = (comment lines + multi-line string lines) / SLOC * 100. Radon passes C through
-  `radians()` as if it were an angle in degrees. Radon counts multi-line strings (docstrings)
-  as comments by default, and I keep that default. A file with zero SLOC or zero
-  Halstead volume gets 100.
-- **How to read it.** Higher is better, on a 0-100 scale. Radon ranks A (> 19),
-  B (10-19) and C (<= 9).
-- **Tool.** Radon 6.0.1 (`radon mi`), default settings.
-- **Aggregation.** Mean of per-file MI over all Python files. Every file counts the
-  same regardless of size.
-- **Limits.** The coefficients were fitted on 1990s industrial C and Pascal systems.
-  Short files score near 100 whatever their quality. The mean over files lets many
-  tiny files (for example empty `__init__.py`) push the repo score up. The effect is
-  large in a few repos: in W2023 team 7 the repo MI is 90.9, but the mean over files
-  with at least 10 logical lines is 64.4 (W2023 team 11: 90.9 vs 66.5). Across the
-  48 Python repos the median difference is 4.1 points.
+**What it measures.** Oman and Hagemeister (1992) proposed MI as a single score for how easy code is to maintain. It combines size, complexity and comment density.
+
+**Formula (Radon's variant).**
+
+```math
+MI = \min\left(100,\ \max\left(0,\ 100 \cdot \frac{171 - 5.2 \ln V - 0.23\,G - 16.2 \ln L + 50 \sin\left(\sqrt{2.46 \cdot \mathrm{radians}(C)}\right)}{171}\right)\right)
+```
+
+where:
+
+| Symbol | Meaning                                                                 |
+|:------:|-------------------------------------------------------------------------|
+| $V$    | Halstead volume                                                         |
+| $G$    | total cyclomatic complexity                                             |
+| $L$    | logical lines of code (LLOC, not SLOC)                                  |
+| $C$    | comment percentage: (comment lines + multi-line string lines) / SLOC × 100 |
+
+Radon passes $C$ through `radians()` as if it were an angle in degrees. It counts multi-line strings (docstrings) as comments by default, and I keep that default. A file with zero SLOC or zero Halstead volume gets an MI of 100.
+
+**How to read it.** Higher is better, on a 0-100 scale. Radon's ranks are **A** (> 19), **B** (10-19) and **C** (≤ 9).
+
+**Tool.** Radon 6.0.1 (`radon mi`), default settings.
+
+**Aggregation.** Mean of the per-file MI over all Python files. Every file counts the same, whatever its size.
+
+**Limits.**
+
+- The coefficients were fitted on 1990s industrial C and Pascal systems.
+- Short files score close to 100 regardless of quality, so many tiny files (for example empty `__init__.py`) push the repo mean up. In a few repos this effect is large:
+
+  | Repo            | Repo MI | Mean MI over files with ≥ 10 logical lines |
+  |-----------------|--------:|-------------------------------------------:|
+  | W2023 team 7    |    90.9 |                                       64.4 |
+  | W2023 team 11   |    90.9 |                                       66.5 |
+
+  Across the 48 Python repos, the median difference is 4.1 points.
+
+---
 
 ### Pylint score
 
-- **What it measures.** An overall rating of a file set's errors and its adherence to
-  Python coding standards (PEP 8 style, naming, unused code, likely bugs, refactoring
-  hints).
-- **Formula.** Pylint's default evaluation:
-  score = max(0, 10 - (5 * error + warning + refactor + convention) / statement * 10),
-  where each term is a count of messages of that category and `statement` is the
-  number of statements analysed.
-- **How to read it.** Higher is better, up to 10. The score can hit the floor of 0 on
-  code with many messages per statement.
-- **Tool.** Pylint 4.0.9.
-- **Aggregation.** One run over all of the repo's Python files together, as the PDF
-  did for SWE-bench ("all files at once, as PyLint supports it"). 10-minute timeout
-  per repo; NA if it fails.
-- **Settings.** The PDF used default parameters for LiveCodeBench. For SWE-bench
-  Verified it disabled four import-related checks (import-error, no-name-in-module,
-  wrong-import-position, ungrouped-imports), because imports could fail when the
-  surrounding files were missing. **Decision for this project:** I disable the same
-  four checks, since the capstone repos' dependencies are not installed in my
-  environment and import errors would otherwise dominate the score. All other
-  settings stay at their defaults, and repo-level `.pylintrc` files are ignored so
-  every repo is scored the same way.
-- **Fatal messages.** Pylint's default evaluation sets the score to 0 if any file
-  produces a fatal message, e.g. F0010 when it cannot parse a file. This happened in
-  one repo (W2025 team 6, one demo file saved as ISO-8859 instead of UTF-8). I keep
-  Pylint's own number in `py_pylint_score` and also store
-  `py_pylint_score_excl_fatal`, which re-runs Pylint without the fatal files.
-- **Limits.** The score mostly reflects style conventions, and a few noisy message
-  types can dominate it. It is not calibrated across project sizes, and it cannot
-  tell a deliberate style choice from a mistake.
+**What it measures.** An overall rating of a file set's errors and how closely it follows Python coding standards: PEP 8 style, naming, unused code, likely bugs and refactoring hints.
+
+**Formula.** Pylint's default evaluation:
+
+```math
+\text{score} = \max\left(0,\ 10 - \frac{5 \cdot \text{error} + \text{warning} + \text{refactor} + \text{convention}}{\text{statement}} \cdot 10\right)
+```
+
+Each term is the count of messages in that category, and `statement` is the number of statements analysed.
+
+**How to read it.** Higher is better, up to 10. Code with many messages per statement can hit the floor of 0.
+
+**Tool.** Pylint 4.0.9.
+
+**Aggregation.** One run over all of the repo's Python files together, as the PDF did for SWE-bench ("all files at once, as PyLint supports it"). Each repo has a 10-minute timeout; the score is `NA` if the run fails.
+
+**Settings.** The PDF used default parameters for LiveCodeBench. For SWE-bench Verified it turned off four import-related checks, because imports could fail when the surrounding files were missing:
+
+- `import-error`
+- `no-name-in-module`
+- `wrong-import-position`
+- `ungrouped-imports`
+
+> **Decision for this project:** I turn off the same four checks. The capstone repos' dependencies aren't installed in my environment, so import errors would otherwise dominate the score. Everything else stays at its default, and repo-level `.pylintrc` files are ignored so every repo is scored the same way.
+
+**Fatal messages.** By default, Pylint sets the score to 0 if any file produces a fatal message, for example `F0010` when it can't parse a file. This happened in one repo: W2025 team 6, where a demo file was saved as ISO-8859 instead of UTF-8. I keep Pylint's own number in `py_pylint_score` and also store `py_pylint_score_excl_fatal`, which re-runs Pylint without the files that raised fatal messages.
+
+**Limits.**
+
+- The score mostly reflects style conventions, and a few noisy message types can dominate it.
+- It isn't calibrated across project sizes.
+- It can't tell a deliberate style choice from a mistake.
+
+---
 
 ### Source lines of code (SLOC)
 
-- **What it measures.** The size of the code in lines that contain source code, not
-  counting blank and comment-only lines.
-- **Formula.** SLOC = sum over files of Radon's `sloc` field.
-- **How to read it.** Neither higher nor lower is better. It measures size and
-  verbosity, and it is the denominator for comment %.
-- **Tool.** Radon 6.0.1 (`radon raw`).
-- **Aggregation.** Sum over files.
-- **Limits.** It depends on formatting style, since the same logic can span one line
-  or five. It says nothing about quality by itself.
+**What it measures.** Code size, counted in lines that contain source code. Blank lines and comment-only lines are not counted.
+
+**Formula.** The sum over files of Radon's `sloc` field.
+
+**How to read it.** Neither higher nor lower is better. SLOC describes size and verbosity, and it is the denominator for comment %.
+
+**Tool.** Radon 6.0.1 (`radon raw`).
+
+**Aggregation.** Sum over files.
+
+**Limits.** SLOC depends on formatting style, since the same logic can take one line or five. On its own it says nothing about quality.
+
+---
 
 ### Comment percentage
 
-- **What it measures.** Documentation density: how much comment text there is
-  relative to code.
-- **Formula (PDF).** comment % = comments / SLOC * 100, with comments = sum of Radon's
-  `comments` field (lines containing a `#` comment, including inline comments) and
-  SLOC as above.
-- **How to read it.** Some commenting is good. Very high values can mean
-  commented-out code rather than documentation, so the value is read as a
-  description, not a score.
-- **Tool.** Radon 6.0.1 (`radon raw`).
-- **Aggregation.** Ratio of the repo totals (not a mean of per-file ratios).
-- **Limits.** Docstrings are counted by Radon as `multi`, not `comments`, so a repo
-  that documents with docstrings looks under-commented. The metric counts lines, not
-  comment quality. Note that SonarQube's `comment_lines_density` uses a different
-  denominator (see `metrics_mapping.md`).
+**What it measures.** Documentation density: how much comment text there is relative to code.
 
-### Bandit security findings (high / medium / low)
+**Formula (PDF).**
 
-- **What it measures.** The number of potential security problems found by Bandit's
-  rule set for Python, for example `eval`, shell injection, hard-coded passwords,
-  weak hashes, `assert` used for checks, or unsafe deserialisation.
-- **Formula.** For each severity s in {high, medium, low}:
-  Bandit_s = sum over files f of |Issues_s(f)|.
-- **How to read it.** Lower is better. Keep the three levels separate, since one high
-  finding weighs more than several low ones.
-- **Tool.** Bandit 1.9.4, default profile, all confidence levels counted.
-- **Aggregation.** Summed over all Python files.
-- **Limits.** Detection is rule-based pattern matching. It misses logic flaws and
-  cross-file data flow, and it reports false positives (`assert` in test files is a
-  very common low finding: B101 accounts for 29,830 of the 31,835 low findings, 94%,
-  across the 48 Python repos). Bandit's severity levels are its own and do not
-  correspond to SonarQube's severities. Bandit honours `# nosec` comments and
-  SonarQube honours `NOSONAR`, so a team can suppress findings; I do not record how
-  many suppressions each repo has.
+```math
+\text{comment \%} = \frac{\text{comments}}{\text{SLOC}} \times 100
+```
+
+Here `comments` is the sum of Radon's `comments` field (lines containing a `#` comment, inline comments included), and SLOC is as above.
+
+**How to read it.** Some commenting is good, but very high values can mean commented-out code rather than documentation. Treat the value as a description, not a score.
+
+**Tool.** Radon 6.0.1 (`radon raw`).
+
+**Aggregation.** Ratio of the repo totals, not a mean of per-file ratios.
+
+**Limits.**
+
+- Radon counts docstrings as `multi`, not `comments`, so a repo that documents with docstrings looks under-commented.
+- It counts lines, not comment quality.
+- SonarQube's `comment_lines_density` uses a different denominator. See [`metrics_mapping.md`](metrics_mapping.md).
+
+---
+
+### Bandit security findings
+
+**What it measures.** The number of potential security problems found by Bandit's Python rule set, split into high, medium and low severity. Typical findings include `eval`, shell injection, hard-coded passwords, weak hashes, `assert` used for checks and unsafe deserialisation.
+
+**Formula.** For each severity $s \in \{\text{high}, \text{medium}, \text{low}\}$:
+
+```math
+\text{Bandit}_s = \sum_{f} |\text{Issues}_s(f)|
+```
+
+**How to read it.** Lower is better. Keep the three levels separate, since one high finding weighs more than several low ones.
+
+**Tool.** Bandit 1.9.4, default profile, all confidence levels counted.
+
+**Aggregation.** Summed over all Python files.
+
+**Limits.**
+
+- Detection is rule-based pattern matching. It misses logic flaws and data flow across files.
+- It reports false positives. `assert` in test files is by far the most common low finding: rule B101 accounts for 29,830 of the 31,835 low findings (94%) across the 48 Python repos.
+- Bandit's severity levels are its own and don't correspond to SonarQube's.
+- Bandit honours `# nosec` comments and SonarQube honours `NOSONAR`, so teams can suppress findings. I don't record how many suppressions each repo has.
+
+---
 
 ### Functional correctness
 
-- **What it measures.** Whether code produces the expected output on the benchmark's
-  tests.
-- **Formula (PDF).** For instance i, C_i = 1 if all tests pass, 0 otherwise.
-- **Status here.** Out of scope for Deliverable 1. Capstone repos do not share a test
-  harness, and running their tests would mean installing each project's dependencies
-  and services. It could be revisited for repos that ship runnable test suites.
+**What it measures.** Whether code produces the expected output on a benchmark's tests.
+
+**Formula (PDF).** For instance $i$, $C_i = 1$ if all tests pass and $0$ otherwise.
+
+**Status.** Out of scope for Deliverable 1. The capstone repos don't share a test harness, and running their tests would mean installing each project's dependencies and services. This could be revisited for repos that ship runnable test suites.
+
+---
 
 ### Pre/post deltas
 
-The PDF measures the effect of a patch as post-patch minus pre-patch values:
+The PDF measures the effect of a patch as the post-patch value minus the pre-patch value:
 
-- ΔCCavg = (1/|B_post|) Σ_{b∈B_post} CC_b − (1/|B_pre|) Σ_{b∈B_pre} CC_b
-- ΔCCmax = max_{b∈B_post} CC_b − max_{b∈B_pre} CC_b
-- ΔMI = MI_avg^post − MI_avg^pre
-- ΔPylint = Pylint^post − Pylint^pre
-- ΔBandit_s = Σ_{f∈F} |Issues_s^post(f)| − Σ_{f∈F} |Issues_s^pre(f)|, for s in {high, medium, low}
+```math
+\begin{aligned}
+\Delta CC_{avg} &= \frac{1}{|B_{post}|} \sum_{b \in B_{post}} CC_b \;-\; \frac{1}{|B_{pre}|} \sum_{b \in B_{pre}} CC_b \\
+\Delta CC_{max} &= \max_{b \in B_{post}} CC_b \;-\; \max_{b \in B_{pre}} CC_b \\
+\Delta MI &= MI_{avg}^{post} - MI_{avg}^{pre} \\
+\Delta Pylint &= Pylint^{post} - Pylint^{pre} \\
+\Delta Bandit_s &= \sum_{f \in F} |Issues_s^{post}(f)| \;-\; \sum_{f \in F} |Issues_s^{pre}(f)|, \quad s \in \{high, medium, low\}
+\end{aligned}
+```
 
-Here B is the set of blocks (functions, methods, classes) in the modified files and F
-is the set of modified files. This follows Chen and Jiang (2025), who compare agent
-patches against the code before the patch.
+$B$ is the set of blocks (functions, methods, classes) in the modified files, and $F$ is the set of modified files. This follows Chen and Jiang (2025), who compare agent patches against the code before the patch.
 
-Deliverable 1 takes one snapshot per repo (HEAD of the default branch), so no deltas
-are computed yet. `results/results.csv` stores one row per (repo, commit), so D3
-can add more commits per repo and compute the same deltas between consecutive
-snapshots, or between the pre and post versions of a single commit's changed files.
+Deliverable 1 takes one snapshot per repo (the `HEAD` of the default branch), so no deltas are computed yet. `results/results.csv` stores one row per (repo, commit), so D3 can add more commits per repo and compute the same deltas, either between consecutive snapshots or between the before and after versions of the files a single commit changed.
 
-## Limitations (from the PDF)
+---
 
-The PDF treats all of these metrics as interpretable proxies, not complete measures
-of software quality. MI and CC focus on structural maintainability risk. Pylint
-covers style and static code-quality conventions. SLOC and comment % describe
-verbosity and documentation. Bandit only finds rule-based security issues. None of
-them matches a professional developer's judgement of whether code is maintainable
-or good in production. Results should therefore be read as relative comparisons
-between groups measured under the same procedure.
+## Limitations
 
-The PDF adds a qualitative code-book analysis on top of the metrics. It covers
-communication style, response structure, code explanations, readability,
-commenting quality, error handling and hallucination patterns. A version of this
-for student repos is a possible later extension, for example coding a sample of
-files for readability, commenting quality and error handling. It would be a
-complement to the metrics, not a replacement for developer judgement.
+The PDF treats all of these metrics as interpretable proxies, not complete measures of software quality:
+
+- **MI and CC** focus on structural maintainability risk.
+- **Pylint** covers style and static code-quality conventions.
+- **SLOC and comment %** describe verbosity and documentation.
+- **Bandit** only finds rule-based security issues.
+
+None of them matches a professional developer's judgement of whether code is maintainable or good in production. The results should be read as relative comparisons between groups measured with the same procedure.
+
+The PDF also adds a qualitative code-book analysis on top of the metrics, covering communication style, response structure, code explanations, readability, commenting quality, error handling and hallucination patterns. A version of this for student repos is a possible later extension, for example coding a sample of files for readability, commenting quality and error handling. It would complement the metrics, not replace developer judgement.
+
+---
 
 ## References
 
@@ -252,9 +313,9 @@ complement to the metrics, not a replacement for developer judgement.
 - Börstler, J., Bennin, K.E., Hooshangi, S., Jeuring, J., Keuning, H., Kleiner, C., MacKellar, B., Duran, R., Störrle, H., Toll, D., et al. (2023). Developers talking about code quality. *Empirical Software Engineering* 28(6), 128.
 - Chen, Z., Jiang, L. (2025). Evaluating software development agents: Patch patterns, code quality, and issue complexity in real-world GitHub scenarios. *SANER 2025*, 657-668.
 - Chowdhury, S., Holmes, R., Zaidman, A., Kazman, R. (2022). Revisiting the debate: Are code metrics useful for measuring maintenance effort? *Empirical Software Engineering* 27(6), 158.
-- Lacchia, M. Radon. https://github.com/rubik/radon (version 6.0.1 used here).
+- Lacchia, M. Radon. <https://github.com/rubik/radon> (version 6.0.1 used here).
 - McCabe, T.J. (1976). A complexity measure. *IEEE Transactions on Software Engineering* SE-2(4), 308-320.
 - Oman, P., Hagemeister, J. (1992). Metrics for assessing a software system's maintainability. *Proc. Conference on Software Maintenance 1992*, 337-338.
 - Pantiuchina, J., Lanza, M., Bavota, G. (2018). Improving code: The (mis) perception of quality metrics. *ICSME 2018*, 80-91.
-- Pylint contributors. Pylint. https://github.com/pylint-dev/pylint (version 4.0.9 used here).
-- PyCQA. Bandit. https://github.com/PyCQA/bandit (version 1.9.4 used here).
+- Pylint contributors. Pylint. <https://github.com/pylint-dev/pylint> (version 4.0.9 used here).
+- PyCQA. Bandit. <https://github.com/PyCQA/bandit> (version 1.9.4 used here).
