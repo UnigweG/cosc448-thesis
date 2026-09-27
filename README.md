@@ -1,12 +1,15 @@
-# COSC 448 thesis - capstone repo metrics
+# Code Quality in COSC 499 Capstone Repositories
 
-Directed studies project (COSC 448, UBC Okanagan). The goal is to mine the COSC 499
-capstone project repositories from three cohorts (GitHub orgs COSC-499-W2023,
-COSC-499-W2024, COSC-499-W2025) and measure code quality with the metrics from my
-supervisor's metrics document (docs/references/Metrics.pdf) plus SonarQube.
+COSC 448 Directed Studies, UBC Okanagan.
+Gurkirn Kaur and Gabriel Unigwe, supervised under Dr. Bowen Hui
 
-Deliverable 1 is the data pipeline: inventory the repos, pick the capstone projects,
-clone them, and produce one metrics table per repo snapshot.
+This project mines the COSC 499 capstone repositories from three cohorts and measures their code quality. The metrics come from the supervisor's metrics document ([`docs/references/Metrics.pdf`](docs/references/Metrics.pdf)), with SonarQube run alongside them.
+
+| Cohort | GitHub organisation |
+|--------|---------------------|
+| 2023   | `COSC-499-W2023`    |
+| 2024   | `COSC-499-W2024`    |
+| 2025   | `COSC-499-W2025`    |
 
 ## Layout
 
@@ -20,62 +23,82 @@ clone them, and produce one metrics table per repo snapshot.
 
 ## Setup
 
-Needs git, gh (logged in with read access to the three orgs), sonar-scanner and a
-SonarQube server on localhost:9000.
+### Prerequisites
 
-    python3 -m venv .venv
-    .venv/bin/pip install -r requirements.txt    # exact versions used for results/
-    cp .env.example .env     # then fill in SONAR_TOKEN (a SonarQube user token, not a global analysis token)
+- `git`
+- GitHub CLI (`gh`), logged in with read access to all three organisations
+- `sonar-scanner`
+- A SonarQube server running on `localhost:9000`
 
-The scripts read .env themselves, so there is no need to export the token.
+### Install
 
-`requirements.txt` pins every package, including the transitive ones (for example
-astroid, which decides Pylint's parsing). The results were produced with Python 3.14.0
-and exactly these versions.
+```bash
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+cp .env.example .env
+```
 
-GitHub access is read only. Every clone gets its push URL set to DISABLED and a
-pre-push hook that refuses to push.
+Open `.env` and fill in `SONAR_TOKEN`. It must be a SonarQube **user token**, not a global analysis token. The scripts load `.env` themselves, so you don't need to export anything.
 
-## Running
+`requirements.txt` pins every package, including transitive dependencies. That matters for packages like `astroid`, which is the parser Pylint uses. Everything in `results/` was produced with Python 3.14.0 and exactly these versions.
 
-    .venv/bin/python scripts/00_sonar_catalog.py      # SonarQube metric keys/languages -> docs/
-    .venv/bin/python scripts/01_inventory.py          # all repos in the 3 orgs -> results/repo_inventory_all.csv
-    .venv/bin/python scripts/01_inventory.py --groups # print name-pattern groups (add --examples for sample names)
-    bash scripts/02_clone.sh                          # clone/fetch repos in config/repo_selection.txt
-    .venv/bin/python scripts/02b_repo_stats.py        # commit stats -> results/repo_inventory.csv
-    .venv/bin/python scripts/03_sonar_scan.py         # SonarQube scans -> results/sonar_scan_status.csv
-    .venv/bin/python scripts/04_sonar_export.py       # SonarQube measures -> results/sonarqube_metrics.csv
-    .venv/bin/python scripts/05_custom_metrics.py     # radon/pylint/bandit -> results/custom_metrics.csv
-    .venv/bin/python scripts/06_build_results.py      # merged table -> results/results.csv
+### GitHub access is read-only
 
-`03_sonar_scan.py` and `05_custom_metrics.py` also take `--only <repo>` (or
-`--only <org>/<repo>`) to redo one repo.
+Every clone has its push URL set to `DISABLED` and a pre-push hook that refuses to push.
 
-Each script can be re-run; clones are fetched instead of re-cloned and SonarQube
-projects are re-analysed in place. A fetch does not move a clone's checked-out HEAD, so
-a re-run measures the same snapshot as the first clone. To measure a different commit,
-check it out in `data/repos/<year>/<repo>` first.
+---
 
-What each step needs from earlier steps:
+## Running the pipeline
 
-- `02b_repo_stats.py` reads `results/repo_inventory_all.csv` (git-ignored, from 01) and
-  the clones. `results/results.csv` therefore can't be rebuilt from the committed files
-  alone.
-- `04_sonar_export.py` reads from the SonarQube server, so the analyses from 03 must
-  still be on it.
-- `06_build_results.py` reads the four result CSVs and the clones (for snapshot dates).
+Run the scripts in this order:
+
+```bash
+.venv/bin/python scripts/00_sonar_catalog.py
+.venv/bin/python scripts/01_inventory.py
+bash scripts/02_clone.sh
+.venv/bin/python scripts/02b_repo_stats.py
+.venv/bin/python scripts/03_sonar_scan.py
+.venv/bin/python scripts/04_sonar_export.py
+.venv/bin/python scripts/05_custom_metrics.py
+.venv/bin/python scripts/06_build_results.py
+```
+
+| Script                | What it does                                          | Output                                                                     |
+|-----------------------|-------------------------------------------------------|----------------------------------------------------------------------------|
+| `00_sonar_catalog.py` | Records the metric keys and languages SonarQube offers | `docs/sonarqube_metrics_available.csv`, `docs/sonarqube_languages.csv`     |
+| `01_inventory.py`     | Lists every repo in the three organisations           | `results/repo_inventory_all.csv`                                           |
+| `02_clone.sh`         | Clones or fetches the repos in `config/repo_selection.txt` | `data/repos/<year>/`                                                  |
+| `02b_repo_stats.py`   | Collects commit statistics                            | `results/repo_inventory.csv`                                               |
+| `03_sonar_scan.py`    | Runs a SonarQube scan on each repo                    | `results/sonar_scan_status.csv`                                            |
+| `04_sonar_export.py`  | Exports SonarQube measures                            | `results/sonarqube_metrics.csv`                                            |
+| `05_custom_metrics.py`| Runs Radon, Pylint and Bandit                         | `results/custom_metrics.csv`                                               |
+| `06_build_results.py` | Merges everything into one table                      | `results/results.csv`                                                      |
+
+### Useful options
+
+- `01_inventory.py --groups` prints the repo-name pattern groups. Add `--examples` to see sample names in each group.
+- `03_sonar_scan.py` and `05_custom_metrics.py` take `--only <repo>` or `--only <org>/<repo>` to redo a single repo.
+
+### Re-running
+
+Every script is safe to run again. Existing clones are fetched instead of re-cloned, and SonarQube projects are re-analysed in place.
+
+A fetch does not move a clone's checked-out `HEAD`, so a re-run measures the same snapshot as the first run. To measure a different commit, check it out in `data/repos/<year>/<repo>` first.
+
+### What each step depends on
+
+- **`02b_repo_stats.py`** reads the clones and `results/repo_inventory_all.csv` from step 01. That CSV is git-ignored, so `results/results.csv` can't be rebuilt from the committed files alone.
+- **`04_sonar_export.py`** reads from the SonarQube server, so the analyses from step 03 have to still be there.
+- **`06_build_results.py`** reads the four result CSVs, plus the clones for snapshot dates.
+
+---
 
 ## Tests
 
-    .venv/bin/python -m pytest -q tests
+```bash
+.venv/bin/python -m pytest -q tests
+```
 
-The tests use small fixture repos and a mocked SonarQube API, so they need neither the
-clones nor a running server.
+The tests use small fixture repos and a mocked SonarQube API, so they need neither the clones nor a running server.
 
-## Notes
-
-- docs/metrics_definitions.md - the metrics from the supervisor's document and how I compute them
-- docs/metrics_mapping.md - which of them SonarQube 26.9 provides and which come from radon/pylint/bandit
-- docs/metrics_notes.md - short explanations of each metric
-- docs/results_schema.md - columns of results/results.csv
-- docs/environment.md - tool versions
+---
