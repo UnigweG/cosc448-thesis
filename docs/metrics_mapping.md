@@ -73,7 +73,7 @@ These depend on SonarQube's rule set, not on the Halstead / CC / LOC formula, so
 
 ### Pylint
 
-There is no equivalent. As a rough proxy I export SonarQube issues per 1,000 ncloc (`violations / ncloc * 1000`) and the maintainability-issue count. These come from SonarQube's own Python rules (444 on this server), not Pylint's.
+There is no equivalent. As a rough proxy we export SonarQube issues per 1,000 ncloc (`violations / ncloc * 1000`) and the maintainability-issue count. These come from SonarQube's own Python rules (444 on this server), not Pylint's.
 
 ### SLOC
 
@@ -195,7 +195,7 @@ The three are not interchangeable.
 
 For SLOC, `sq_py_ncloc` agrees with `py_sloc` within 1% in 41 of 48 repos and within 2% in 44 (range 0.972-1.055).
 
-> **Pylint note.** The headline column is `py_pylint_score`, Pylint's own score as the PDF defines it. One repo is affected by Pylint's fatal-message rule: W2025 team 6 scores 0.0 because one file can't be parsed, and 8.37 in `py_pylint_score_excl_fatal` without that file. This pulls the W2025 cohort mean down from 7.63 to 7.21 (by 0.42, over 20 repos). I report the headline column and give both numbers for this repo.
+> **Pylint note.** The headline column is `py_pylint_score`, Pylint's own score as the PDF defines it. One repo is affected by Pylint's fatal-message rule: W2025 team 6 scores 0.0 because one file can't be parsed, and 8.37 in `py_pylint_score_excl_fatal` without that file. This pulls the W2025 cohort mean down from 7.63 to 7.21 (by 0.42, over 20 repos). We report the headline column and give both numbers for this repo.
 
 The PDF metrics are only defined for Python, so they are `NA` for the 20 repos without tracked Python. For those repos only the SonarQube columns are available. For C# code, not even those, because the CLI scanner doesn't analyse C# (see [`environment.md`](environment.md)).
 

@@ -110,7 +110,7 @@ Radon leaves out nested blocks entirely. A closure (a function defined inside an
 
 **Limits.**
 
-- Radon derives a class block's complexity from its methods, so including classes counts those methods twice in the pooled list. I keep classes in because the PDF lists them as blocks.
+- Radon derives a class block's complexity from its methods, so including classes counts those methods twice in the pooled list. We keep classes in because the PDF lists them as blocks.
 - CC counts paths, not how hard code is to read. A flat 30-case dispatch scores high but is easy to follow.
 - CC ignores naming, nesting depth and data complexity.
 - Radon counts every `assert` as a decision point, so test functions with many asserts score higher than their logic suggests.
@@ -136,7 +136,7 @@ where:
 | $L$    | logical lines of code (LLOC, not SLOC)                                  |
 | $C$    | comment percentage: (comment lines + multi-line string lines) / SLOC × 100 |
 
-Radon passes $C$ through `radians()` as if it were an angle in degrees. It counts multi-line strings (docstrings) as comments by default, and I keep that default. A file with zero SLOC or zero Halstead volume gets an MI of 100.
+Radon passes $C$ through `radians()` as if it were an angle in degrees. It counts multi-line strings (docstrings) as comments by default, and we keep that default. A file with zero SLOC or zero Halstead volume gets an MI of 100.
 
 **How to read it.** Higher is better, on a 0-100 scale. Radon's ranks are **A** (> 19), **B** (10-19) and **C** (≤ 9).
 
@@ -183,9 +183,9 @@ Each term is the count of messages in that category, and `statement` is the numb
 - `wrong-import-position`
 - `ungrouped-imports`
 
-> **Decision for this project:** I turn off the same four checks. The capstone repos' dependencies aren't installed in my environment, so import errors would otherwise dominate the score. Everything else stays at its default, and repo-level `.pylintrc` files are ignored so every repo is scored the same way.
+> **Decision for this project:** We turn off the same four checks. The capstone repos' dependencies aren't installed in our environment, so import errors would otherwise dominate the score. Everything else stays at its default, and repo-level `.pylintrc` files are ignored so every repo is scored the same way.
 
-**Fatal messages.** By default, Pylint sets the score to 0 if any file produces a fatal message, for example `F0010` when it can't parse a file. This happened in one repo: W2025 team 6, where a demo file was saved as ISO-8859 instead of UTF-8. I keep Pylint's own number in `py_pylint_score` and also store `py_pylint_score_excl_fatal`, which re-runs Pylint without the files that raised fatal messages.
+**Fatal messages.** By default, Pylint sets the score to 0 if any file produces a fatal message, for example `F0010` when it can't parse a file. This happened in one repo: W2025 team 6, where a demo file was saved as ISO-8859 instead of UTF-8. We keep Pylint's own number in `py_pylint_score` and also store `py_pylint_score_excl_fatal`, which re-runs Pylint without the files that raised fatal messages.
 
 **Limits.**
 
@@ -258,7 +258,7 @@ Here `comments` is the sum of Radon's `comments` field (lines containing a `#` c
 - Detection is rule-based pattern matching. It misses logic flaws and data flow across files.
 - It reports false positives. `assert` in test files is by far the most common low finding: rule B101 accounts for 29,830 of the 31,835 low findings (94%) across the 48 Python repos.
 - Bandit's severity levels are its own and don't correspond to SonarQube's.
-- Bandit honours `# nosec` comments and SonarQube honours `NOSONAR`, so teams can suppress findings. I don't record how many suppressions each repo has.
+- Bandit honours `# nosec` comments and SonarQube honours `NOSONAR`, so teams can suppress findings. We don't record how many suppressions each repo has.
 
 ---
 
