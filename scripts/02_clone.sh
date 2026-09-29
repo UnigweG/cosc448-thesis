@@ -28,6 +28,17 @@ lock_push() {
   chmod +x "$dir/.git/hooks/pre-push"
 }
 
+fetch_prs() {
+  # the head of every pull request, including PRs whose branch was deleted; kept under
+  # refs/pull/ so HEAD and the branch list do not change
+  local full="$1" dest="$2" out
+  out="$(git -C "$dest" fetch --quiet origin '+refs/pull/*/head:refs/pull/*/head' 2>&1)" || {
+    echo "$full PR fetch failed: $(echo "$out" | tail -1)" >> "$FAIL_LOG"
+    echo "FAIL $full"
+    return 1
+  }
+}
+
 clone_one() {
   local full="$1" org repo year dest out
   org="${full%%/*}"
@@ -41,6 +52,7 @@ clone_one() {
       echo "FAIL $full"
       return 0
     }
+    fetch_prs "$full" "$dest" || return 0
     echo "fetched $full"
   else
     mkdir -p "$(dirname "$dest")"
@@ -50,10 +62,11 @@ clone_one() {
       return 0
     }
     lock_push "$dest"
+    fetch_prs "$full" "$dest" || return 0
     echo "cloned $full"
   fi
 }
-export -f clone_one lock_push year_of
+export -f clone_one fetch_prs lock_push year_of
 export ROOT FAIL_LOG
 
 run_list() {
