@@ -1,0 +1,157 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { useFormik } from "formik";
+import { Checkbox } from "@/app/components/ui/checkbox";
+import * as Yup from "yup";
+import SignUp from "./api/signup";
+import SignIn from "./api/signin";
+import Input from "@/app/components/formComponents/Input";
+import Member from "@/app/types/Member";
+import { useSearchParams } from "next/navigation";
+import Logo from "@/app/images/TheSomethingSomethingCompanyLogoV3.svg";
+import { useWebSocket } from "../../contexts/WebSocketContext";
+import { send } from "process";
+
+export default function UserAuthentication() {
+
+	const { isConnected, sendMessage } = useWebSocket();
+	sendMessage("hideNavigation", {});
+
+
+	const router = useRouter();
+	const searchParams = useSearchParams();
+
+	const [showSignIn, setShowSignIn] = useState(true);
+	const [terms, setTerms] = useState(false);
+	const [highlightTerms, setHighlightTerms] = useState(false);
+
+	// It checks if the user is logged in on entering the page
+
+
+	// USE EFFECT TO DETERMINE IF SIGN-IN OR SIGN-UP IS SHOWN
+
+	useEffect(() => {
+		if (searchParams.has("signin")) {
+			searchParams.get("signin") === "true"
+				? setShowSignIn(true)
+				: setShowSignIn(false);
+		} else {
+			setShowSignIn(false);
+		}
+	}, []);
+
+	// SECURITY QUESTIONS FOR IF USER FORGETS PASSWORD IN THE FUTURE
+
+	const securityQuestions = [
+		{value: "childhoodPet", label: "What was the name of your first pet?"},
+		{value: "childhoodCareer", label: "When you were a kid, what did you want to be when you grew up?"},
+		{value: "childhoodHero", label: "Who was your childhood hero?"},
+	];
+
+	// FORMIK LOGIC
+
+	const emailRegex = /^[a-zA-Z0-9+_.-]+@[a-zA-Z0-9.-]+$/;
+	const usernameRegex = /^[a-zA-Z0-9]+$/;
+
+	const formik = useFormik({
+		initialValues: {
+			username: "e.g., johndoe",
+			email: "e.g., example@email.com",
+			password: "",
+			confirmpassword: "",
+			securityQuestion: "",
+			securityAnswer: "",
+		},
+		onSubmit: (values: {
+			username: string;
+			email: string;
+			password: string;
+			confirmpassword: string;
+			securityQuestion: string;
+			securityAnswer: string;
+		}) => {
+			submitSignUpData(values);
+		},
+
+		// SCHEMA VALIDATION
+		validationSchema: Yup.object({
+			username: Yup.string().required(
+				"You cannot leave this field empty! Please enter a username"
+			),
+			email: Yup.string()
+				.email("Please enter a valid email address")
+				.required(
+					"You cannot leave this field empty! Please enter your email address"
+				),
+			password: Yup.string()
+				.matches(
+					/^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})/,
+					"Must contain at least one uppercase, one lowercase, one number and one special character and be 8 characters or more in total"
+				)
+				.required(
+					"You cannot leave this field empty! Please enter your password."
+				),
+			confirmpassword: Yup.string().required("You cannot leave this field empty! Please confirm your password."),
+
+			securityQuestion: Yup.string().required(
+				"Please select a security question"
+			  ),
+			  securityAnswer: Yup.string().required(
+				"Please provide an answer to your security question"
+			  ),
+		}),
+	});
+
+	const formikSignIn = useFormik({
+		initialValues: {
+			identifier: "",
+			password: "",
+		},
+		onSubmit: (values: { identifier: string; password: string }) => {
+			submitSignInData(values);
+		},
+
+		// SCHEMA VALIDATION
+		validationSchema: Yup.object({
+			identifier: Yup.string()
+				.required(
+					"This field cannot be empty! Please enter your valid username or email address."
+				)
+				.test(
+					"is-username-or-email",
+					"Please enter your username or email address",
+					(value) => {
+						if (!value) return false;
+						return (
+							emailRegex.test(value) || usernameRegex.test(value)
+						);
+					}
+				),
+			password: Yup.string().required(
+				"You cannot leave this field empty! Please enter your password"
+			),
+		}),
+	});
+
+	const submitSignUpData = async (values: {
+		username: string;
+		email: string;
+		password: string;
+		confirmpassword: string;
+		securityQuestion: string;
+		securityAnswer: string;
+	}) => {
+		try {
+			if (!terms) {
+				setHighlightTerms(true);
+				throw new Error("Please accept the terms and conditions");
+			}
+			if (values.password !== values.confirmpassword) {
+				throw new Error("Passwords do not match! Please try again!");
+			}
+			const body: Member = {
+				username: values.username,
+				email: values.email,

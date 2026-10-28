@@ -1,0 +1,170 @@
+"""
+Framework detection module.
+
+Recursively scans a project and detects frameworks based on YAML rules.
+Supports multiple ecosystems by reading package.json, pyproject.toml,
+requirements*.txt, angular.json, nest-cli.json, etc.
+
+Features:
+  - Lock file analysis (package-lock.json, yarn.lock, poetry.lock)
+  - Transitive dependency detection
+  - Tree-sitter based AST parsing for accurate import extraction
+  - Multi-language support (Python, JavaScript, TypeScript, Java, C#, Go, Rust, PHP, Ruby)
+  - Framework-specific configuration detection
+
+Migrated from src/core/framework_detector.py
+Added caching for rules loading.
+"""
+
+from __future__ import annotations
+
+import ast
+import json
+import logging
+import re
+from functools import lru_cache
+from pathlib import Path
+
+import yaml
+
+logger = logging.getLogger(__name__)
+
+# tomllib: Python 3.11+ / for 3.10 use tomli
+try:
+    import tomllib  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover
+    import tomli as tomllib  # type: ignore
+
+# Tree-sitter for accurate multi-language parsing
+try:
+    from tree_sitter_languages import get_parser
+
+    TREE_SITTER_AVAILABLE = True
+except ImportError:
+    TREE_SITTER_AVAILABLE = False
+    logger.debug(
+        "tree-sitter not available, falling back to regex-based import detection"
+    )
+
+
+# =============================================================================
+# File IO helpers
+# =============================================================================
+
+TEXT_SCAN_EXTS = {
+    ".py",
+    ".ts",
+    ".tsx",
+    ".js",
+    ".jsx",
+    ".json",
+    ".yml",
+    ".yaml",
+    ".toml",
+    ".txt",
+    ".cfg",
+    ".ini",
+    ".xml",
+    ".md",
+    ".properties",
+    ".gradle",
+    ".kts",
+    ".cs",
+    ".sln",
+    ".java",
+    ".php",
+    ".rb",
+    ".go",
+    ".rs",
+}
+
+
+def read_text_safe(path: Path) -> str | None:
+    """Read text file safely, returning None on error."""
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")
+    except Exception:
+        return None
+
+
+def read_bytes_safe(path: Path) -> bytes | None:
+    """Read bytes from file safely, returning None on error."""
+    try:
+        return path.read_bytes()
+    except Exception:
+        return None
+
+
+def load_json_safe(path: Path) -> dict | None:
+    """Load JSON file safely, returning None on error."""
+    txt = read_text_safe(path)
+    if not txt:
+        return None
+    try:
+        return json.loads(txt)
+    except Exception:
+        return None
+
+
+def load_toml_safe(path: Path) -> dict | None:
+    """Load TOML file safely, returning None on error."""
+    raw = read_bytes_safe(path)
+    if not raw:
+        return None
+    try:
+        return tomllib.loads(raw.decode("utf-8", errors="ignore"))
+    except Exception:
+        return None
+
+
+def path_in_excludes(path: Path, excludes: set[str]) -> bool:
+    """Check if any part of the path is in the excludes set."""
+    return any(part in excludes for part in path.parts)
+
+
+def any_glob(folder: Path, patterns: list[str], excludes: set[str]) -> bool:
+    """Check if any file matching the patterns exists in the folder."""
+    for pat in patterns:
+        for p in folder.rglob(pat):
+            if not path_in_excludes(p, excludes):
+                return True
+    return False
+
+
+def scan_text_any(folder: Path, needles: list[str], excludes: set[str]) -> bool:
+    """Scan text files under folder for any of the needles (simple substring)."""
+    if not needles:
+        return False
+    for p in folder.rglob("*"):
+        if (
+            p.is_file()
+            and p.suffix.lower() in TEXT_SCAN_EXTS
+            and not path_in_excludes(p, excludes)
+        ):
+            txt = read_text_safe(p)
+            if not txt:
+                continue
+            for n in needles:
+                if n and (n in txt):
+                    return True
+    return False
+
+
+# =============================================================================
+# Lock file parsing for accurate dependency detection
+# =============================================================================
+
+
+def parse_package_lock(path: Path) -> dict[str, set[str]]:
+    """
+    Parse package-lock.json to get all dependencies (direct + transitive).
+
+    Returns dict mapping package name to versions.
+    """
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        deps = {}
+
+        # NPM 7+ uses packages field, earlier versions use dependencies
+        packages = data.get("packages", {})
+        if packages:

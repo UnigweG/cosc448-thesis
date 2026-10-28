@@ -1,0 +1,145 @@
+import os
+import glob
+import shutil
+import tempfile
+import json
+import pickle
+import logging
+import time
+from typing import Optional, Dict, Any, List
+from pathlib import Path
+import uuid
+from input_validation import validate_uuid
+
+logger = logging.getLogger("uvicorn.error")
+
+from fastapi import FastAPI, File, UploadFile, HTTPException, Depends, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from resume_builder import ResumeBuilder
+
+from analysis_pipeline import AnalysisPipeline
+from config_manager import ConfigManager
+from database_manager import DatabaseManager
+from llm.llm_clients import LocalLLMClient, OnlineLLMClient
+from portfolio_builder import PortfolioBuilder
+from main_utils import perform_update_merge
+from anytree.importer import DictImporter
+from anytree.exporter import DictExporter
+from tree_manager import TreeManager
+from file_manager import FileManager
+
+app = FastAPI(title="Artifact Mining API")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def get_db():
+    db = DatabaseManager()
+    try:
+        yield db
+    finally:
+        db.close()
+
+#helper
+def location_header(location:str):
+    """Returns dict with location header with given location string"""
+    return {"location": location}
+
+
+def cleanup_stale_cache(cache_dir: str = "cache", max_age_seconds: int = 1):
+    """Delete pending_*.pkl files older than max_age_seconds (lazy cleanup)."""
+    if not os.path.isdir(cache_dir):
+        return
+    now = time.time()
+    for path in glob.glob(os.path.join(cache_dir, "pending_*.pkl")):
+        try:
+            if now - os.path.getmtime(path) > max_age_seconds:
+                os.remove(path)
+                logger.info("[CACHE] Deleted stale cache file: %s", path)
+        except Exception as exc:
+            logger.error("[CACHE] Failed to delete stale cache file %s: %s", path, exc)
+    
+
+class ResumeEditRequest(BaseModel):
+    resume_title: str = None
+    resume_data:Dict[str,Any]
+
+class PortfolioEditRequest(BaseModel):
+    portfolio_title: str = None
+    portfolio_data:Dict[str,Any]
+
+
+class ConfigRequest(BaseModel):
+    config_type: str
+    value: bool|str
+
+class BulkConfigRequest(BaseModel):
+    preferences: Dict[str, Any]
+
+class TopicEditRequest(BaseModel):
+    topic_keywords: List[Dict[str, Any]] 
+
+class TopicKeyword(BaseModel):
+    topic_id: int
+    keywords: List[str]
+
+
+class CommitUpdateRequest(BaseModel):
+    topic_keywords: List[TopicKeyword]
+    user_highlights: List[str]
+    selected_projects: List[str]  # Ordered list of repo names
+    online_llm_consent: bool
+
+
+# --- Endpoints ---
+@app.get("/")
+def health_check():
+    return {"status": "active"}
+
+@app.post("/projects/upload/extract")
+async def extract_upload(
+    file: UploadFile = File(...),
+    db: DatabaseManager = Depends(get_db),
+):
+    """
+    Phase 1 – Upload & Extract for a NEW project.
+    Saves the uploaded file, runs the extraction pipeline (which creates
+    a new analysis ID internally), caches heavy state for the commit step,
+    and returns lightweight results to the frontend.
+    """
+    cleanup_stale_cache()
+    t0 = time.time()
+    config = ConfigManager()
+    github_username = config.preferences.get("github_username")
+    github_email = config.preferences.get("github_email")
+    logger.info("[EXTRACT] === Request received ===")
+    logger.info("[EXTRACT] file=%s, size=%s, username=%s, email=%s",
+                file.filename, file.size, github_username, github_email)
+
+    # Save uploaded file to a temporary path
+    suffix = Path(file.filename).suffix
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+    logger.info("[EXTRACT] File saved to %s (%.2fs)", tmp_path, time.time() - t0)
+
+    try:
+        # Initialize pipeline
+        t1 = time.time()
+        pipeline = AnalysisPipeline(config, db)
+        logger.info("[EXTRACT] Pipeline initialized (%.2fs)", time.time() - t1)
+
+        # Run extraction – no existing_analysis_id or preloaded data,
+        # so the pipeline creates a brand-new analysis ID and saves
+        # the initial fileset to the database automatically.
+        t2 = time.time()
+        logger.info("[EXTRACT] Starting run_analysis_extract...")
+        extract_result = pipeline.run_analysis_extract(
+            filepath=tmp_path,

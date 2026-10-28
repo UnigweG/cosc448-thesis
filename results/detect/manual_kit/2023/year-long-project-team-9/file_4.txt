@@ -1,0 +1,129 @@
+"use client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Requests, Submissions, Users } from "stack/database/src/sql.generated";
+import { Archive, Trash2, ListVideo, FileText, ArchiveX } from "lucide-react";
+import { format } from "date-fns";
+import {
+  HoverCard,
+  HoverCardContent,
+  HoverCardTrigger,
+} from "@/components/ui/hover-card";
+import { ComponentProps, useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/modified-shadcn-ui-components/modified-alert-dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer";
+import { ResponsiveContainer } from "recharts";
+import { DataTable } from "./data-table/data-table";
+import { columns } from "./data-table/columns";
+import { useRequests } from "@/app/hooks/use-requests";
+import { useToast } from "@/components/ui/use-toast";
+import { useIsShowingVideo } from "@/app/hooks/use-is-showing-video";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useRequest } from "@/app/hooks/use-request";
+import {
+  EnrichedRequests,
+  SubmissionData,
+} from "@obscurus/database/src/types/enrichedRequests";
+import PanelLoader from "@/app/submit/components/panel-2-loader";
+import { get } from "http";
+
+export default function RequestDisplay({
+  userData,
+  updateRequestGrouping,
+  getProfileImgPresignedUrl,
+  form,
+  getPfp,
+  getDownloadPresignedUrl,
+}: {
+  userData: Users;
+  updateRequestGrouping: Function;
+  getProfileImgPresignedUrl?: (username: string) => Promise<string>;
+  form: any;
+  getPfp: Function;
+  getDownloadPresignedUrl?: (submissionId: string) => Promise<string>;
+}) {
+  console.log("getpfp", getPfp);
+  const [request, setRequest] = useRequest();
+  const [iseShowingVideo, setShowingVideo] = useIsShowingVideo();
+  const { toast } = useToast();
+  const [processedVideo, setProcessedVideo] = useState<string | null>(null);
+
+  const submissionIdFromQuery = useSearchParams().get("submissionId");
+
+  const [requests] = useRequests();
+  const selected = requests
+    ? requests.find((sub) => sub.requestId === request.requestId)
+    : undefined;
+
+  useEffect(() => {
+    if (submissionIdFromQuery) {
+      const requestId = requests?.find( (req) => req.submissions.find( (sub) => sub.submissionId === submissionIdFromQuery)?.requestId);
+
+      if (requestId) {
+        setRequest(requestId);
+      }
+    }
+    getRequesterProfileImage(selected?.requester, selected);
+  }, [submissionIdFromQuery, selected]);
+
+  const getRequesterProfileImage = async (
+    requester: any,
+    requestDetails: any
+  ) => {
+    const imgkey = requester?.profileImage;
+    const requesterEmail = requestDetails?.requesterEmail;
+    if (requesterEmail && getProfileImgPresignedUrl) {
+      const url = await getProfileImgPresignedUrl(imgkey);
+      setrequesterProfileImage(url);
+    }
+  };
+
+  const RequestHeader = ({ selected }: { selected: EnrichedRequests }) => {
+    return (
+      <>
+        <div className="flex items-start p-4">
+          <div className="flex items-start gap-4 text-sm max-w-[65%]">
+            <Avatar className="mt-1.5">
+              <AvatarImage
+                src={requesterProfileImage || ""}
+                alt={selected?.requester.givenName || ""}
+              />
+              <AvatarFallback>
+                {selected?.requester.givenName.charAt(0)}
+                {selected?.requester.familyName.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid gap-1 text-ellipsis line-clamp-1 ">
+              <div className="font-semibold line-clamp-1">
+                {selected?.requestTitle}
+              </div>
+              <div className="line-clamp-3 text-xs text-ellipsis ">
+                <span className="font-medium">From: </span>
+                {selected?.requester.givenName} {selected?.requester.familyName}{" "}
+              </div>
+              <div className="line-clamp-3 text-xs text-ellipsis  ">
+                <span className="font-medium ">Email: </span>

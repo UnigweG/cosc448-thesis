@@ -1,0 +1,201 @@
+from __future__ import annotations
+
+from contextlib import suppress
+from datetime import date
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+from textual import on
+from textual.app import App, ComposeResult
+from textual.containers import Container, VerticalScroll
+from textual.widgets import (
+    Button,
+    Footer,
+    Header,
+    Input,
+    Label,
+    ListItem,
+    ListView,
+    Markdown,
+    ProgressBar,
+    Static,
+    TextArea,
+)
+from textual.worker import Worker, WorkerState
+
+from capstone_project_team_5.consent_tool import ConsentTool
+from capstone_project_team_5.services import create_portfolio_item, upload_zip
+from capstone_project_team_5.services.auth import authenticate_user, create_user
+from capstone_project_team_5.services.portfolio_persistence import (
+    get_latest_portfolio_item_for_project,
+)
+from capstone_project_team_5.services.project_thumbnail import (
+    THUMBNAIL_EXTENSIONS,
+    clear_project_thumbnail,
+    has_project_thumbnail,
+    set_project_thumbnail,
+)
+from capstone_project_team_5.services.user_skill_list import (
+    get_chronological_skills,
+    render_skills_as_markdown,
+)
+from capstone_project_team_5.tui_rendering import (
+    render_detected_list,
+    render_project_markdown,
+)
+from capstone_project_team_5.utils import prompt_for_zip_file
+from capstone_project_team_5.workflows.analysis_pipeline import analyze_projects_structured
+
+if TYPE_CHECKING:
+    from capstone_project_team_5.data.models.code_analysis import CodeAnalysis
+    from capstone_project_team_5.data.models.project import Project
+
+
+ViewMode = Literal["analysis", "saved"]
+
+
+class EditorTextArea(TextArea):
+    """TextArea subclass that wires Ctrl+S to the app's save_edit action."""
+
+    BINDINGS = [
+        ("ctrl+s", "save_edit", "Save edit"),
+    ]
+
+    def action_save_edit(self) -> None:
+        """Dispatch save_edit to the parent application when editing."""
+        app = self.app
+        if isinstance(app, Zip2JobTUI):
+            app.action_save_edit()
+
+
+class Zip2JobTUI(App[None]):
+    """Modern, scrollable TUI for Zip2Job."""
+
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("e", "toggle_edit", "Edit view"),
+        ("ctrl+s", "save_edit", "Save edit"),
+        ("escape", "cancel_edit", "Cancel edit"),
+        ("p", "export_pdf", "Export PDF"),
+        ("t", "export_txt", "Export TXT"),
+    ]
+
+    CSS = """
+Screen {
+    layout: vertical;
+    background: $background;
+}
+
+/* Auth screen centered content */
+#auth-screen {
+    height: 1fr;
+    layout: vertical;
+    align-horizontal: center;
+    align-vertical: middle;
+}
+
+#auth-card {
+    padding: 2;
+    border: heavy $primary;
+    background: $panel;
+    width: 40;
+    align-horizontal: center;
+}
+
+#auth-card Static {
+    text-align: center;
+    margin-bottom: 1;
+}
+
+#auth-card Button,
+#auth-card Input {
+    width: 100%;
+    margin-top: 1;
+}
+
+/* Middle split: sidebar + main output */
+#middle {
+    height: 1fr;
+    layout: horizontal;
+}
+
+/* Sidebar */
+#sidebar {
+    width: 26;
+    padding: 2;
+    border: heavy $primary;
+    background: $panel;
+}
+
+#sidebar Button {
+    margin-top: 1;
+    width: 100%;
+}
+
+#btn-delete-analysis {
+    margin-left: 2;
+    width: 18;
+}
+
+#title {
+    text-align: center;
+    margin-bottom: 2;
+    color: $text;
+}
+
+#projects-header,
+#analyses-header {
+    color: blue;
+    margin-top: 1;
+    margin-bottom: 1;
+}
+
+/* Main scroll area */
+#main {
+    border: heavy $primary;
+    background: $surface;
+    height: 1fr;
+    padding: 1;
+    layout: horizontal;
+}
+
+#output-container {
+    height: 1fr;
+}
+
+#output {
+    color: $text;
+    padding: 1;
+}
+
+/* Status bar */
+#statusbar {
+    height: auto;
+    padding: 1;
+    border: heavy $primary;
+    background: $panel;
+    color: $text;
+}
+
+/* ProgressBar styling */
+ProgressBar {
+    dock: bottom;
+    margin-top: 1;
+}
+"""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._consent_tool: ConsentTool | None = None
+        self._worker: Worker[dict] | None = None
+        self._current_markdown: str = ""
+        self._view_mode: ViewMode = "analysis"
+        self._current_user: str | None = None
+        self._auth_mode: str | None = None
+        self._upload_summary: dict | None = None
+        self._projects: list[dict] = []
+        self._ranks: dict[int, int] = {}
+        self._saved_uploads: list[dict] = []
+        self._saved_projects: list[dict] = []
+        self._saved_active_project_index: int | None = None
+        self._analysis_selected: bool = False

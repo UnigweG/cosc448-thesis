@@ -1,0 +1,117 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+using KelownaSoftware.Application.AggregateRoots.DTOs;
+using KelownaSoftware.Application.Interfaces;
+using KelownaSoftware.Server.Areas.Controllers;
+using Microsoft.AspNetCore.Mvc;
+using Moq;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Xunit;
+
+namespace KelownaSoftware.Server.Tests.Controllers
+{
+    public class AttendeeDataControllerTests
+    {
+        private readonly Mock<IAttendeeDataService> _mockAttendeeDataService;
+        private readonly Mock<IAttendeeService> _mockAttendeeService;
+        private readonly AttendeeDataController _controller;
+
+        public AttendeeDataControllerTests()
+        {
+            _mockAttendeeDataService = new Mock<IAttendeeDataService>();
+            _mockAttendeeService = new Mock<IAttendeeService>();
+            _controller = new AttendeeDataController(_mockAttendeeDataService.Object, _mockAttendeeService.Object);
+        }
+
+        [Fact]
+        public async Task GetAllAttendeeData_ReturnsOkResult_WithAttendeeDataList()
+        {
+            // Arrange
+            var expectedData = new List<AttendeeDataDto>
+            {
+                new AttendeeDataDto { Id = Guid.NewGuid(), FirstName = "Test User 1", Email = "test1@example.com" },
+                new AttendeeDataDto { Id = Guid.NewGuid(), FirstName = "Test User 2", Email = "test2@example.com" }
+            };
+
+            _mockAttendeeDataService.Setup(service => service.GetAllDataAsync())
+                .ReturnsAsync(expectedData);
+
+            // Act
+            var result = await _controller.GetAllAttendeeData();
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnedData = Assert.IsType<List<AttendeeDataDto>>(okResult.Value);
+            Assert.Equal(expectedData.Count, returnedData.Count);
+        }
+
+        [Fact]
+        public async Task GetAttendeeDataById_WithValidId_ReturnsOkResult_WithAttendeeData()
+        {
+            // Arrange
+            var attendeeId = Guid.NewGuid();
+            var expectedData = new AttendeeDataDto 
+            { 
+                Id = attendeeId, 
+                FirstName = "Test User", 
+                Email = "test@example.com" 
+            };
+
+            _mockAttendeeDataService.Setup(service => service.GetDataByIdAsync(attendeeId))
+                .ReturnsAsync(expectedData);
+
+            // Act
+            var result = await _controller.GetAttendeeDataById(attendeeId);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnedData = Assert.IsType<AttendeeDataDto>(okResult.Value);
+            Assert.Equal(attendeeId, returnedData.Id);
+        }
+
+        [Fact]
+        public async Task GetAttendeeDataById_WithInvalidId_ReturnsNotFound()
+        {
+            // Arrange
+            var nonExistentId = Guid.NewGuid();
+            
+            _mockAttendeeDataService.Setup(service => service.GetDataByIdAsync(nonExistentId))
+                .ReturnsAsync((AttendeeDataDto)null);
+
+            // Act
+            var result = await _controller.GetAttendeeDataById(nonExistentId);
+
+            // Assert
+            Assert.IsType<NotFoundResult>(result.Result);
+        }
+
+        [Fact]
+        public async Task GetAttendeeDataForCampaign_ReturnsOkResult_WithAttendeeDataList()
+        {
+            // Arrange
+            var campaignId = Guid.NewGuid();
+            var expectedData = new List<AttendeeDataDto>
+            {
+                new AttendeeDataDto { Id = Guid.NewGuid(), CampaignId = campaignId },
+                new AttendeeDataDto { Id = Guid.NewGuid(), CampaignId = campaignId }
+            };
+
+            _mockAttendeeDataService.Setup(service => service.GetAllDataByCampaignIdAsync(campaignId, null))
+                .ReturnsAsync(expectedData);
+
+            // Act
+            var result = await _controller.GetAttendeeDataForCampaign(campaignId);
+
+            // Assert
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
+            var returnedData = Assert.IsType<List<AttendeeDataDto>>(okResult.Value);
+            Assert.Equal(expectedData.Count, returnedData.Count);
+            Assert.All(returnedData, data => Assert.Equal(campaignId, data.CampaignId));
+        }
+
+        [Fact]
+        public async Task GetAttendeeDataForCampaignById_ReturnsOkResult_WithAttendeeDataList()
+        {
+            // Arrange

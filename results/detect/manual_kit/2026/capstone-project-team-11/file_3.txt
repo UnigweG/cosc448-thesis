@@ -1,0 +1,204 @@
+import type {
+  DifficultyLevel,
+  OmrQuestionType,
+  Question,
+  QuestionChoice,
+  QuestionTag,
+  QuestionType,
+} from "../types/question";
+import type {
+  AddQuestionToExamInput,
+  AnswerKey,
+  AnswerKeyEntry,
+  Exam,
+  ExamCreateInput,
+  ExamDuplicateInput,
+  ExamListItem,
+  ExamQuestion,
+  ExamQuestionLink,
+  ExamQuestionUpdateInput,
+  ExamUpdateInput,
+  ExamVariant,
+  ExamPackage,
+  ExamPackageAnswerPatternCell,
+  ExamPackageAnswerPatternComparison,
+  ExamPackageAnswerPatternComparisonInput,
+  ExamPackageAnswerPatternOption,
+  ExamPackageAnswerPatternPosition,
+  ExamPackageCreateInput,
+  ExamPackageDiversity,
+  ExamPackageDiversityClosestPair,
+  ExamPackageDiversityInput,
+  ExamPackageDiversityMetrics,
+  ExamPackageRecommendation,
+  ExamPackageRecommendationInput,
+  ExamPackageUpdateInput,
+  ExamPackageSelectionMethod,
+  ExamPackageVariant,
+  ExamVariantDetail,
+  ExamVariantGenerationInput,
+  ExamVariantGenerationResult,
+  ExamVariantLayoutUpdate,
+  AnswerKeyFileFormat,
+  InventoryWarning,
+  MarkingScheme,
+  MarkingSchemeUpdateInput,
+  MultipleSelectScoringPolicy,
+  PrintableDisposition,
+  PrintableFile,
+  PrintableFormat,
+  PrintableZipExportInput,
+  QuestionScore,
+  QuestionScoreStatus,
+  ScorePreview,
+  ScorePreviewInput,
+  VariantChoice,
+  VariantQuestion,
+  VariantStrategy,
+} from "../types/exam";
+import { isIsoCalendarDate } from "../utils/calendarDate";
+import {
+  EXAM_DURATION_VALIDATION_MESSAGE,
+  isValidExamDurationMinutes,
+} from "../constants/examDuration";
+import {
+  buildApiUrl,
+  clearSessionIfUnauthorized,
+  CONNECTION_ERROR_MESSAGE,
+  getResponseDetail,
+  hasValidationDetails,
+  isSessionInvalidResponse,
+  readJson,
+  SESSION_EXPIRED_MESSAGE,
+} from "./apiClient";
+import { getStoredToken } from "./authSession";
+
+const GENERIC_ERROR_MESSAGE =
+  "Something went wrong. Please try again.";
+const VALIDATION_ERROR_MESSAGE =
+  "Please check the exam information and try again.";
+
+const QUESTION_TYPES = [
+  "multiple_choice",
+  "multiple_select",
+  "true_false",
+  "short_answer",
+  "cloze",
+] as const;
+
+const DIFFICULTY_LEVELS = [
+  "easy",
+  "medium",
+  "hard",
+] as const;
+
+const VARIANT_STRATEGIES = [
+  "reuse",
+  "substitution",
+] as const;
+
+const MULTIPLE_SELECT_SCORING_POLICIES = [
+  "partial_credit",
+  "all_or_nothing",
+] as const;
+
+const EXAM_PACKAGE_SELECTION_METHODS = [
+  "manual",
+  "recommended",
+] as const;
+
+const QUESTION_SCORE_STATUSES = [
+  "correct",
+  "partial",
+  "incorrect",
+  "unanswered",
+  "invalid",
+  "manual_grading",
+] as const;
+
+const PRINTABLE_FORMATS = [
+  "pdf",
+  "docx",
+] as const;
+
+const ANSWER_KEY_FILE_FORMATS = [
+  "pdf",
+  "docx",
+  "csv",
+] as const;
+
+const PRINTABLE_DISPOSITIONS = [
+  "inline",
+  "attachment",
+] as const;
+
+type BackendExamResponse = {
+  exam_id: number;
+  course_id: number;
+  exam_name: string;
+  duration_minutes: number | null;
+  exam_date: string | null;
+  variant_strategy: VariantStrategy | null;
+  shuffle_true_false_options: boolean;
+  multiple_choice_marks: number;
+  multiple_select_marks: number;
+  true_false_marks: number;
+  short_answer_marks: number;
+  cloze_marks: number;
+  multiple_select_scoring_policy: MultipleSelectScoringPolicy;
+  created_at: string;
+};
+
+type BackendExamListItemResponse = BackendExamResponse & {
+  question_count: number;
+  variant_count: number;
+  package_count: number;
+};
+
+type BackendExamCreateRequest = {
+  exam_name: string;
+  duration_minutes?: number | null;
+  exam_date?: string | null;
+  multiple_choice_marks?: number;
+  multiple_select_marks?: number;
+  true_false_marks?: number;
+  short_answer_marks?: number;
+  cloze_marks?: number;
+  multiple_select_scoring_policy?: MultipleSelectScoringPolicy;
+};
+
+type BackendExamDuplicateRequest = {
+  exam_name?: string;
+  duration_minutes?: number | null;
+  exam_date?: string | null;
+  question_ids?: number[];
+};
+
+type BackendExamUpdateRequest = {
+  exam_name?: string;
+  duration_minutes?: number | null;
+  exam_date?: string | null;
+  variant_strategy?: VariantStrategy | null;
+  shuffle_true_false_options?: boolean;
+};
+
+type BackendQuestionTagResponse = {
+  tag_id: number;
+  name: string;
+};
+
+type BackendQuestionChoiceResponse = {
+  choice_id: number;
+  choice_text: string;
+  is_correct: boolean;
+  choice_order: number;
+};
+
+type BackendQuestionResponse = {
+  question_id: number;
+  course_id: number;
+  question_type: QuestionType;
+  question_text: string;
+  difficulty_level: DifficultyLevel | null;
+  created_at: string;
+  tags: BackendQuestionTagResponse[];

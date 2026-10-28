@@ -1,0 +1,134 @@
+import sqlite3 from 'sqlite3';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+sqlite3.verbose();
+const dbPath = path.resolve(__dirname, 'table.db');
+const basePath = '/app/Database/images';
+
+export let db; // Declare the db variable
+
+
+// Function to connect to the database
+export function connectToDB() {
+    return new Promise((resolve, reject) => {
+        db = new sqlite3.Database(dbPath, sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE, (err) => {
+            const createUsersTableSQL = `
+            CREATE TABLE IF NOT EXISTS users (
+                sessionId TEXT PRIMARY KEY,
+                age INTEGER,
+                gender TEXT,
+                education TEXT,
+                field_of_study TEXT,
+                visual_arts_exp
+            )
+        `;
+
+        db.run(createUsersTableSQL, (err) => {
+            if (err) {
+                console.error("Error creating 'users' table:", err.message);
+                process.exit(1); // Exit if table creation fails
+            } else {
+                console.log("'users' table is ready.");
+            }
+        });
+            if (err) {
+                console.error("Connection Error: ", err.message);
+                reject(err);  // Reject the promise if there's an error
+            } else {
+                console.log("Connected to the database.");
+                resolve(db);  // Resolve the promise with db on success
+            }
+        });
+    });
+}
+
+// Function to insert data into the table
+export function insertData(sessionId, age, gender, education, field_of_study, visual_arts_exp) {
+    return new Promise((resolve, reject) => {
+        const sql = `
+            INSERT INTO users (sessionId, age, gender, education, field_of_study, visual_arts_exp)
+            VALUES (?, ?, ?, ?, ?, ?)
+        `;
+        db.run(sql, [sessionId, age, gender, education, field_of_study, visual_arts_exp], function (err) {
+            if (err) {
+                console.error("Insert Error: ", err.message);
+                if (err.message.includes("UNIQUE constraint")) {
+                    return resolve("Test user already exists.");
+                }
+                return reject(err);
+            }
+            resolve(this.lastID);
+        });
+    });
+}
+
+
+export function deleteData(sessionId, tableName) {
+    return new Promise((resolve, reject) => {
+        let sql;
+        const params = [];
+        if(sessionId) {
+            sql = `DELETE FROM ${tableName} WHERE sessionId = ?`;
+            params.push(sessionId);
+        } else {
+            sql = `DELETE FROM ${tableName}`;
+        }
+        db.run(sql, params, (err) => {
+            if (err) {
+                console.error("Delete Error: ", err.message);
+                return reject(err);
+            }
+            console.log("Row deleted.");
+            resolve();
+        });
+    });
+}
+
+// Function to query data from the table
+export function queryData(tableName) {
+    return new Promise((resolve, reject) => {
+        const sql = `SELECT id, age, gender, education, field_of_study, visual_arts_exp FROM ${tableName}`;
+        db.all(sql, [], (err, rows) => {
+            if (err) {
+                console.error("Query Error: ", err.message);
+                return reject(err);
+            }
+            console.log("Rows retrieved:", rows);
+            resolve(rows);
+        });
+    });
+}
+
+
+// Function to drop the table
+export function dropTable(tableName) {
+    return new Promise((resolve, reject) => {
+        const sql = `DROP TABLE IF EXISTS ${tableName}`;
+        db.run(sql, (err) => {
+            if (err) {
+                console.error(`Table Drop Error for ${tableName}: `, err.message);
+                return reject(err);
+            }
+            console.log(`Table "${tableName}" dropped.`);
+            resolve();
+        });
+    });
+}
+
+// Close the database connection
+export function closeDB() {
+    db.close((err) => {
+        if (err) return console.error("Close Error: ", err.message);
+        console.log("Database connection closed.");
+    });
+}
+
+export function insertAdmin(username, password) {
+    return new Promise((resolve, reject) => {
+        const sql = `INSERT INTO admin (username, password) VALUES (?, ?)`;
+        db.run(sql, [username, password], function (err) {
+            if (err) {
+                console.error("Insert Error: ", err.message);

@@ -1,0 +1,103 @@
+# Project API Routes Helper Module
+# Provides models, services, and utilities for project scan CRUD operations
+# Endpoints are registered in this module's router
+
+from fastapi import APIRouter, HTTPException, status, Header, Depends, File, UploadFile, Query, Response, Request
+from pydantic import BaseModel, Field, field_validator
+from typing import Optional, List, Dict, Any, cast
+from datetime import datetime, timezone
+import asyncio
+import json
+import logging
+import sys
+import os
+import re
+import time
+from pathlib import Path
+from dataclasses import asdict, is_dataclass
+import uuid
+import tempfile
+import threading
+import zipfile
+from pathlib import PurePosixPath
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+try:
+    from services.services.projects_service import ProjectsService, ProjectsServiceError
+    from services.services.encryption import EncryptionService
+    from services.services.project_overrides_service import (
+        ALLOWED_ROLES,
+        ProjectOverridesService,
+        ProjectOverridesServiceError,
+    )
+    from auth.consent_validator import ConsentValidator
+    from api.llm_routes import get_user_client
+    from api.settings_routes import get_or_hydrate_llm_client
+    from services.services.export_service import ExportService
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.services.services.projects_service import ProjectsService, ProjectsServiceError
+    from backend.src.services.services.encryption import EncryptionService
+    from backend.src.services.services.project_overrides_service import (
+        ALLOWED_ROLES,
+        ProjectOverridesService,
+        ProjectOverridesServiceError,
+    )
+    from backend.src.auth.consent_validator import ConsentValidator
+    from backend.src.api.llm_routes import get_user_client
+    from backend.src.api.settings_routes import get_or_hydrate_llm_client
+    from backend.src.services.services.export_service import ExportService
+
+try:
+    from scanner.parser import parse_zip
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.scanner.parser import parse_zip
+
+try:
+    from scanner.models import ScanPreferences
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.scanner.models import ScanPreferences
+
+try:
+    from services.language_stats import summarize_languages
+    from services.services.skills_analysis_service import SkillsAnalysisService
+    from services.services.contribution_analysis_service import ContributionAnalysisService
+    from local_analysis.git_repo import analyze_git_repo
+    from api.upload_routes import uploads_store, uploads_store_lock
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.services.language_stats import summarize_languages
+    from backend.src.services.services.skills_analysis_service import SkillsAnalysisService
+    from backend.src.services.services.contribution_analysis_service import ContributionAnalysisService
+    from backend.src.local_analysis.git_repo import analyze_git_repo
+    from backend.src.api.upload_routes import uploads_store, uploads_store_lock
+
+try:
+    from api.request_context import get_request_access_token, set_request_access_token
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.api.request_context import get_request_access_token, set_request_access_token
+
+try:
+    from analyzer.file_filters import (
+        is_test_path as _is_test_like_path,
+        is_generated_or_package_path as _is_generated_or_package_path,
+        is_non_implementation_path as _is_non_implementation_path,
+        AI_BATCH_LOGIC_PREFERRED_EXTS,
+    )
+except (ModuleNotFoundError, ImportError):
+    from backend.src.analyzer.file_filters import (
+        is_test_path as _is_test_like_path,
+        is_generated_or_package_path as _is_generated_or_package_path,
+        is_non_implementation_path as _is_non_implementation_path,
+        AI_BATCH_LOGIC_PREFERRED_EXTS,
+    )
+
+try:
+    from api.dependencies import AuthContext, get_auth_context
+except (ModuleNotFoundError, ImportError):  # pragma: no cover - test/import fallback
+    from backend.src.api.dependencies import AuthContext, get_auth_context
+
+logger = logging.getLogger(__name__)
+
+# Human-friendly labels for skill categories
+CATEGORY_LABELS = {
+    "oop": "Object-Oriented Design",

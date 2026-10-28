@@ -1,0 +1,217 @@
+/* ============================================
+   DESIGN SYSTEM — Bright ClickUp-Inspired
+   ============================================ */
+
+:root {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F7F8FC;
+  --bg-sidebar: #FFFFFF;
+
+  --purple: #7B68EE;
+  --purple-deep: #6C5CE7;
+  --purple-light: #E8E4FF;
+  --purple-glow: rgba(123, 104, 238, 0.08);
+
+  --green: #00B894;
+  --green-bg: #D4FAEF;
+  --yellow: #FDCB6E;
+  --yellow-bg: #FFF8E1;
+  --red: #D63031;
+  --red-bg: #FFE0E0;
+  --blue: #0984E3;
+  --blue-bg: #DBF0FF;
+  --pink: #E84393;
+  --pink-bg: #FFE0F0;
+  --cyan: #00CEC9;
+  --cyan-bg: #D4FFFE;
+
+  --text-primary: #2D3436;
+  --text-secondary: #636E72;
+  --text-muted: #B2BEC3;
+
+  --border: #E9ECF2;
+  --border-focus: #7B68EE;
+
+  --shadow-card: 0 2px 12px rgba(123, 104, 238, 0.08);
+  --shadow-card-hover: 0 6px 24px rgba(123, 104, 238, 0.14);
+  --shadow-button: 0 4px 16px rgba(123, 104, 238, 0.3);
+
+  --radius-card: 12px;
+  --radius-pill: 20px;
+  --radius-button: 10px;
+  --radius-input: 10px;
+
+  --sidebar-width: 240px;
+  --detail-panel-width: 340px;
+}
+
+.dark {
+  --bg-primary: #1A1B26;
+  --bg-secondary: #0F1219;
+  --bg-sidebar: #13141C;
+  --bg-input: #24283B;
+
+  --purple-light: rgba(123, 104, 238, 0.15);
+  --purple-glow: rgba(123, 104, 238, 0.15);
+  --green-bg: rgba(0, 184, 148, 0.15);
+  --yellow-bg: rgba(253, 203, 110, 0.15);
+  --red-bg: rgba(214, 48, 49, 0.15);
+  --blue-bg: rgba(9, 132, 227, 0.15);
+  --pink-bg: rgba(232, 67, 147, 0.15);
+  --cyan-bg: rgba(0, 206, 201, 0.15);
+
+  --text-primary: #E0E2EA;
+  --text-secondary: #9AA5CE;
+  --text-muted: #565F89;
+
+  --border: #292E42;
+  --border-focus: #7B68EE;
+
+  --shadow-card: 0 4px 16px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-button: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================
+   LAYOUT
+   ============================================ */
+
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ── */
+
+.sidebar {
+  width: var(--sidebar-width);
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  z-index: 100;
+}
+
+.sidebar-brand {
+  padding: 22px 20px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-brand__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--purple), var(--pink));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+
+.sidebar-brand h1 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--purple), var(--purple-deep));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  letter-spacing: -0.02em;
+}
+
+.sidebar-brand span {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.sidebar-nav {
+  flex: 1;
+  padding: 14px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-button);
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.nav-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.nav-item.is-active {
+  background: var(--purple-light);
+  color: var(--purple-deep);
+  font-weight: 700;
+}
+
+.nav-icon {
+  font-size: 1rem;
+  width: 20px;
+  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sidebar-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sidebar-footer p {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.theme-toggle {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: var(--radius-pill);
+  width: 44px;
+  height: 44px;
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-card);
+}
+
+.theme-toggle:hover {
+  background: var(--bg-secondary);
+  border-color: var(--purple);
+}

@@ -1,0 +1,270 @@
+.page-header {
+  display: flex;
+  flex-direction: row;
+}
+
+/* Events Container */
+.events-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 20px;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+/* Event Page Section */
+.event-page-section {
+  flex: 1;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  min-width: 500px;
+}
+
+/* Event Form Section */
+.event-form-section {
+  flex: 1;
+  /* flex-wrap: wrap; */
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  /* max-height: inherit; */
+  overflow-y: scroll;
+  min-width: 500px;
+
+}
+
+
+/* TabStrip Styling */
+kendo-tabstrip {
+  margin-top: 20px;
+  overflow-y: scroll;
+}
+
+.customization-tab {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.customization-options {
+  flex: 1;
+}
+
+.preview-section {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  flex: 1;
+  margin-top: 20px;
+}
+
+label {
+  font-weight: bold;
+  display: block;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+/* Input field styling */
+input.form-control {
+  width: 90%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  margin-bottom: 15px;
+}
+
+/* Input focus effect */
+input.form-control:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
+  outline: none;
+}
+
+/* Error message container */
+.alert {
+  color: #d9534f;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  padding: 8px;
+  /* margin-top: 5px; */
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+/* Adding red border for invalid fields */
+input.ng-invalid.ng-touched,
+input.ng-dirty.ng-invalid {
+  border-color: #d9534f;
+  background-color: #fff5f5;
+}
+
+.checkbox-container {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.checkboxes input[type="checkbox"] {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  /* border: 2px solid #007bff; */
+  border-radius: 4px;
+  background-color: white;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: background-color 0.2s, border-color 0.2s;
+  position: relative;
+  margin-right: 10px;
+}
+
+/* Checkbox checked state */
+.checkboxes input[type="checkbox"]:checked {
+  background-color: #007bff;
+  border-color: #0056b3;
+}
+
+div#events.event-page-section {
+  width: 30%;
+}
+
+div#events.event-page-section {
+  width: 30%;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  position: relative;
+  gap: 20px;
+}
+
+
+.form-bisection {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+}
+
+
+div#left.form-bisection {
+
+  flex-basis: 50%;
+  flex-basis: 50%;
+}
+
+div#right.form-bisection {
+  flex-grow: .4;
+  flex-basis: 45%;
+}
+
+.image-button {
+  cursor: pointer;
+  display: inline-block;
+  border: 2px dashed #ccc;
+  border-radius: 5px;
+  overflow: hidden;
+  width: 200px;
+  height: 200px;
+}
+
+.image-button:hover {
+  border-color: #999;
+  background-color: #f9f9f9;
+}
+
+.upload-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Progress Bar Styling */
+.progress-container {
+  width: 100%;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 10px;
+}
+
+.progress-bar {
+  height: 20px;
+  background-color: rgb(0, 186, 25);
+  text-align: center;
+  line-height: 20px;
+  color: white;
+  border-radius: 10px 0 0 10px;
+}
+
+.progress-bar.full {
+  border-radius: 10px;
+}
+
+button {
+  margin: 5px 0;
+}
+
+/* Utility Classes */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+h2 {
+  margin-bottom: 20px;
+  font-size: 24px;
+  color: var(--primary);
+}
+
+.logo-image-preview {
+  height: 100px;
+  margin-right: 20px;
+}
+
+.color-buttons {
+  width: 50%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.color-picker {
+  display: flex;
+  align-items: center;
+  border: none;
+  padding: 10px 15px;
+  font-size: 16px;
+  cursor: pointer;
+  background-color: var(--gray-light);
+  border-radius: 5px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: background-color 0.3s ease;
+  height: 2.5rem;
+}
+
+.page-customization {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.custom-fields {
+  display: flex;

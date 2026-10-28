@@ -1,0 +1,152 @@
+import io
+import pytest
+from fastapi.testclient import TestClient
+from datetime import datetime
+from pathlib import Path
+
+import src.api.routes as routes
+from src.api.api_main import app
+from src.managers.ProjectManager import ProjectManager
+from src.models.Project import Project
+from src.models.Report import Report
+from src.models.ReportProject import ReportProject, PortfolioDetails
+
+
+# Shared Test Client, fake HTTP client connected to FastAPI app.
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+# Fake Project
+class FakeProject:
+    def __init__(
+        self,
+        id,
+        name,
+        skills_used=None,
+        categories=None,
+        num_files=0,
+        test_file_ratio=0.0,
+        languages=None,
+        language_share=None,
+        author_count=1,
+        collaboration_status="individual",
+        size_kb=0,
+        total_loc=0,
+        date_created=None,
+        last_modified=None,
+        contributor_roles=None,
+        bullets=None,
+        summary="",
+        resume_score=0.0,
+        portfolio_details=None,
+        frameworks=None,
+        file_path="fake/path.zip",
+        ):
+        self.id = id
+        self.name = name
+        self.skills_used = skills_used or []
+        self.contributor_roles = contributor_roles or {}
+        self.categories = categories or {}
+        self.num_files = num_files
+        self.test_file_ratio = test_file_ratio
+        self.languages = languages or []
+        self.language_share = language_share or {}
+        self.author_count = author_count
+        self.collaboration_status = collaboration_status
+        self.size_kb = size_kb
+        self.total_loc = total_loc
+        self.date_created = date_created
+        self.last_modified = last_modified
+        self.bullets = bullets or []
+        self.summary = summary
+        self.resume_score = resume_score
+        self.portfolio_details = portfolio_details
+        self.frameworks = frameworks or []
+        self.file_path = file_path
+
+
+def test_privacy_consent_sets_value(client, monkeypatch):
+    calls = {}
+
+    class FakeConsentManager:
+        def has_user_consented(self):
+            return True  # not needed here but safe
+
+        def set_consent(self, consent: bool):
+            calls["consent"] = consent
+
+    monkeypatch.setattr(routes, "ConsentManager", FakeConsentManager)
+
+    res = client.post("/privacy-consent", json={"consent": True})
+    assert res.status_code == 200
+
+    data = res.json()
+    assert data["consent"] is True
+    assert calls["consent"] is True
+
+def test_get_privacy_consent_true(client, monkeypatch):
+    class FakeConsentManager:
+        def has_user_consented(self):
+            return True
+
+    monkeypatch.setattr(routes, "ConsentManager", FakeConsentManager)
+
+    res = client.get("/privacy-consent")
+    assert res.status_code == 200
+    assert res.json()["consent"] is True
+
+
+def test_get_privacy_consent_false(client, monkeypatch):
+    class FakeConsentManager:
+        def has_user_consented(self):
+            return False
+
+    monkeypatch.setattr(routes, "ConsentManager", FakeConsentManager)
+
+    res = client.get("/privacy-consent")
+    assert res.status_code == 200
+    assert res.json()["consent"] is False
+
+
+def test_get_privacy_consent_independent_of_post(client, monkeypatch):
+    """GET should reflect whatever ConsentManager returns, not be affected by prior POST state."""
+    state = {"consent": False}
+
+    class FakeConsentManager:
+        def has_user_consented(self):
+            return state["consent"]
+
+        def set_consent(self, value):
+            state["consent"] = value
+
+    monkeypatch.setattr(routes, "ConsentManager", FakeConsentManager)
+
+    res = client.get("/privacy-consent")
+    assert res.json()["consent"] is False
+
+    client.post("/privacy-consent", json={"consent": True})
+
+    res = client.get("/privacy-consent")
+    assert res.json()["consent"] is True
+
+
+# /projects (list) test. testing GET /project
+def test_get_projects_list(client, monkeypatch):
+    class FakeProjectManager:
+        def get_project_groups(self):
+            return {
+                "current": [FakeProject(2, "B")],
+                "previous": [FakeProject(1, "A")],
+            }
+
+    monkeypatch.setattr(routes, "ProjectManager", FakeProjectManager)
+
+    res = client.get("/projects")
+    assert res.status_code == 200
+
+    data = res.json()
+    # API concatenates current_projects followed by previous_projects
+    assert data["projects"] == [
+        {"id": 2, "name": "B"},

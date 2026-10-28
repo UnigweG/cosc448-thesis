@@ -1,0 +1,83 @@
+"use client";
+import { useState, useEffect } from "react";
+import Navbar from "../components/Navbar";
+import Sidebar from "../components/userSidebar";
+import ImageSet from "../components/imageSet";
+import Link from "next/link";
+import AnimatedGrating from "../components/AnimatedGrating";
+import AsmrShapes from "../components/AsmrShapes";
+
+export default function RateImages() {
+  const [language, setLanguage] = useState("en");
+  const [numQuestions, setNumQuestions] = useState(0);
+  const [inputValue, setInputValue] = useState("");
+  const [choices, setChoices] = useState({});
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  
+  // Translations for the page
+  const translations = {
+    en: {
+      pageTitle: "Rate Images",
+      subheading: "Compare and choose the image you find more aesthetically pleasing",
+      instructions: "Click on the image you prefer for each pair, and submit your choices at the end.",
+      questionPrompt: "How many questions would you like to answer? (with a limit of 50)",
+      placeholder: "Enter number of questions",
+      setQuestions: "Set Questions",
+      submitChoices: "Submit All Choices",
+      successMessage: "All choices submitted successfully!",
+      failureMessage: "Failed to submit choices.",
+      errorMessage: "An error occurred while submitting your choices.",
+      previous: "Previous",
+      next: "Next",
+    },
+    fr: {
+      pageTitle: "Noter les images",
+      subheading: "Comparez et choisissez l'image que vous trouvez la plus esthétique",
+      instructions: "Cliquez sur l'image que vous préférez pour chaque paire, puis soumettez vos choix à la fin.",
+      questionPrompt: "Combien de questions souhaitez-vous répondre ? (limite de 50)",
+      placeholder: "Entrez le nombre de questions",
+      setQuestions: "Définir les questions",
+      submitChoices: "Soumettre tous les choix",
+      successMessage: "Tous les choix ont été soumis avec succès !",
+      failureMessage: "Échec de la soumission des choix.",
+      errorMessage: "Une erreur s'est produite lors de la soumission de vos choix.",
+      previous: "Précédent",
+      next: "Suivant",
+    },
+  };
+
+  const content = translations[language];
+
+  // Image pairs array with 100 images (50 pairs)
+  const imagePairs = [
+    [{ id: 1, url: "/img 1L.png" }, { id: 2, url: "/img 1R.png" }],
+    [{ id: 3, url: "/img 2L.png" }, { id: 4, url: "/img 2R.png" }],
+    [{ id: 5, url: "/img 3L.png" }, { id: 6, url: "/img 3R.png" }],
+    [{ id: 7, url: "/img 4L.png" }, { id: 8, url: "/img 4R.png" }],
+    [{ id: 9, url: "/img 5L.png" }, { id: 10, url: "/img 5R.png" }],
+    [{ id: 11, url: "/img 6L.png" }, { id: 12, url: "/img 6R.png" }],
+    [{ id: 13, url: "/img 7L.png" }, { id: 14, url: "/img 7R.png" }],
+    [{ id: 15, url: "/img 8L.png" }, { id: 16, url: "/img 8R.png" }],
+    [{ id: 17, url: "/img 9L.png" }, { id: 18, url: "/img 9R.png" }],
+    [{ id: 19, url: "/img 10L.png" }, { id: 20, url: "/img 10R.png" }],
+    [{ id: 21, url: "/img 11L.png" }, { id: 22, url: "/img 11R.png" }],
+    [{ id: 23, url: "/img 12L.png" }, { id: 24, url: "/img 12R.png" }],
+    [{ id: 25, url: "/img 13L.png" }, { id: 26, url: "/img 13R.png" }],
+    [{ id: 27, url: "/img 14L.png" }, { id: 28, url: "/img 14R.png" }],
+    [{ id: 29, url: "/img 15L.png" }, { id: 30, url: "/img 15R.png" }],
+    [{ id: 31, url: "/img 16L.png" }, { id: 32, url: "/img 16R.png" }],
+    [{ id: 33, url: "/img 17L.png" }, { id: 34, url: "/img 17R.png" }],
+    [{ id: 35, url: "/img 18L.png" }, { id: 36, url: "/img 18R.png" }],
+    [{ id: 37, url: "/img 19L.png" }, { id: 38, url: "/img 19R.png" }],
+    [{ id: 39, url: "/img 20L.png" }, { id: 40, url: "/img 20R.png" }],
+    [{ id: 41, url: "/img 21L.png" }, { id: 42, url: "/img 21R.png" }],
+    [{ id: 43, url: "/img 22L.png" }, { id: 44, url: "/img 22R.png" }],
+    [{ id: 45, url: "/img 23L.png" }, { id: 46, url: "/img 23R.png" }],
+    [{ id: 47, url: "/img 24L.png" }, { id: 48, url: "/img 24R.png" }],
+    [{ id: 49, url: "/img 25L.png" }, { id: 50, url: "/img 25R.png" }],
+    [{ id: 51, url: "/img 26L.png" }, { id: 52, url: "/img 26R.png" }],
+    [{ id: 53, url: "/img 27L.png" }, { id: 54, url: "/img 27R.png" }],
+    [{ id: 55, url: "/img 28L.png" }, { id: 56, url: "/img 28R.png" }],
+    [{ id: 57, url: "/img 29L.png" }, { id: 58, url: "/img 29R.png" }],
+    [{ id: 59, url: "/img 30L.png" }, { id: 60, url: "/img 30R.png" }],
+    [{ id: 61, url: "/img 31L.png" }, { id: 62, url: "/img 31R.png" }],

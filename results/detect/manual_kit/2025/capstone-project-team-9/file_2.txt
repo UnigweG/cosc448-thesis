@@ -1,0 +1,227 @@
+/* ============================================
+   Dashboard Styles – Artifact
+   ============================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ============== Layout ============== */
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    min-height: 100vh;
+    padding: 0;
+    line-height: 1.5;
+}
+
+/* Generic card surface */
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+/* Global select fix */
+select {
+    color: var(--text-primary);
+    background: var(--bg-secondary);
+}
+
+.page-shell {
+    width: 100%;
+    margin: 0;
+}
+
+body > header,
+body > .message,
+body > .nav-wrapper,
+body > #viewContainer {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+    padding-left: 24px;
+    padding-right: 24px;
+}
+
+/* ============== Header ============== */
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0;
+    padding: 14px 28px;
+    background: var(--bg-card);
+    border: none;
+    border-bottom: 1px solid var(--border-color);
+    border-radius: 0;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow: var(--shadow-sm);
+    gap: 24px;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-nav-btn {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.header-nav-btn:hover {
+    color: var(--text-primary);
+    background: var(--accent-glow);
+}
+
+.header-nav-btn.active {
+    color: var(--accent-primary);
+    background: var(--accent-glow);
+    font-weight: 600;
+}
+
+.header-nav-btn svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.2s ease;
+}
+
+.header-nav-btn-dropdown.open svg {
+    transform: rotate(180deg);
+}
+
+.header-nav-dropdown {
+    position: relative;
+}
+
+.header-nav-submenu {
+    display: none;
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    min-width: 200px;
+    z-index: 20;
+    padding: 8px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-lg);
+}
+
+.header-nav-submenu.open {
+    display: block;
+}
+
+.header-nav-submenu-btn {
+    display: block;
+    width: 100%;
+    padding: 10px 14px;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    text-align: left;
+    transition: all 0.15s ease;
+}
+
+.header-nav-submenu-btn:hover {
+    color: var(--text-primary);
+    background: var(--accent-glow);
+}
+
+.header-nav-submenu-btn.active {
+    color: var(--accent-primary);
+    background: var(--accent-glow);
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.header-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.header-action-btn:hover {
+    color: var(--accent-primary);
+    background: var(--accent-glow);
+    border-color: var(--accent-primary);
+}
+
+.header-action-btn svg {
+    width: 18px;
+    height: 18px;
+}
+
+.header h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: var(--text-primary);
+    white-space: nowrap;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.header h1::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: var(--accent-primary);
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.header h1 span {
+    color: var(--text-muted);
+    font-weight: 500;
+}

@@ -1,0 +1,114 @@
+import "../styles/ComparePage.css";
+import "../styles/DocUploadPage.css";
+import {
+    getComparisonData,
+    getDocument, getManualComparison, getManualComparisons,
+    parseDocument, postDeleteComparison,
+    postDocumentUpdate,
+    postStartComparison,
+    uploadDocument
+} from "../services/documentService";
+import React, {useEffect, useState} from "react";
+import {useNavigate, useSearchParams} from "react-router-dom";
+import {useHeaderContent} from "../contexts/HeaderContext";
+import DocumentViewerComp from "../components/docupload/DocumentViewerComp";
+import {NewDocumentComp} from "../components/docupload/NewDocumentComp";
+import {DocumentListComp} from "../components/docupload/DocumentListComp";
+import {useTranslation} from "react-i18next";
+import {fetchDocuments} from "../services/customerService";
+import {useDocuments} from "../contexts/DocumentContext";
+import {useAuth} from "../contexts/AuthContext";
+import {useEventContext} from "../contexts/EventContext";
+import ReactMarkdown from "react-markdown";
+import Comparison from "../model/Comparison";
+import ManualComparisons from "../components/docupload/ManualComparisons";
+
+const ComparePage = () => {
+    const {authState} = useAuth();
+    const {documentList, setDocumentList, refreshDocumentList} = useDocuments();
+    const [filteredDocuments, setFilteredDocuments] = useState([]);
+    const [sourceDoc, setSourceDoc] = useState(null);
+    const [targetDoc, setTargetDoc] = useState(null);
+    const [searchParams, setSearchParams] = useSearchParams();
+    const {t} = useTranslation();
+    const {setHeaderContent} = useHeaderContent();
+    const navigate = useNavigate();
+    const {onEvent} = useEventContext();
+
+    const [aiOverview, setAiOverview] = useState({});
+    const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+    const [loadingAi, setLoadingAi] = useState(false);
+    const [currentComparisonId, setCurrentComparisonId] = useState(null);
+
+    const [manualComparisons, setManualComparisons] = useState([]);
+
+    const customer = searchParams.get('customer');
+    const source = searchParams.get('source');
+    const target = searchParams.get('target');
+
+    useEffect(() => {
+        async function fetchData() {
+            const sourceDoc = await getDocument(source);
+            if (!sourceDoc.success) {
+                console.error('Failed to retrieve source document');
+                setSourceDoc({absent: true})
+                return;
+            }
+            setSourceDoc({
+                name: sourceDoc.document.getName(),
+                file: sourceDoc.document.getFile(),
+                parsed: sourceDoc.document.getParsed(),
+                id: sourceDoc.document.getId()
+            });
+
+            if (target) {
+                const targetDoc = await getDocument(target);
+                if (!targetDoc.success) {
+                    console.error('Failed to retrieve target document');
+                    setTargetDoc({absent: true})
+                    return;
+                }
+                setTargetDoc({
+                    name: targetDoc.document.getName(),
+                    file: targetDoc.document.getFile(),
+                    parsed: targetDoc.document.getParsed(),
+                    id: targetDoc.document.getId()
+                });
+
+                const comparisonData = await getComparisonData(source, target);
+                if (!comparisonData.success) {
+                    console.error('Failed to retrieve comparison data', comparisonData.message);
+                    return;
+                }
+                const comparisons = Comparison.fromJsonArray(comparisonData.data);
+                setManualComparisons(Comparison.getManualComparisons(comparisons));
+            } else {
+                setTargetDoc({absent: true});
+            }
+        }
+
+        fetchData().then();
+
+    }, [searchParams]);
+
+    useEffect(() => {
+        setHeaderContent(<div className="compare-documents-title">
+            {t("compare_page.title")}
+        </div>);
+
+        return () => setHeaderContent(null);
+    }, [setHeaderContent]);
+
+    const updateFilteredDocuments = () => {
+        const index = documentList.findIndex(doc => `${doc.getId()}` === source);
+        if (index === -1) return;
+
+        const filtered = documentList.slice();
+        filtered.splice(index, 1);
+        setFilteredDocuments(filtered);
+    }
+
+    useEffect(() => {
+        if (documentList) {
+            updateFilteredDocuments();
+        }

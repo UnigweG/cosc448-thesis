@@ -1,0 +1,120 @@
+import os
+import sys
+import time
+import subprocess
+import zipfile
+import io
+import threading
+import contextlib
+import tempfile
+import json
+import sqlite3
+import re
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src')))
+from config import load_config, save_config, merge_settings, config_path as default_config_path, is_default_config
+from consent import ask_for_data_consent, ask_yes_no
+from detect_langs import detect_languages_and_frameworks, LANGUAGE_MAP
+from detect_skills import detect_skills
+from file_utils import is_valid_format, is_image_file
+from db import get_connection, init_db, save_scan
+from collab_summary import summarize_project_contributions, identify_contributions
+from datetime import datetime
+from llm_summary import get_or_generate_summary, summary_timestamp
+
+# =============================================================================
+# SCAN PROGRESS OUTPUT MANAGER
+# =============================================================================
+
+# Centralized, clean scan output manager for consistent CLI display
+class ScanProgress:
+
+    def __init__(self):
+        self.results = {}
+
+    # Print a section header
+    def header(self, title: str):
+        print(f"\n{title}")
+        print("-" * 20)
+
+    # Print a real-time progress bar (updates in place)
+    def progress(self, current: int, total: int):
+        if total <= 0:
+            return
+        pct = min(100, int((current / total) * 100))
+        width = 25
+        filled = int((current / total) * width)
+        bar = '#' * filled + '-' * (width - filled)
+        sys.stdout.write(f'\r    [{bar}] {pct}%')
+        sys.stdout.flush()
+        if current >= total:
+            print()
+
+    # Print a simple item line
+    def item(self, text: str):
+        print(f"    [-] {text}")
+
+    # Store a result for later display in summary
+    def store(self, key: str, value):
+        self.results[key] = value
+
+    # Print scan complete summary with moderate detail
+    def complete(self, project_name: str, output_dir: str = None):
+        self.header("Scan Complete!")
+        self.item(f"Project: {project_name}")
+        if self.results.get('files_found'):
+            self.item(f"Files: {self.results['files_found']} scanned, {self.results.get('files_skipped', 0)} skipped ({self.results['files_found'] + self.results.get('files_skipped', 0)} total)")
+        if self.results.get('languages'):
+            self.item(f"Languages: {', '.join(self.results['languages'])}")
+        if self.results.get('frameworks'):
+            self.item(f"Frameworks: {', '.join(self.results['frameworks'])}")
+        if self.results.get('skills'):
+            self.item(f"Skills: {', '.join(self.results['skills'])}")
+        if self.results.get('contributors'):
+            self.item(f"Contributors: {', '.join(self.results['contributors'])}")
+        if self.results.get('project_type'):
+            self.item(f"Project Type: {self.results['project_type']}")
+        if output_dir:
+            self.item(f"Summary saved to: {output_dir}")
+
+# Global progress instance for use across functions
+_scan_progress = None
+
+# Get or create the global scan progress instance (set reset=True to start fresh)
+def get_scan_progress(reset: bool = False) -> ScanProgress:
+    global _scan_progress
+    if _scan_progress is None or reset:
+        _scan_progress = ScanProgress()
+    return _scan_progress
+
+# Try to import contribution metrics module; support running as package or standalone
+try:
+    from contrib_metrics import analyze_repo, pretty_print_metrics, canonical_username
+except Exception:
+    try:
+        from .contrib_metrics import analyze_repo, pretty_print_metrics, canonical_username
+    except Exception:
+        analyze_repo = None
+        pretty_print_metrics = None
+        canonical_username = None
+
+# Try to import project_info_output (gather & write summaries)
+try:
+    from project_info_output import gather_project_info, output_project_info
+except Exception:
+    try:
+        from .project_info_output import gather_project_info, output_project_info
+    except Exception:
+        gather_project_info = None
+        output_project_info = None
+
+
+def _zip_mtime_to_epoch(dt_tuple):
+    """
+    Convert ZipInfo.date_time (Y, M, D, h, m, s) to a POSIX timestamp.
+    Note: The tuple has no timezone info; treated as local time.
+    """
+    try:
+        y, mo, d, h, mi, s = dt_tuple
+        return time.mktime((y, mo, d, h, mi, s, 0, 0, -1))
+    except Exception:

@@ -1,0 +1,95 @@
+import React, { useEffect, useRef, useState } from 'react';
+import ReactDOM from 'react-dom';
+import axios from 'axios';
+import { API_BASE_URL } from './api';
+import { showModal } from "./modal";
+
+const MAX_FEATURED = 3;
+
+function formatRoleConfidence(value) {
+  if (typeof value !== 'number' || Number.isNaN(value)) return '0%';
+  return `${Math.round(value * 100)}%`;
+}
+
+// Modal component to act as an expanded project card, showing all available information about the project and the user's contributions to it
+function ProjectModal({ project, detail, username, displayName, onClose }) {
+  const name = project.display_name ?? project.name ?? '(unnamed)';
+  const projectId = project.id ?? project.project_id;
+  const thumbSrc = getThumbnailSrc(projectId, project.thumbnail_path);
+  const languages = Array.isArray(detail?.languages) ? detail.languages : [];
+  const frameworks = Array.isArray(detail?.frameworks) ? detail.frameworks : [];
+  const skills = Array.isArray(detail?.skills) ? detail.skills : [];
+  const contributors = Array.isArray(detail?.contributors) ? detail.contributors : [];
+  const evidence = Array.isArray(detail?.evidence) ? detail.evidence : [];
+  const filesSummary = detail?.files_summary ?? {};
+  const git = detail?.git_metrics ?? {};
+  const llmSummary = detail?.llm_summary?.text ?? null;
+  const repoUrl = detail?.project?.repo_url ?? null;
+
+  // Filter contributor roles to only the selected portfolio user
+  const allRoles = Array.isArray(detail?.contributor_roles?.contributors)
+    ? detail.contributor_roles.contributors
+    : [];
+  const userRole = allRoles.find(
+    (c) => c.name?.toLowerCase() === username?.toLowerCase()
+  ) ?? null;
+
+  // Git metrics helpers
+  const totalCommits = git?.total_commits ?? null;
+  const durationDays = git?.duration_days ?? null;
+  const projectStart = git?.project_start ? String(git.project_start).slice(0, 10) : null;
+  const projectEnd = git?.project_end ? String(git.project_end).slice(0, 10) : null;
+  const linesAdded = git?.lines_added_per_author?.[username] ?? null;
+  const linesRemoved = git?.lines_removed_per_author?.[username] ?? null;
+  const linesAddedPerAuthor = git?.lines_added_per_author ?? {};
+  const totalLinesAdded = Object.values(linesAddedPerAuthor).reduce((s, v) => s + (v ?? 0), 0) || null;
+  const userCommits = git?.commits_per_author?.[username] ?? null;
+  const commitsPerAuthor = git?.commits_per_author ?? {};
+  const allAuthors = Object.entries(commitsPerAuthor).sort((a, b) => b[1] - a[1]);
+  const userRank = allAuthors.findIndex(([n]) => n.toLowerCase() === username?.toLowerCase());
+  const commitPct = totalCommits && userCommits != null ? ((userCommits / totalCommits) * 100).toFixed(1) : null;
+  const avgCommitsPerWeek = (durationDays && userCommits != null && durationDays > 0)
+    ? (userCommits / Math.max(1, durationDays / 7)).toFixed(1)
+    : null;
+
+  // Rank Projects Score
+  const rankScore = detail?.rank_score ?? null;
+
+  // Contribution breakdown (from role analysis)
+  const breakdown = userRole?.contribution_breakdown ?? null;
+  const breakdownEntries = breakdown
+    ? Object.entries(breakdown).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
+    : [];
+
+  // Top 6 file extensions (skip if empty)
+  const extEntries = Object.entries(filesSummary.extensions ?? {})
+    .filter(([ext]) => ext)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 6);
+
+  const isCollaborative = contributors.length > 1;
+
+  // Expanded Project Card Modal
+  return (
+    <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-label={`${name} details`}>
+      <div
+        className="modal-card modal-card--project"
+        style={{ width: '720px', maxWidth: '95vw', maxHeight: '85vh', overflowY: 'auto', textAlign: 'left' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="detail-card-header" style={{ marginBottom: '1rem' }}>
+          <div>
+            <span className="panel-eyebrow">Project · {isCollaborative ? 'Collaborative' : 'Individual'}</span>
+            <h3 style={{ margin: 0 }}>{name}</h3>
+            {(projectStart || projectEnd) && (
+              <span className="modal-date-range">
+                {projectStart ?? '?'} → {projectEnd ?? 'present'}
+              </span>
+            )}
+          </div>
+          <button type="button" className="hero-action-button" onClick={onClose}>✕ Close</button>
+        </div>
+
+        {/* Thumbnail */}
+        {thumbSrc && (

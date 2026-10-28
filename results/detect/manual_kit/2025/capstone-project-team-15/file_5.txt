@@ -1,0 +1,141 @@
+from __future__ import annotations
+
+import argparse # CLI argument parsing
+import json
+import os
+import sys
+import time
+from dataclasses import dataclass, asdict, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
+
+
+DEFAULT_API_URL = "http://localhost:5001"
+DEFAULT_STATE_PATH = ".artifactminer_state.json"
+
+
+# ----------------------------
+# Utilities
+# ----------------------------
+
+def _eprint(msg: str) -> None:
+    print(msg, file=sys.stderr)
+
+
+def _pretty(obj: Any) -> str:
+    return json.dumps(obj, indent=2, sort_keys=True, default=str)
+
+
+def _api_url(args: argparse.Namespace) -> str:
+    return (args.api_url or os.environ.get("ARTIFACT_MINER_API_URL") or DEFAULT_API_URL).rstrip("/")
+
+
+def _bool_flag(s: str) -> bool:
+    v = s.strip().lower()
+    if v in ("1", "true", "t", "yes", "y", "on"):
+        return True
+    if v in ("0", "false", "f", "no", "n", "off"):
+        return False
+    raise argparse.ArgumentTypeError(f"invalid boolean: {s}")
+
+
+def _require_file(path: str) -> Path:
+    p = Path(path).expanduser().resolve()
+    if not p.exists():
+        raise argparse.ArgumentTypeError(f"file not found: {p}")
+    return p
+
+
+def _require_zip(path: str) -> Path:
+    p = _require_file(path)
+    if p.suffix.lower() != ".zip":
+        raise argparse.ArgumentTypeError("expected a .zip file")
+    return p
+
+
+# ----------------------------
+# State (for demos)
+# ----------------------------
+
+@dataclass
+class DemoState:
+    api_url: str = DEFAULT_API_URL
+    user_id: Optional[str] = None
+    portfolio_id: Optional[str] = None
+    last_upload: Dict[str, Any] = field(default_factory=dict)
+    last_project_id: Optional[str] = None
+    last_snapshot_id: Optional[str] = None
+    last_analysis_id: Optional[str] = None
+    last_resume_id: Optional[str] = None
+    last_showcase_id: Optional[str] = None
+
+    def apply_upload_response(self, res: Dict[str, Any]) -> None:
+        self.last_upload = res or {}
+        self.user_id = str(res.get("user_id") or self.user_id or "") or self.user_id
+        self.portfolio_id = str(res.get("portfolio_id") or self.portfolio_id or "") or self.portfolio_id
+
+        created = (res.get("created") or [])
+        if created:
+            c0 = created[0] or {}
+            if c0.get("project_id"):
+                self.last_project_id = str(c0["project_id"])
+            if c0.get("snapshot_id"):
+                self.last_snapshot_id = str(c0["snapshot_id"])
+
+    def apply_projects_response(self, res: Dict[str, Any]) -> None:
+        projects = res.get("projects") or []
+        if projects:
+            self.last_project_id = str(projects[0].get("id") or self.last_project_id or "") or self.last_project_id
+            latest = (projects[0].get("latest_snapshot") or {}).get("id")
+            if latest:
+                self.last_snapshot_id = str(latest)
+
+    def apply_portfolio_generate(self, res: Dict[str, Any]) -> None:
+        showcases = res.get("showcases") or []
+        if showcases:
+            sc0 = showcases[0] or {}
+            if sc0.get("id"):
+                self.last_showcase_id = str(sc0["id"])
+
+    def apply_resume_generate(self, res: Dict[str, Any]) -> None:
+        if res.get("resume_id"):
+            self.last_resume_id = str(res["resume_id"])
+
+
+def _load_state(path: Path) -> DemoState:
+    if not path.exists():
+        return DemoState()
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        st = DemoState()
+        for k, v in (data or {}).items():
+            if hasattr(st, k):
+                setattr(st, k, v)
+        return st
+    except Exception:
+        return DemoState()
+
+
+def _save_state(path: Path, st: DemoState) -> None:
+    path.write_text(_pretty(asdict(st)) + "\n", encoding="utf-8")
+
+
+# ----------------------------
+# HTTP client
+# ----------------------------
+
+class ApiClient:
+    def __init__(self, base_url: str, timeout_s: float = 30.0):
+        self.base = base_url.rstrip("/")
+        self.timeout_s = float(timeout_s)
+        self.sess = requests.Session()
+
+    def _req(self, method: str, path: str, *, params=None, json_body=None, data=None, files=None, timeout_s=None) -> requests.Response:
+        url = f"{self.base}{path}"
+        t = self.timeout_s if timeout_s is None else float(timeout_s)
+        r = self.sess.request(method, url, params=params, json=json_body, data=data, files=files, timeout=t)
+        return r
+
+    def get(self, path: str, *, params=None, timeout_s=None) -> Dict[str, Any]:

@@ -1,0 +1,120 @@
+"""
+Digital Artifact Mining Software - Main Entry Point
+Integrates all components for a complete workflow
+
+"""
+import json
+import sys
+import os
+from pathlib import Path
+import re
+import math
+from datetime import datetime, timezone
+
+# Filter out Git error messages globally
+_original_print = print
+def print(*args, **kwargs):
+    message = ' '.join(str(arg) for arg in args)
+    if 'Git' not in message and 'git' not in message:
+        _original_print(*args, **kwargs)
+import builtins
+builtins.print = print
+
+
+
+# Add parent directory to path so we can import from src
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from src.Databases.user_config import ConfigManager
+
+from src.Helpers.installDependencies import install_requirements
+install_requirements()
+from src.UserPrompts.getConsent import get_user_consent
+from src.UserPrompts.config_integration import (
+    show_current_configuration,
+    configure_privacy_settings,
+    configure_analysis_preferences,
+    request_and_store_basic_consent,
+    request_and_store_ai_consent,
+    quick_setup_wizard,
+    config_manager,
+)
+from src.UserPrompts.externalPermissions import request_ai_consent
+from src.Extraction.zipHandler import (
+    validate_zip_file, extract_zip, get_zip_contents, 
+    count_files_in_zip, ZipExtractionError, InvalidFileFormatError
+)
+from src.Portfolio.portfolioFormatter import PortfolioFormatter
+from src.Helpers.fileDataCheck import sniff_supertype
+from src.Helpers.classifier import supertype_from_extension
+from src.Analysis.codingProjectScanner import scan_coding_project
+from src.Analysis.textDocumentScanner import scan_text_document
+from src.Analysis.mediaProjectScanner import scan_media_project
+from src.Analysis.visualMediaAnalyzer import analyze_visual_project
+from src.Extraction.keywordExtractorText import extract_keywords_with_scores
+from src.Analysis.summarizeProjects import summarize_projects
+from src.Analysis.runSummaryFromDb import fetch_projects_for_summary
+from src.Analysis.projectcollabtype import identify_project_type
+from src.AI.ai_project_analyzer import AIProjectAnalyzer
+from src.AI.ai_project_ranker import AIProjectRanker
+from src.AI.ai_enhanced_summarizer import (
+    summarize_projects_with_ai,
+    generate_resume_bullets
+)
+from src.Analysis.importanceScores import assign_importance_scores
+from src.Analysis.importanceRanking import get_ranked_projects
+from src.Analysis.rank_projects_by_date import get_ranked_timeline_from_db
+from src.Analysis.codeEfficiency import grade_efficiency
+from src.Analysis.folderEfficiency import grade_folder
+from src.AI.ai_text_project_analyzer import AITextProjectAnalyzer
+from src.AI.ai_media_project_analyzer import AIMediaProjectAnalyzer
+from src.Analysis.incrementalZipHandler import handle_incremental_zip_upload
+from src.Analysis.incrementalFileHandler import handle_add_files_to_project
+from src.Analysis.multiProjectZip import processZipFile, identifyProjectType, splitZipFile
+from src.Databases.database import db_manager
+
+# Import evidence management features
+try:
+    from src.Evidence.evidenceMenu import evidence_main_menu
+    from src.Evidence.evidenceManager import evidence_manager
+    EVIDENCE_FEATURES_AVAILABLE = True
+except ImportError:
+    EVIDENCE_FEATURES_AVAILABLE = False
+    print("⚠️  Evidence management features not available (modules not found)")
+
+# Import deletion management features
+try:
+    from src.deletion_manager import DeletionManager
+    from src.enhanced_deletion import (
+        delete_project_enhanced,
+        bulk_delete_projects,
+        view_shared_files_report
+    )
+    DELETION_FEATURES_AVAILABLE = True
+except ImportError:
+    DELETION_FEATURES_AVAILABLE = False
+    print("⚠️  Deletion features not available (modules not found)")
+
+# Import resume menu
+try:
+    from src.Resume.resumeMenu import run_resume_menu
+    RESUME_FEATURES_AVAILABLE = True
+except ImportError:
+    RESUME_FEATURES_AVAILABLE = False
+    print("⚠️  Resume features not available (modules not found)")
+
+# Import showcase selector
+try:
+    from src.Portfolio.showcaseSelector import run_showcase_selector
+    SHOWCASE_FEATURES_AVAILABLE = True
+except ImportError:
+    SHOWCASE_FEATURES_AVAILABLE = False
+    print("⚠️  Showcase selector not available (module not found)")
+
+def clear_screen():
+    """Clear console screen"""
+    os.system('cls' if os.name == 'nt' else 'clear')
+
+def print_header(text):
+    """Print formatted header"""
+    print("\n" + "=" * 70)
+    print(f"  {text}")

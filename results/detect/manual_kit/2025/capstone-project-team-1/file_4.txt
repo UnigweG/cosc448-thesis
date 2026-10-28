@@ -1,0 +1,151 @@
+"""Local LLM API endpoints for the OpenTUI resume-generation flow."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import inspect
+import shutil
+import subprocess
+import tempfile
+import uuid
+from pathlib import Path
+from typing import Any, Callable
+from zipfile import ZipFile, is_zipfile
+
+from fastapi import APIRouter, HTTPException, Query
+
+from ..helpers.zip_utils import safe_extract_zip
+from ..local_llm.generation.jobs import (
+    append_message,
+    make_job,
+    make_telemetry,
+    mark_cancelled,
+    should_stop,
+    update_job,
+)
+from ..local_llm.generation.schemas import (
+    GenerationFeedback,
+    ProjectFacts,
+    ResumeOutputModel,
+)
+from ..local_llm.generation.service import (
+    build_draft_output,
+    build_polished_output,
+    finalize_output,
+    generate_project_facts,
+)
+from ..local_llm.runtime.config import DEFAULT_MODEL_NAME, DEFAULT_MODELS_DIR
+from ..local_llm.runtime.process_manager import get_server_status, stop_server
+from ..local_llm.runtime.registry import (
+    list_available_models,
+    list_supported_models,
+    select_default_model_name,
+)
+from .local_llm_schemas import (
+    CancellationResponse,
+    ContributorDiscoveryRequest,
+    ContributorDiscoveryResponse,
+    ContributorIdentity,
+    GenerationStartRequest,
+    GenerationStartResponse,
+    GenerationStatusResponse,
+    GenerationTelemetry,
+    IntakeCreateRequest,
+    IntakeCreateResponse,
+    LocalLLMSetupResponse,
+    PolishRequest,
+    PolishResponse,
+    RepositoryCandidate,
+)
+
+
+router = APIRouter(prefix="/local-llm", tags=["local-llm"])
+
+
+_active_intakes: dict[str, "IntakeContext"] = {}
+_generation_jobs: dict[str, dict[str, Any]] = {}
+_active_generation_id: str | None = None
+_generation_cancel_hooks: dict[str, Callable[[], Any]] = {}
+_JOB_LAUNCH_DELAY_SECONDS = 0.1
+
+
+class IntakeContext:
+    """Represents an active intake session with metadata."""
+
+    def __init__(
+        self,
+        intake_id: str,
+        zip_path: str,
+        repos: list[RepositoryCandidate],
+        extracted_dir: str,
+    ):
+        self.intake_id = intake_id
+        self.zip_path = zip_path
+        self.repos = repos
+        self.extracted_dir = extracted_dir
+        self.repo_id_to_path: dict[str, Path] = {
+            repo.id: Path(extracted_dir) / repo.rel_path for repo in repos
+        }
+
+
+def register_generation_cancellation_hook(
+    job_id: str, cancel_hook: Callable[[], Any]
+) -> None:
+    """Register optional runtime cancellation hook for a generation job."""
+
+    _generation_cancel_hooks[job_id] = cancel_hook
+
+
+async def _stop_job_runtime(job_id: str, job: dict[str, Any]) -> None:
+    """Stop all runtime controls attached to a generation job."""
+
+    generation_task = job.get("generation_task")
+    if generation_task is not None and hasattr(generation_task, "cancel"):
+        generation_task.cancel()
+
+    stop_server()
+
+    cancel_hook = _generation_cancel_hooks.get(job_id) or job.get("cancel_hook")
+    if callable(cancel_hook):
+        maybe_awaitable = cancel_hook()
+        if inspect.isawaitable(maybe_awaitable):
+            await maybe_awaitable
+
+    if generation_task is not None and hasattr(generation_task, "__await__"):
+        with contextlib.suppress(asyncio.CancelledError, TimeoutError, Exception):
+            await asyncio.wait_for(generation_task, timeout=1.5)
+
+
+def _is_git_repo(path: Path) -> bool:
+    git_dir = path / ".git"
+    return git_dir.is_dir() and (git_dir / "HEAD").is_file()
+
+
+def _is_macos_metadata(path: Path, base_path: Path) -> bool:
+    try:
+        parts = path.relative_to(base_path).parts
+    except ValueError:
+        parts = path.parts
+    return any(part == "__MACOSX" or part.startswith("._") for part in parts)
+
+
+def _discover_repos_in_zip(zip_path: str) -> tuple[list[RepositoryCandidate], str]:
+    if not Path(zip_path).exists():
+        raise ValueError(f"ZIP file not found: {zip_path}")
+    if not is_zipfile(zip_path):
+        raise ValueError(f"Invalid ZIP file: {zip_path}")
+
+    candidates: list[RepositoryCandidate] = []
+    seen_repos: set[str] = set()
+    temp_extracted_dir = tempfile.mkdtemp(prefix="zip_extract_")
+
+    try:
+        try:
+            with ZipFile(zip_path, "r") as zf:
+                safe_extract_zip(zf, Path(temp_extracted_dir))
+        except Exception as exc:
+            shutil.rmtree(temp_extracted_dir)
+            raise ValueError(f"Failed to extract ZIP file: {exc}") from exc
+
+        extracted_root = Path(temp_extracted_dir)

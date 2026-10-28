@@ -1,0 +1,153 @@
+import json
+import mimetypes
+import os
+import sys
+import re
+import sqlite3
+from io import BytesIO, StringIO
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
+import subprocess
+
+# Ensure local imports work when running via uvicorn from repo root.
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
+from fastapi import APIRouter, Body, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
+from project_evidence import add_evidence, delete_evidence, update_evidence, validate_evidence_type
+from pydantic import BaseModel, Field
+import contextlib
+import queue
+import threading
+import glob
+import tempfile
+import zipfile
+
+from config import load_config, save_config, config_path as default_config_path
+from cli_username_selection import get_candidate_usernames
+from db import get_connection, save_portfolio, update_portfolio, list_portfolios, list_all_portfolios, rename_portfolio, delete_portfolio, save_resume, delete_project_by_id
+from generate_portfolio import aggregate_projects_for_portfolio
+from generate_resume import (
+    collect_projects,
+    aggregate_for_user,
+    render_markdown,
+    maybe_generate_resume_summary,
+)
+from project_info_output import gather_project_info, output_project_info
+from rank_projects import rank_projects, rank_projects_by_importance, list_custom_rankings, get_custom_ranking, save_custom_ranking, delete_custom_ranking
+from contrib_metrics import canonical_username, classify_file
+from detect_roles import analyze_project_roles
+from scan import (
+    run_with_saved_settings,
+    scan_with_clean_output,
+    _find_all_project_roots,
+    _find_git_root,
+    _resolve_extracted_root,
+)
+from inspect_db import inspect_connection
+from generate_portfolio import build_portfolio
+
+try:
+    from pypdf import PdfReader  # type: ignore
+except Exception:
+    PdfReader = None
+
+
+app = FastAPI(title="MDA API")
+web_router = APIRouter(prefix="/web/portfolio", tags=["web-portfolio"])
+
+
+@app.get("/health")
+def health() -> Dict[str, str]:
+    return {"status": "ok"}
+
+# Allow local frontend origins (Vite/Electron dev) to read API responses.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+class PrivacyConsentRequest(BaseModel):
+    data_consent: bool
+    llm_summary_consent: Optional[bool] = None
+    llm_resume_consent: Optional[bool] = None
+
+
+class ProjectUploadRequest(BaseModel):
+    project_path: str
+    recursive_choice: bool = False
+    file_type: Optional[str] = None
+    show_collaboration: bool = False
+    show_contribution_metrics: bool = False
+    show_contribution_summary: bool = False
+    save_to_db: bool = True
+    thumbnail_path: Optional[str] = None
+    llm_summary: bool = False
+    manual_contributors_by_path: Optional[Dict[str, List[str]]] = None
+
+
+class ScanPlanProject(BaseModel):
+    project_name: str
+    project_path: str
+    is_git: bool
+    requires_contributor_assignment: bool
+
+
+class ScanPlanResponse(BaseModel):
+    root_path: str
+    total_projects: int
+    is_multi_project: bool
+    projects: List[ScanPlanProject]
+    existing_contributors: List[str]
+
+
+class ProjectEditRequest(BaseModel):
+    custom_name: Optional[str] = None
+    repo_url: Optional[str] = None
+    thumbnail_path: Optional[str] = None
+    summary_text: Optional[str] = None
+
+
+
+class ResumeGenerateRequest(BaseModel):
+    username: str
+    output_root: str = "output"
+    resume_dir: str = "resumes"
+    allow_bots: bool = False
+    save_to_db: bool = False
+    llm_summary: bool = False
+    excluded_project_names: List[str] = Field(default_factory=list)
+    education: Optional[List[Dict[str, str]]] = None
+
+
+class ResumeEditRequest(BaseModel):
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class PortfolioGenerateRequest(BaseModel):
+    username: str
+    output_root: str = "output"
+    portfolio_dir: str = "portfolios"
+    confidence_level: str = Field("high", pattern="^(high|medium|low)$")
+    save_to_db: bool = False
+
+
+class PortfolioSaveRequest(BaseModel):
+    username: str
+    portfolio_name: str
+    display_name: Optional[str] = None
+    included_project_ids: List[int] = []
+    featured_project_ids: List[int] = []
+
+
+class PortfolioRenameRequest(BaseModel):

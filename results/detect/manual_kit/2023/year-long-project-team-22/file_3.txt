@@ -1,0 +1,105 @@
+import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import './VideoList.css';
+import styles from './VideoDashboard.css';
+import logo from './logo.svg';
+import video from './add-video.png';
+import Dropdown from 'react-bootstrap/Dropdown';
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+const pageSize = 6;
+
+const VideoList = () => {
+    const [videos, setVideos] = useState([]);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(0);
+    const token = sessionStorage.getItem("token");
+    const [avatar, setAvatar] = useState('');
+    const userId = sessionStorage.getItem('userId');
+    const defaultImageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRFr5mqtVORmBTMIwXT8iDuNMKrbADOQdA-uw&usqp=CAU";
+
+
+    useEffect(() => {
+        fetch(`http://127.0.0.1:8888/user/getAvatar=${userId}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'token': token
+          },
+        })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Failed to fetch user profile');
+            }
+            return response.json();
+          })
+          .then(data => {
+            if (!data.data) {
+              setAvatar("https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg");
+            } else {
+              console.log(data);
+              let base64String = data.data;
+              let byteCharacters = atob(base64String);
+              let byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              let byteArray = new Uint8Array(byteNumbers);
+              let blob = new Blob([byteArray], { type: 'application/octet-stream' })
+              console.log(blob);
+              let blobUrl = URL.createObjectURL(blob);
+              setAvatar(blobUrl);
+            }
+          })
+          .catch(error => {
+            console.error('Error fetching user profile:', error.message);
+          });
+    
+          const fetchVideos = async () => {
+            const token = sessionStorage.getItem("token");
+            try {
+              const response = await fetch('http://127.0.0.1:8888/video/UserReceivedVideoList', {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'token': token,
+                },
+              });
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              const jsonResponse = await response.json();
+              console.log(jsonResponse);
+          
+              let data = Array.isArray(jsonResponse.data) ? jsonResponse.data : Array.isArray(jsonResponse) ? jsonResponse : [];
+              
+              const videosWithCovers = await Promise.all(data.map(async (video) => {
+                try {
+                  const coverResponse = await fetch(`http://127.0.0.1:8888/video/getCover=${video.id}`, {
+                    method: 'GET',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'token': token,
+                    },
+                  });
+                  if (!coverResponse.ok) {
+                    throw new Error('Failed to fetch cover');
+                  }
+                  const coverData = await coverResponse.json();
+                  if(coverData.data!=null){
+                  console.log(coverData);
+                  let base64String = coverData.data;
+                  console.log(base64String);
+                  let byteCharacters = atob(base64String);
+                  let byteNumbers = new Array(byteCharacters.length);
+                  for (let i = 0; i < byteCharacters.length; i++) {
+                    byteNumbers[i] = byteCharacters.charCodeAt(i);
+                  }
+                  let byteArray = new Uint8Array(byteNumbers);
+                  console.log(byteArray);
+                  let blob = new Blob([byteArray], {type : 'image/jpeg'}); 
+                  let coverUrl = URL.createObjectURL(blob);
+                  console.log(coverUrl);
+                  return { ...video, cover: coverUrl }; 
+                  }else{
+                  let coverUrl=defaultImageUrl;

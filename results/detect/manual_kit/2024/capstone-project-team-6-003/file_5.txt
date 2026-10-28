@@ -1,0 +1,119 @@
+﻿using System.Net.Http.Json;
+using KelownaSoftware.Application.AggregateRoots.DTOs;
+using KelownaSoftware.Application.Interfaces;
+using KelownaSoftware.Domain.AggregateRoots.Achievement;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+
+namespace KelownaSoftware.Infrastructure.Services;
+
+public class AchievementService : IAchievementService
+{
+    private readonly IKSDbContext _context;
+    private readonly INotificationService _notificationService;
+    
+    public AchievementService(
+        IKSDbContext context, 
+        INotificationService notificationService)
+    {
+        _context = context;
+        _notificationService = notificationService;
+    }
+    
+    public async Task<IEnumerable<AchievementDto>> GetVendorAchievementsAsync(string vendorId)
+    {
+        // Get IDs first to avoid DateTime conversion issues
+        var earnedAchievementIds = await _context.VendorAchievements
+            .AsNoTracking()
+            .Where(va => va.VendorId == vendorId)
+            .Select(va => va.AchievementId)
+            .ToListAsync();
+            
+        // Then get the achievement details
+        var achievements = await _context.Achievements
+            .AsNoTracking()
+            .Where(a => earnedAchievementIds.Contains(a.Id))
+            .Select(a => new AchievementDto
+            {
+                Id = a.Id.ToString(),
+                Name = a.Name,
+                Description = a.Description,
+                IconUrl = a.IconUrl,
+                IsCompleted = true,
+                Criteria = a.Criteria,
+                DateAwarded = DateTime.Now // Using current time as a fallback
+            })
+            .ToListAsync();
+            
+        return achievements;
+    }
+    
+    // Get all possible achievements, marking the ones the vendor has completed
+    public async Task<IEnumerable<AchievementDto>> GetAllAchievementsForVendorAsync(string vendorId)
+    {
+        try {
+            // First, get all achievements
+            var allAchievements = await _context.Achievements
+                .AsNoTracking()
+                .Select(a => new AchievementDto
+                {
+                    Id = a.Id.ToString(),
+                    Name = a.Name,
+                    Description = a.Description,
+                    IconUrl = a.IconUrl,
+                    IsCompleted = false, // Default to not completed
+                    Criteria = a.Criteria,
+                    DateAwarded = null // Use null for non-earned achievements
+                })
+                .ToListAsync();
+            
+            // Then get the vendor achievements with their award dates
+            var vendorAchievements = await _context.VendorAchievements
+                .AsNoTracking()
+                .Where(va => va.VendorId == vendorId)
+                .Select(va => new 
+                { 
+                    AchievementId = va.AchievementId.ToString(), // Convert to string here to match
+                    DateAwarded = va.DateAwarded 
+                })
+                .ToListAsync();
+            
+            // Mark the completed achievements with the actual award dates
+            int completedCount = 0;
+            foreach (var achievement in allAchievements)
+            {
+                var completed = vendorAchievements.FirstOrDefault(va => va.AchievementId == achievement.Id);
+                if (completed != null)
+                {
+                    achievement.IsCompleted = true;
+                    achievement.DateAwarded = completed.DateAwarded;
+                    completedCount++;
+                }
+            }
+            
+            return allAchievements;
+        }
+        catch (Exception ex) {
+            throw;
+        }
+    }
+
+    public async Task AwardAchievementAsync(string vendorId, string achievementName)
+    {
+        // First check if this achievement is already awarded to this vendor
+        string achievementId = await GetAchievementIdByNameAsync(achievementName);
+        
+        var existingAchievement = await _context.VendorAchievements
+            .FirstOrDefaultAsync(va => va.VendorId == vendorId && va.AchievementId == achievementId);
+
+        if (existingAchievement != null)
+        {
+            // Already awarded, don't do anything
+            return;
+        }
+
+        // Create new achievement award
+        var vendorAchievement = new VendorAchievement
+        {
+            VendorId = vendorId,
+            AchievementId = achievementId,

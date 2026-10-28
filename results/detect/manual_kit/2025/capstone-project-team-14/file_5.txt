@@ -1,0 +1,125 @@
+"""
+Unit tests for presentation module (portfolio and resume generation)
+"""
+
+import sys
+from pathlib import Path
+
+# Add project root to Python path
+project_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(project_root))
+
+import pytest
+from src.project.presentation import (
+    extract_project_metrics,
+    generate_portfolio_item,
+    generate_resume_item,    generate_items_from_project_id,
+    PortfolioItem,
+    ResumeItem,
+    ProjectMetrics
+)
+from src.insights.storage import ProjectInsightsStore
+
+
+class TestProjectMetrics:
+    """Test ProjectMetrics dataclass"""
+    
+    def test_project_metrics_initialization(self):
+        """Test that ProjectMetrics initializes with defaults"""
+        metrics = ProjectMetrics()
+        
+        assert metrics.languages == []
+        assert metrics.frameworks == []
+        assert metrics.skills == []
+        assert metrics.total_files == 0
+        assert metrics.total_lines == 0
+        assert metrics.total_commits == 0
+        assert metrics.total_contributors == 0
+        assert metrics.is_collaborative is False
+        # New fields
+        assert metrics.doc_files == 0
+        assert metrics.doc_words == 0
+        assert metrics.image_files == 0
+        assert metrics.video_files == 0
+        assert metrics.test_files == 0
+        assert metrics.has_documentation is False
+        assert metrics.has_images is False
+        assert metrics.has_videos is False
+        assert metrics.has_tests is False
+    
+    def test_project_metrics_with_values(self):
+        """Test that ProjectMetrics can be initialized with values"""
+        metrics = ProjectMetrics(
+            languages=["Python", "JavaScript"],
+            frameworks=["Flask", "React"],
+            skills=["REST API", "Frontend"],
+            total_files=50,
+            total_lines=5000,
+            total_commits=100,
+            total_contributors=3,
+            is_collaborative=True
+        )
+        
+        assert metrics.languages == ["Python", "JavaScript"]
+        assert metrics.frameworks == ["Flask", "React"]
+        assert metrics.skills == ["REST API", "Frontend"]
+        assert metrics.total_files == 50
+        assert metrics.total_lines == 5000
+        assert metrics.total_commits == 100
+        assert metrics.total_contributors == 3
+        assert metrics.is_collaborative is True
+
+
+class TestExtractProjectMetrics:
+    """Test extract_project_metrics helper function"""
+    
+    def test_extract_metrics_from_full_project_dict(self):
+        """Test extraction from a fully populated project dict"""
+        project_dict = {
+            "project_name": "test-project",
+            "analysis_results": {
+                "code": {
+                    "metrics": {
+                        "languages": ["Python", "JavaScript", "TypeScript"],
+                        "frameworks": ["Django", "React", "pytest"],
+                        "skills": ["REST API", "Database Design", "Unit Testing"],
+                        "total_files": 42,
+                        "total_lines": 3500,
+                        "test_files": 8
+                    }
+                },
+                "documentation": {
+                    "totals": {
+                        "total_files": 5,
+                        "total_words": 1200
+                    }
+                }
+            },
+            "categorized_contents": {
+                "images": ["image1.png", "image2.jpg"],
+                "other": ["video1.mp4", "video2.mov", "other.txt"]
+            },
+            "git_analysis": {
+                "total_commits": 150,
+                "total_contributors": 4
+            }
+        }
+        
+        metrics = extract_project_metrics(project_dict)
+        
+        assert metrics.languages == ["Python", "JavaScript", "TypeScript"]
+        assert metrics.frameworks == ["Django", "React", "pytest"]
+        assert metrics.skills == ["REST API", "Database Design", "Unit Testing"]
+        assert metrics.total_files == 42
+        assert metrics.total_lines == 3500
+        assert metrics.total_commits == 150
+        assert metrics.total_contributors == 4
+        assert metrics.is_collaborative is True  # > 1 contributor
+        # New fields
+        assert metrics.doc_files == 5
+        assert metrics.doc_words == 1200
+        assert metrics.has_documentation is True
+        assert metrics.image_files == 2
+        assert metrics.has_images is True
+        assert metrics.video_files == 2
+        assert metrics.has_videos is True

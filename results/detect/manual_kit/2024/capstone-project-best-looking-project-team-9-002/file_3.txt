@@ -1,0 +1,167 @@
+import React, { useEffect, useState } from 'react';
+import {
+  Box,
+  Center,
+  Heading,
+  Progress,
+  Text,
+  VStack,
+  Image,
+  Button,
+  ButtonGroup,
+  Flex,
+} from "@chakra-ui/react";
+
+import { useTranslation } from "react-i18next";
+
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+  Tooltip
+} from "recharts";
+
+
+const COLORS = [
+  '#FF5F6D', '#FFC371', '#4ECDC4', '#7EE8FA', '#88FF8A',
+  '#EEC0C6', '#C9D6FF', '#FF9A9E', '#FBAB7E', '#A6C1EE'
+];
+
+const CHAKRA_COLOR_SCHEMES = [
+  'red', 'orange', 'yellow', 'green', 'teal',
+  'blue', 'cyan', 'purple', 'pink'
+];
+
+/** 
+ * A custom tooltip component that displays an image preview 
+ * and the vote count when hovering over a slice/bar.
+ */
+const ImageTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const { imageUrl, value, selectedByUser } = payload[0].payload;
+    return (
+      <Box bg="white" p={2} borderRadius="md" boxShadow="md">
+        <Image src={imageUrl} alt="Option" boxSize="80px" mb={2} />
+        <Text color="black">{value} votes</Text>
+        {selectedByUser && (
+          <Text color="green.500" fontWeight="bold">
+            Your Choice
+          </Text>
+        )}
+      </Box>
+    );
+  }
+  return null;
+};
+
+const SurveyResult = () => {
+  const [responses, setResponses] = useState([]);
+  const [aggregatedResults, setAggregatedResults] = useState({});
+  const [currentUserID, setCurrentUserID] = useState(null);
+  const [error, setError] = useState(null);
+  
+  // A single global chartType for all questions
+  const [chartType, setChartType] = useState("poll");
+
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  const { t } = useTranslation();
+
+
+
+  // Fetch responses and user cookie
+  const fetchResponses = async () => {
+    try {
+      // Fetch the user's cookie to get their userID
+
+      const cookieRes = await fetch(
+        isProduction
+          ? "/aesthetics/group9/app/api/cookie/cookie-value"
+          : "http://localhost:5050/api/cookie/cookie-value",
+        {
+          method: "GET",
+          credentials: "include",
+        }
+      );
+
+
+      if (cookieRes.ok) {
+        const { userId } = await cookieRes.json();
+        setCurrentUserID(userId);
+
+
+        // Fetch all responses
+        const responseRes = await fetch(
+          isProduction
+            ? "/aesthetics/group9/app/api/responses"
+            : "http://localhost:5050/api/responses",
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+
+
+        if (responseRes.ok) {
+          const responseData = await responseRes.json();
+          console.log('Raw response data:', responseData);
+
+          // Parse the prompts field if it's a JSON string
+          const parsedResponses = responseData.map((response) => ({
+            ...response,
+            prompts: Array.isArray(response.prompts)
+              ? response.prompts
+              : JSON.parse(response.prompts),
+          }));
+          console.log('Parsed responses:', parsedResponses);
+          setResponses(parsedResponses);
+        } else {
+          console.log("Failed to fetch responses");
+          setError("Failed to fetch responses");
+        }
+      } else {
+        console.log("Failed to retrieve cookie");
+        setError("Failed to retrieve cookie");
+      }
+    } catch (error) {
+      console.log("Error fetching responses from responses:", error);
+      setError("Error fetching responses");
+    }
+  };
+
+
+  // Aggregate results for each question
+  const aggregateResults = () => {
+    const userResponses = responses;
+    console.log('Filtered user responses:', userResponses);
+    console.log('Current userID:', currentUserID);
+    const results = {};
+
+    userResponses.forEach(({ userID, prompts, userAnswer }) => {
+
+      const promptKey = JSON.stringify(prompts);
+
+      if (!results[promptKey]) {
+        results[promptKey] = {
+          totalResponses: 0,
+          options: {},
+        };
+      }
+
+      results[promptKey].totalResponses += 1;
+
+      prompts.forEach((option) => {
+        if (!results[promptKey].options[option]) {
+          results[promptKey].options[option] = {
+            count: 0,
+            percentage: 0,
+            selectedByUser: false
+          };
+        }
+
+        if (userAnswer === option) {

@@ -1,0 +1,189 @@
+"""
+Language analysis module.
+
+This module provides language detection, file analysis, and line-of-code
+counting functionality.
+
+Features:
+  - Tree-sitter based AST parsing for accurate detection
+  - Comprehensive language/extension mappings
+  - Multi-line comment handling
+  - Special file detection (Dockerfile, Makefile, Gemfile, etc.)
+  - Fallback detection chain for edge cases
+
+Migrated from src/core/language_analyzer.py
+Updated to use unified constants from src/core/constants.py
+"""
+
+import os
+import logging
+import yaml
+from pathlib import Path
+from typing import Dict, Any, Iterator, Tuple, Optional
+from dataclasses import dataclass
+
+from src.core.constants import (
+    SKIP_DIRECTORIES,
+    SKIP_EXTENSIONS,
+    SKIP_FILENAMES,
+    HIDDEN_FILE_EXCEPTIONS,
+    MIN_FILE_SIZE,
+    DEFAULT_MAX_SIZE,
+)
+
+logger = logging.getLogger(__name__)
+
+# Tree-sitter for accurate multi-language parsing
+try:
+    from tree_sitter_languages import get_parser
+
+    TREE_SITTER_AVAILABLE = True
+except ImportError:
+    TREE_SITTER_AVAILABLE = False
+    logger.debug("tree-sitter not available, using fallback detection")
+
+
+# =============================================================================
+# Built-in language patterns (comprehensive fallback)
+# =============================================================================
+
+# Comprehensive extension to language mapping
+EXTENSION_MAP = {
+    # Web
+    ".html": "HTML",
+    ".htm": "HTML",
+    ".css": "CSS",
+    ".scss": "SCSS",
+    ".sass": "Sass",
+    ".less": "LESS",
+    # JavaScript/TypeScript
+    ".js": "JavaScript",
+    ".jsx": "JavaScript",
+    ".ts": "TypeScript",
+    ".tsx": "TypeScript",
+    ".mjs": "JavaScript",
+    ".cjs": "JavaScript",
+    ".vue": "Vue",
+    ".svelte": "Svelte",
+    # Python
+    ".py": "Python",
+    ".pyw": "Python",
+    ".pyx": "Cython",
+    ".pyi": "Python",
+    # Java/JVM
+    ".java": "Java",
+    ".kt": "Kotlin",
+    ".scala": "Scala",
+    ".groovy": "Groovy",
+    ".gradle": "Gradle",
+    ".clj": "Clojure",
+    ".cljs": "ClojureScript",
+    # C/C++
+    ".c": "C",
+    ".h": "C",
+    ".cpp": "C++",
+    ".cc": "C++",
+    ".cxx": "C++",
+    ".c++": "C++",
+    ".hpp": "C++",
+    ".hxx": "C++",
+    ".h++": "C++",
+    # C#/.NET
+    ".cs": "C#",
+    ".csproj": "MSBuild",
+    ".sln": "MSBuild",
+    ".vb": "VB.NET",
+    # Go
+    ".go": "Go",
+    ".mod": "Go",
+    ".sum": "Go",
+    # Rust
+    ".rs": "Rust",
+    ".toml": "TOML",
+    # PHP
+    ".php": "PHP",
+    ".php3": "PHP",
+    ".php4": "PHP",
+    ".php5": "PHP",
+    ".phtml": "PHP",
+    ".phar": "PHP",
+    # Ruby
+    ".rb": "Ruby",
+    ".erb": "ERB",
+    ".gemspec": "Ruby",
+    ".jbuilder": "Ruby",
+    # Shell
+    ".sh": "Shell",
+    ".bash": "Shell",
+    ".zsh": "Shell",
+    ".fish": "Shell",
+    ".ps1": "PowerShell",
+    ".psm1": "PowerShell",
+    ".psd1": "PowerShell",
+    # SQL
+    ".sql": "SQL",
+    ".tsql": "T-SQL",
+    # Configuration
+    ".json": "JSON",
+    ".yaml": "YAML",
+    ".yml": "YAML",
+    ".xml": "XML",
+    ".ini": "INI",
+    ".cfg": "Config",
+    ".conf": "Config",
+    ".config": "Config",
+    ".properties": "Java Properties",
+    # Markdown
+    ".md": "Markdown",
+    ".markdown": "Markdown",
+    ".mdown": "Markdown",
+    ".mkd": "Markdown",
+    ".mdx": "MDX",
+    # Other
+    ".r": "R",
+    ".R": "R",
+    ".swift": "Swift",
+    ".lua": "Lua",
+    ".pl": "Perl",
+    ".pm": "Perl",
+    ".proto": "Protocol Buffer",
+    ".graphql": "GraphQL",
+    ".gql": "GraphQL",
+    ".dockerfile": "Dockerfile",
+    ".tex": "LaTeX",
+    ".rst": "reStructuredText",
+}
+
+# Special filenames that indicate a language
+SPECIAL_FILES = {
+    "Makefile": "Makefile",
+    "makefile": "Makefile",
+    "GNUmakefile": "Makefile",
+    "Dockerfile": "Dockerfile",
+    "dockerfile": "Dockerfile",
+    ".dockerignore": "Docker",
+    "Gemfile": "Ruby",
+    "Rakefile": "Ruby",
+    "Guardfile": "Ruby",
+    "Procfile": "Procfile",
+    "Procfile.dev": "Procfile",
+    "Appfile": "Ruby",
+    "Berksfile": "Ruby",
+    "Cheffile": "Chef",
+    "Podfile": "Cocoapods",
+    "Cartfile": "Carthage",
+    "Package.swift": "Swift",
+    "Cargo.toml": "Rust",
+    "Cargo.lock": "Rust",
+    ".travis.yml": "YAML",
+    ".github": "GitHub Actions",
+    "bitbucket-pipelines.yml": "YAML",
+    ".circleci": "CircleCI",
+    "tox.ini": "Python",
+    "setup.py": "Python",
+    "setup.cfg": "Python",
+    "pyproject.toml": "Python",
+    "requirements.txt": "Python",
+    "Pipfile": "Python",
+    "poetry.lock": "Python",
+    "package.json": "JSON",

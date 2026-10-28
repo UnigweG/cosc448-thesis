@@ -1,0 +1,154 @@
+import { useEffect, useState } from "react";
+import {
+  getResume,
+  editResume,
+  removeProjectFromResume,
+  downloadResumeDocx,
+  downloadResumePdf,
+  getResumeProjectEligibleRoles,
+  getResumePdfPreviewBlob,
+  getResumeSkills,
+  type ResumeDetail as ResumeDetailType,
+  type ResumeProject,
+  type SkillWithStatus,
+} from "../../api/outputs";
+import { MinimalConfirmDialog } from "../shared";
+import ExportDropdown from "./ExportDropdown";
+import AddProjectModal from "./AddProjectModal";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardAction,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+import {
+  Pencil,
+  Check,
+  X,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  ArrowLeft,
+} from "lucide-react";
+
+type Props = {
+  resumeId: number;
+  initialEditing?: boolean;
+  onBack: () => void;
+};
+
+type ProjectEdits = {
+  display_name: string;
+  key_role: string;
+  contribution_bullets: string[];
+  scope: "resume_only" | "global";
+};
+
+export default function ResumeDetail({
+  resumeId,
+  initialEditing = false,
+  onBack,
+}: Props) {
+  const [resume, setResume] = useState<ResumeDetailType | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Edit mode toggle
+  const [editing, setEditing] = useState(initialEditing);
+
+  // Resume name editing
+  const [editingName, setEditingName] = useState(false);
+  const [nameVal, setNameVal] = useState("");
+  const [savingName, setSavingName] = useState(false);
+
+  // Key role editing
+  const [eligibleRoles, setEligibleRoles] = useState<string[]>([]);
+
+  // Per-project editing
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [projectEdits, setProjectEdits] = useState<ProjectEdits | null>(null);
+  const [savingProject, setSavingProject] = useState(false);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  const [projectToRemove, setProjectToRemove] = useState<ResumeProject | null>(
+    null
+  );
+  const [removingProject, setRemovingProject] = useState(false);
+  const [showAddProject, setShowAddProject] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+
+  // Skill preferences
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [availableSkills, setAvailableSkills] = useState<SkillWithStatus[]>([]);
+  const [pendingSkills, setPendingSkills] = useState<Map<string, boolean>>(new Map());
+  const [savingSkills, setSavingSkills] = useState(false);
+
+  function loadResume() {
+    setLoading(true);
+    setErr(null);
+    getResume(resumeId)
+      .then((r) => {
+        setResume(r.data);
+        setNameVal(r.data?.name ?? "");
+      })
+      .catch((e) => setErr(e.message))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(loadResume, [resumeId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    if (editing || !showPreview) {
+      setPdfPreviewUrl(null);
+      setPreviewLoading(false);
+      return;
+    }
+
+    setPreviewLoading(true);
+    getResumePdfPreviewBlob(resumeId)
+      .then((blob) => {
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPdfPreviewUrl(objectUrl);
+      })
+      .catch(() => {
+        if (!cancelled) setPdfPreviewUrl(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPreviewLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [resumeId, editing, showPreview, successMsg]);
+
+  // Clear success message after 3 seconds
+  useEffect(() => {
+    if (!successMsg) return;
+    const t = setTimeout(() => setSuccessMsg(null), 3000);
+    return () => clearTimeout(t);
+  }, [successMsg]);
+
+  // When leaving edit mode, collapse any open project edit
+  function toggleEditing() {
+    if (editing) {
+      setEditingProjectId(null);
+      setProjectEdits(null);
+      setEditingName(false);
+      setNameVal(resume?.name ?? "");

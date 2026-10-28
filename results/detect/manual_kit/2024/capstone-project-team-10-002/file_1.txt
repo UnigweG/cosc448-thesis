@@ -1,0 +1,257 @@
+/* You can add global styles to this file, and also import other style files */
+:root {
+  --blue: #007bff;
+  --blue: #0c55a7;
+  --purple: #6f42c1;
+  --pink: #e83e8c;
+  --red: #dc3545;
+  --orange: #fd7e14;
+  --yellow: #ffc107;
+  --green: #28a745;
+  --teal: #20c997;
+  --cyan: #17a2b8;
+  --white: #fff;
+  --gray: #6c757d;
+  --gray-dark: #343a40;
+  --primary: #007bff;
+  --primary: #0c55a7;
+  --secondary: #6c757d;
+  --success: #28a745;
+  --info: #17a2b8;
+  --warning: #ffc107;
+  --danger: #dc3545;
+  --light: #f8f9fa;
+  --dark: #343a40;
+  --font-family-sans-serif: Montserrat, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-family-monospace: SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --blue-gradient: linear-gradient(to right, #008bcf, #0c55a7);
+  --blue-gradient-dark: linear-gradient(to right, #0082bf, #0b509b);
+  --blue-gradient-reverse: linear-gradient(to left, #008bcf, #0c55a7);
+  --blue-gradient-start: #008bcf;
+  --blue-gradient-end: #0c55a7;
+  --red-gradient: linear-gradient(to right, #e04b59, #dc3545);
+  --gray-light: #F8F8F8;
+  --gray-light: #FBFBFB;
+  --gray-medium: #707070;
+  --blue-light: #f5faff;
+  --blue-light: #ecf4fc;
+  --blue-very-light: #f6faff;
+  --blue-dark: #0b509b;
+  --gray-very-light: #f0f0f0;
+}
+
+.btn-primary{
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.btn-primary:hover {
+  background: var(--blue-dark);
+  border-color: var(--blue-dark);
+}
+
+.text-primary {
+  color: var(--primary) !important;
+}
+
+.bg-very-light {
+  background-color: #f9f9f9;
+}
+
+body {
+  font-family: var(--font-family-sans-serif);
+  background-color: var(--blue-light);
+}
+
+body.noscroll {
+  overflow: hidden;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+}
+
+a{
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: none;
+}
+
+.page-title {
+  border-bottom: 1px solid #dedede;
+  background-color: #fff;
+}
+
+.page-title h1 {
+  margin: 0;
+  padding: 0.5em 0;
+  font-size: 1.2em;
+}
+
+footer {
+  font-size: 1em;
+  background-color: var(--blue-gradient);
+  background: var(--blue-gradient);
+  color: var(--white);
+  padding: 1em;
+  padding-bottom: calc(1em + 50px);
+}
+
+footer a {
+  color: var(--white);
+  margin-right: 3em;
+}
+
+footer a:hover {
+  color: var(--gray-light);
+}
+
+footer a,
+        footer span{
+  padding: 0.5em 0;
+  display:inline-block;
+}
+
+/* **************** Components *************** */
+
+.card-columns .card{
+  margin-top: 3px;
+}
+
+.card {
+  border: none;
+  border-radius: 0;
+  box-shadow: 0px 0px 3px 1px rgba(0,0,0,0.2);
+}
+
+.card .card-header {
+  border-radius: 0;
+  background-color: var(--blue);
+  background: var(--blue-gradient);
+  color: var(--white);
+}
+
+.card .card-body {
+  border-radius: 0;
+}
+
+a.card:hover {
+  background-color: #f7f7f7;
+}
+
+.modal-open .modal{
+  overflow-y: visible !important;
+}
+
+.modal .modal-fluid {
+  width: auto !important;
+}
+
+.loading-parent{
+  position: relative;
+  min-height: 150px;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+}
+
+.overlay_background {
+  display: block;
+  position:absolute;
+  background-color: #fff;
+  opacity: 0.85;
+  height: 100%;
+  width: 100%;
+  z-index: 1;
+}
+
+.overlay_content{
+  position: absolute;
+  margin:auto;
+  width: 100%;
+  z-index: 1;
+  text-align: center;
+}
+
+#overlay_container {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  position: absolute;
+  z-index: 1;
+  min-height: 150px;
+}
+
+#overlay {
+  display: block;
+  background: var(--gray-light);
+  opacity: 0.8;
+  width: 100%;
+  height: 100%;
+}
+
+#spinner_container {
+  position: absolute;
+  width: 100px;
+  text-align: center;
+  right: 0;
+  left: 0;
+  margin: auto;
+  top: calc(50% - 25px);
+}
+
+.text-truncate{
+  overflow: hidden;
+  min-width: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.full_height {
+  min-height: calc(100vh - 91px);
+  background-image: url('/assets/img/account/login/bg.jpg');
+}
+
+/* Sticky footer styles
+-------------------------------------------------- */
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  /* Margin bottom by footer height */
+  margin-bottom: 50px;
+}
+
+.footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+}
+
+@media (min-width: 576px) {
+  footer {
+    font-size: 0.9em;
+    padding-bottom: 1em;
+  }
+
+  footer a,
+      footer span {
+    padding: 0;
+  }
+}
+
+*, ::before, ::after {
+  --tw-border-spacing-x: 0;

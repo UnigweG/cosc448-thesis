@@ -1,0 +1,114 @@
+import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { CharityService } from '@infrastructure/services/charity/charity.service';
+import { AuthenticationService } from '@presentation/guard/authentication.service';
+import { ConfettiService } from '@infrastructure/services/gamification/confetti.service';
+import { Router } from '@angular/router';
+import { LevelingService } from '@infrastructure/services/gamification/leveling.service';
+import { ModalService } from '@infrastructure/services/modal.service';
+import { PageTitleService } from "@infrastructure/services";
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
+import { NotificationService } from '@infrastructure/services/notification.service';
+import { ProgressPopupService } from '@infrastructure/services/gamification/progress-popup.service';
+import { EMPTY, switchMap } from "rxjs";
+import { catchError } from "rxjs/operators";
+
+@Component({
+  selector: 'app-charity-list',
+  templateUrl: './charity-list.component.html',
+  styleUrls: ['./charity-list.component.css', '../../shared/pages/common.css']
+})
+export class CharityListComponent implements OnInit {
+  @ViewChild('charityModal') charityModal!: TemplateRef<any>;
+  // Data arrays
+  charities: any[] = [];             // All available charities
+  searchCharities: any[] = [];       // Filtered charities for current view
+  favoriteCharities: any[] = [];     // User's favorited charities
+  userAddedCharities: any[] = [];    // Charities added by the current user
+
+  // UI state
+  selectedCharity: any = null;
+  showModal: boolean = false;
+  searchText: string = '';
+  showOnlyUserCharities: boolean = false;
+
+  loading: boolean = false;
+  // Pagination
+  currentPage: number = 1;
+  pageSize: number = 15;
+  totalCharities: number = 0;
+  totalPages: number = 0;
+  pageInput: number = 1;
+
+  displayedCharities: any[] = []; // Add this to your component properties
+
+  // User info
+  currentVendorId: string = '';
+
+  // Onboarding selected categories
+  onboardingCategories: number[] = [];
+
+
+  // Category mapping for display
+  categoryMap: { [key: number]: string } = {
+    1: 'CHARITY_LIST.CATEGORIES.HEALTHCARE',
+    2: 'CHARITY_LIST.CATEGORIES.FOOD_INSECURITY',
+    3: 'CHARITY_LIST.CATEGORIES.ENVIRONMENT',
+    4: 'CHARITY_LIST.CATEGORIES.EDUCATION',
+    5: 'CHARITY_LIST.CATEGORIES.SOCIAL_JUSTICE',
+    6: 'CHARITY_LIST.CATEGORIES.ANIMALS',
+    7: 'CHARITY_LIST.CATEGORIES.DISASTER_RELIEF',
+    8: 'CHARITY_LIST.CATEGORIES.HOUSING',
+    9: 'CHARITY_LIST.CATEGORIES.OTHER'
+  };
+
+  // Category options for the dropdown - initialize in ngOnInit to ensure proper setup
+  categoryOptions: { value: string | number, label: string }[] = [];
+
+  // Database to frontend category mapping
+  private dbToCategoryMap: { [key: number]: number } = {
+    // Healthcare
+    100: 1, 110: 1, 120: 1, 130: 1, 140: 1, 150: 1,
+    // Relief of Poverty (Food Insecurity)
+    1: 2, 2: 2,
+    // Environment & Agriculture
+    170: 3, 175: 3,
+    // Education
+    10: 4, 11: 4, 12: 4, 13: 4, 14: 4, 15: 4,
+    // Human Rights (Social Justice)
+    155: 5,
+    // Animal Welfare
+    180: 6,
+    // Community Resources (Disaster Relief)
+    160: 7,
+    // Public Amenities (Housing)
+    200: 8
+  };
+
+  private remapCategory(dbCategory: number): number {
+    const mappedCategory = this.dbToCategoryMap[dbCategory] || 9; // Return 9 (Other) if no mapping exists
+    console.log(`Remapping category: DB Category ${dbCategory} -> Frontend Category ${mappedCategory}`);
+    return mappedCategory;
+  }
+
+  // Add new property for selected category
+  selectedCategory: string = '';  // Default to empty string for "All Categories"
+
+  constructor(
+      private charityService: CharityService,
+      private authService: AuthenticationService,
+      private confettiService: ConfettiService,
+      private router: Router,
+      private levelingService: LevelingService,
+      private modalService: ModalService,
+      private pageTitleService: PageTitleService,
+      private translate: TranslateService,
+      private notificationService: NotificationService,
+      private progressPopupService: ProgressPopupService,
+      private translatePipe: TranslatePipe
+  ) {
+    console.log('CharityListComponent constructor called');
+    this.translate.setDefaultLang('en');
+    const savedLanguage = localStorage.getItem('language') || 'en';
+    this.translate.use(savedLanguage);
+
+    this.pageTitleService.setPageTitle(this.translate.instant('CHARITY_LIST.TITLE'));

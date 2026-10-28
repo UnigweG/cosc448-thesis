@@ -1,0 +1,111 @@
+import os
+import sys
+
+# Add the project root directory to the Python path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import unittest
+from app import create_app, db
+from app.models import ImageQuestion, UserResponse, DemographicData, Image
+from datetime import datetime, timedelta
+import json
+import random
+import numpy as np
+from sqlalchemy import func
+
+class TestStatisticalAnalysis(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        """Set up test environment once for all tests"""
+        cls.app = create_app()
+        cls.app_context = cls.app.app_context()
+        cls.app_context.push()
+
+    @classmethod
+    def tearDownClass(cls):
+        """Clean up after all tests"""
+        cls.app_context.pop()
+
+    def setUp(self):
+        """Set up before each test"""
+        self.client = self.app.test_client()
+        db.create_all()
+        self._populate_test_data()
+
+    def tearDown(self):
+        """Clean up after each test"""
+        db.session.remove()
+        db.drop_all()
+
+    def _create_test_questions(self):
+        """Create test questions with controlled content"""
+        questions = [
+            ImageQuestion(question_text="Which image do you find more aesthetically pleasing?"),
+            ImageQuestion(question_text="Select the image that you prefer."),
+            ImageQuestion(question_text="Choose the image that looks more balanced."),
+            ImageQuestion(question_text="Which image appears more visually appealing?"),
+            ImageQuestion(question_text="Select the most aesthetically pleasing image.")  # Similar to first question
+        ]
+        for q in questions:
+            db.session.add(q)
+        db.session.commit()
+        return questions
+
+    def _create_test_images(self, questions):
+        """Create test images with controlled distribution"""
+        images = []
+        for q in questions:
+            # Create two images per question
+            for i in range(2):
+                img = Image(
+                    url=f"test_image_{q.id}_{i+1}.jpg",
+                    question_id=q.id
+                )
+                images.append(img)
+                db.session.add(img)
+        db.session.commit()
+        return images
+
+    def _create_test_demographics(self):
+        """Create diverse demographic test data"""
+        demographics = [
+            DemographicData(fname="John", lname="Doe", age="20-25", country="USA", 
+                          uniCourse="Computer Science", gender="Male"),
+            DemographicData(fname="Jane", lname="Smith", age="26-30", country="Canada", 
+                          uniCourse="Psychology", gender="Female"),
+            DemographicData(fname="Alex", lname="Johnson", age="31-35", country="UK", 
+                          uniCourse="Engineering", gender="Non-binary"),
+            DemographicData(fname="Maria", lname="Garcia", age="20-25", country="Spain", 
+                          uniCourse="Computer Science", gender="Female")
+        ]
+        for d in demographics:
+            db.session.add(d)
+        db.session.commit()
+        return demographics
+
+    def _create_controlled_responses(self, questions, images, demographics):
+        """Create responses with controlled patterns for testing"""
+        base_time = datetime.now()
+        responses = []
+        
+        # Create responses with known patterns
+        for i, demo in enumerate(demographics):
+            for q in questions:
+                # Create biased responses for testing entropy
+                img_choices = [img for img in images if img.question_id == q.id]
+                
+                # For questions 1 and 5 (which have similar text), create correlated responses
+                if q.id == 1 or q.id == 5:
+                    # Ensure users make the same choice for both similar questions
+                    chosen_img = img_choices[0] if i % 2 == 0 else img_choices[1]
+                else:
+                    chosen_img = img_choices[0] if i % 2 == 0 else img_choices[1]
+                
+                response = UserResponse(
+                    question_id=q.id,
+                    image_id=chosen_img.id,
+                    user_id=demo.id,
+                    timestamp=base_time + timedelta(minutes=i),
+                    response_time=2.0 + random.uniform(-0.5, 0.5),  # Controlled variation
+                    flagged=(i % 3 == 0)  # Every third response is flagged
+                )

@@ -1,0 +1,153 @@
+const request = require("supertest");
+const app = require("../src/app");
+const { describe } = require("node:test");
+let server;
+let agent;
+const prisma = require("../prisma/prisma");
+const {
+  createTestUser,
+  clearUserTable,
+  addMockItem,
+  getItemFromPlaid,
+  getTestPublicToken,
+  clearItems,
+} = require("./testHelpers");
+import exp from "node:constants";
+import {
+  addAccount,
+  addBankNameForItem,
+  addItem,
+  addNewTransaction,
+  getAccounts,
+  getAllItems,
+  getItemInfo,
+  getItemsForUser,
+  getPreferredCurrency,
+  getTransactions,
+  getUserUUID,
+  modifyTransaction,
+  removeItem,
+  removeTransaction,
+  saveCursor,
+  setBalance,
+  setPreferredCurrency,
+} from "../src/controllers/dbPlaid";
+import { SimpleTransaction } from "../src/types/simpleTransactionObject";
+const mockTransactionData = require("./mocktransactiondata2.json");
+
+beforeAll(async () => {
+  await clearUserTable();
+});
+beforeEach(async () => {
+  server = await app.listen(4000);
+  agent = request.agent(server);
+});
+afterEach(async () => {
+  await clearUserTable();
+  if (server) {
+    await server.close();
+  }
+});
+
+describe("Add Item to Plaid", () => {
+  it("invalid userid", async () => {
+    const user = await createTestUser();
+    const res = await addItem("testitemid", user.id + 100, "testtoken");
+    expect(res.error).toEqual(`User with id ${user.id + 100} not found.`);
+  });
+
+  it("add item successfully", async () => {
+    const user = await createTestUser();
+    const userId = user.id;
+    const res = await addItem("testitemid", userId, "testtoken");
+    const dbItem = await prisma.Item.findUnique({
+      where: {
+        id: "testitemid",
+      },
+    });
+    expect(dbItem.accessToken).toEqual("testtoken");
+  });
+});
+
+describe("Remove item", () => {
+  it("invalid itemid", async () => {
+    const user = await createTestUser();
+    const res = await removeItem("wrongitemid");
+    expect(res[1].error).toEqual("Item with id wrongitemid not found.");
+    expect(res[0].error).toEqual("Item not found in Plaid.");
+  });
+
+  it("remove item successfully", async () => {
+    const user = await createTestUser();
+    const loginResponse = await agent.post("/users/login").send({
+      email: user.email,
+      password: user.password,
+    });
+    const authToken = loginResponse.body.token;
+    // create item in Plaid
+    const token = await getTestPublicToken();
+    await agent
+      .post("/plaidtokens/exchange_public_token")
+      .send({
+        publicToken: token.public_token,
+      })
+      .set("Cookie", [`transactionQueryingToken=${authToken}`]);
+    const items = await getItemsForUser(user.id);
+    const item = items[0];
+    await removeItem(item.accessToken);
+    const dbItem = await prisma.Item.findUnique({
+      where: {
+        id: item.id,
+      },
+    });
+    // try to get item from plaid
+    const response = await getItemFromPlaid(item.accessToken);
+    await clearItems();
+    expect(dbItem).toEqual(null);
+    expect(response.error_code).toEqual("ITEM_NOT_FOUND");
+  });
+});
+
+describe("Add bank name to item", () => {
+  it("item not in database", async () => {
+    const res = await addBankNameForItem("testid", "Test Bank");
+    expect(res.error).toEqual("Item with id testid not found.");
+  });
+
+  it("edit item successfully", async () => {
+    const user = await createTestUser();
+    const userId = user.id;
+    const item = await addItem("testid", userId, "testtoken");
+    const res = await addBankNameForItem("testid", "Test Bank");
+    const updatedItem = await prisma.Item.findUnique({
+      where: {
+        id: "testid",
+      },
+    });
+    expect(updatedItem.bankName).toEqual("Test Bank");
+  });
+});
+
+describe("Add account", () => {
+  it("invalid itemid", async () => {
+    const user = await createTestUser();
+    const item = await addItem("testitemid", user.id, "testtoken");
+    const res = await addAccount("testaccountid", "wrongitemid", "testname");
+    expect(res.error).toEqual("Item with id wrongitemid not found.");
+  });
+
+  it("add account successfully", async () => {
+    const user = await createTestUser();
+    const item = await addItem("testitemid", user.id, "testtoken");
+    const account = await addAccount("testaccountid", "testitemid", "testname");
+    const dbAccount = await prisma.Account.findUnique({
+      where: {
+        id: "testaccountid",
+      },
+    });
+    expect(dbAccount.name).toEqual("testname");
+  });
+});
+
+describe("update account balance", () => {
+  it("invalid accountid", async () => {

@@ -1,0 +1,120 @@
+import React, { useEffect, useState, useRef } from 'react';
+import './Survey_dashboard.css'; // Ensure this path is correct
+import QuestionStatistics from '../form/QuestionStatistics.js';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, CartesianGrid, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+//images 
+import responseIcon from '../../img/response.png';
+import statusIcon from '../../img/status.png';
+import visualArtsIcon from '../../img/visualarts.png';
+import completionIcon from '../../img/completion.png';
+import translations from '../../pages/Translation.js'; // Import translations
+import { useLanguage } from '../../pages/LanguageProvider.js';
+
+import unflaggedIcon from '../../img/unflaggedIcon.png';
+import flaggedIcon from '../../img/flaggedIcon.png';
+
+import trashIcon from '../../img/trash.png';
+import untrashIcon from '../../img/untrash.png';
+import { useParams } from 'react-router-dom'; // Import useParams
+import { useNavigate, useLocation } from 'react-router-dom';
+
+
+// for the pages in survey results 
+import SurveyResultsAge from './surveyResultsAge.js';
+import SurveyResultsAllData from './surveyResultsAllData.js';
+import SurveyResultsGender from './surveyResultsGender.js';
+import SurveyResultsVA from './surveyResultsVA.js';
+function Survey_dashboard() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { language } = useLanguage(); // Get current language
+  const queryParams = new URLSearchParams(location.search);
+  const initialTab = queryParams.get('tab') || 'summary';
+
+  const [activeTab, setActiveTab] = useState(initialTab);
+  const [isDark, setIsDark] = useState(() => localStorage.getItem("isDark") === "true");
+  const { surveyId } = useParams();
+  console.log('Extracted surveyId:', surveyId);
+  const handleTabClick = (tabName) => {
+    setActiveTab(tabName);
+  };
+
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [location.search]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    navigate(`/surveyResults/${surveyId}?tab=${tab}`);
+  };
+
+  // Toggle dark mode based on `isDark`
+  useEffect(() => {
+    document.body.setAttribute("data-theme", isDark ? "dark" : "light");
+    localStorage.setItem("isDark", isDark); // Ensure `localStorage` is updated
+  }, [isDark]);
+
+  return (
+    <div className="resultDashboard">
+      <div className="tab-container">
+        <div className="tab-header">
+          <div className = "title">
+            <h1>{translations[language].dashboard}</h1>
+          </div>
+          <div className = "selectionContainer">
+          <div className="selection">
+            <button
+              className={activeTab === 'summary' ? 'active' : ''}
+              onClick={() => handleTabChange('summary')}
+            >
+              {translations[language].overview}
+            </button>
+            <button
+              className={activeTab === 'results' ? 'active' : ''}
+              onClick={() => handleTabChange('results')}
+            >
+              {translations[language].surveyResults}
+            </button>
+            <button
+              className={activeTab === 'question' ? 'active' : ''}
+              onClick={() => handleTabChange('question')}
+            >
+              Question
+            </button>
+            <button
+              className={activeTab === 'report' ? 'active' : ''}
+              onClick={() => handleTabChange('report')}
+            >
+              {translations[language].report}
+            </button>
+          </div>
+            
+          </div>
+        </div>
+
+        {/* Tab Content */}
+        <div className='tab-content ${activeTab}'>
+          {activeTab === 'summary' && <SummaryQuestions surveyId={surveyId} />}
+          {activeTab === 'results' && <SurveyResults />}
+          {activeTab === 'report' && <Report />}
+          {activeTab === 'question' && <Question />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SummaryQuestions({ }) {
+  const { language } = useLanguage(); // Get current language
+  const [userCount, setUserCount] = useState(0);
+  const [averageTime, setAverageTime] = useState(0);
+  const [results, setResults] = useState([]);
+  const [surveyDetails, setSurveyDetails] = useState(null); 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [artClassData, setArtClassData] = useState(null);
+  const [genderCounts, setGenderCounts] = useState({
+    male: 0,
+    female: 0,
+    nonBinary: 0,
+    other: 0,

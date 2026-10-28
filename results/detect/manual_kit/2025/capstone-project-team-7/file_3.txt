@@ -1,0 +1,136 @@
+"""
+Export Service Module
+
+Generates formatted PDF and HTML reports from scan results.
+Provides professional-looking portfolio reports with charts and statistics.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+from dataclasses import dataclass, field
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+_DATACLASS_KWARGS = {"slots": True} if sys.version_info >= (3, 10) else {}
+
+
+@dataclass(**_DATACLASS_KWARGS)
+class ExportConfig:
+    """Configuration for export generation."""
+    
+    include_file_list: bool = False  # Disabled by default - not needed in portfolio report
+    include_code_analysis: bool = True
+    include_skills: bool = True
+    include_contributions: bool = True
+    include_git_analysis: bool = True
+    include_media_analysis: bool = True
+    include_pdf_summaries: bool = True
+    max_files_in_list: int = 100
+    chart_style: str = "modern"  # modern, minimal, classic
+
+
+@dataclass(**_DATACLASS_KWARGS)
+class ExportResult:
+    """Result of an export operation."""
+    
+    success: bool
+    file_path: Optional[Path] = None
+    format: str = "html"
+    error: Optional[str] = None
+    file_size_bytes: int = 0
+
+
+class ExportService:
+    """Service for generating formatted PDF and HTML reports."""
+    
+    def __init__(self, config: Optional[ExportConfig] = None):
+        self.config = config or ExportConfig()
+    
+    def export_html(
+        self,
+        payload: Dict[str, Any],
+        output_path: Path,
+        project_name: Optional[str] = None,
+    ) -> ExportResult:
+        """
+        Generate a beautifully formatted HTML report.
+        
+        Args:
+            payload: The scan export payload dictionary
+            output_path: Where to save the HTML file
+            project_name: Optional project name for the report title
+            
+        Returns:
+            ExportResult with success status and file path
+        """
+        try:
+            html_content = self._generate_html_report(payload, project_name)
+            output_path.write_text(html_content, encoding="utf-8")
+            return ExportResult(
+                success=True,
+                file_path=output_path,
+                format="html",
+                file_size_bytes=len(html_content.encode("utf-8")),
+            )
+        except Exception as exc:
+            return ExportResult(
+                success=False,
+                format="html",
+                error=str(exc),
+            )
+    
+    def export_pdf(
+        self,
+        payload: Dict[str, Any],
+        output_path: Path,
+        project_name: Optional[str] = None,
+    ) -> ExportResult:
+        """
+        Generate a PDF report from scan results.
+        
+        Uses HTML as intermediate format, then converts to PDF.
+        Falls back to HTML if PDF generation fails.
+        
+        Args:
+            payload: The scan export payload dictionary
+            output_path: Where to save the PDF file
+            project_name: Optional project name for the report title
+            
+        Returns:
+            ExportResult with success status and file path
+        """
+        try:
+            html_content = self._generate_html_report(payload, project_name, for_pdf=True)
+            
+            # Try WeasyPrint first (requires GTK on Windows)
+            pdf_generated = False
+            pdf_error = None
+            
+            try:
+                from weasyprint import HTML as WeasyHTML
+                pdf_doc = WeasyHTML(string=html_content)
+                pdf_doc.write_pdf(output_path)
+                pdf_generated = True
+            except ImportError:
+                pdf_error = "weasyprint package not installed"
+            except OSError as e:
+                # GTK libraries not found on Windows
+                pdf_error = f"PDF library dependencies missing: {e}"
+            except Exception as e:
+                pdf_error = f"PDF generation failed: {e}"
+            
+            if pdf_generated:
+                return ExportResult(
+                    success=True,
+                    file_path=output_path,
+                    format="pdf",
+                    file_size_bytes=output_path.stat().st_size,
+                )
+            else:
+                # Fallback: save as HTML (user can print to PDF from browser)
+                fallback_path = output_path.with_suffix(".html")
+                fallback_path.write_text(html_content, encoding="utf-8")
+                return ExportResult(

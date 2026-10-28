@@ -1,0 +1,137 @@
+import { TestBed } from '@angular/core/testing';
+import { EventsService, Event, AddEventRequest, EventTemplate, EventInstance } from './events.service';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { ApiService } from '@infrastructure/services/api.service';
+import { AccountService } from '@infrastructure/services/account.service';
+import { DonationService } from './donation.service';
+import { of, throwError, Observable } from 'rxjs';
+import { fakeAsync, tick } from '@angular/core/testing';
+
+describe('EventsService', () => {
+  let service: EventsService;
+  let mockApiService: jasmine.SpyObj<ApiService>;
+  let mockAccountService: jasmine.SpyObj<AccountService>;
+  let mockDonationService: jasmine.SpyObj<DonationService>;
+
+  beforeEach(() => {
+    // Create spies for dependencies.
+    mockApiService = jasmine.createSpyObj('ApiService', ['get', 'post']);
+    mockAccountService = jasmine.createSpyObj('AccountService', ['getValidToken']);
+    mockDonationService = jasmine.createSpyObj('DonationService', ['getDonations']);
+
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [
+        EventsService,
+        { provide: ApiService, useValue: mockApiService },
+        { provide: AccountService, useValue: mockAccountService },
+        { provide: DonationService, useValue: mockDonationService }
+      ],
+    });
+
+    service = TestBed.inject(EventsService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  describe('getEvents', () => {
+    it('should fetch events successfully', fakeAsync(() => {
+      const mockToken = 'mock-token';
+      const mockEventInstances: EventInstance[] = [
+        {
+          id: 1,
+          userId: 'user1',
+          eventDate: '2024-11-01',
+          title: 'Event 1',
+          starExpiryTime: '',
+          eventTemplate: {
+            id: 10,
+            templateName: '',
+            donationAmount: 100,
+            donationGoal: 200,
+            starDonationAmount: 600,
+            starDuration: 89,
+            selectedCharityTitle: 'Charity A',
+            selectedCharityId: 0,
+            emailRequired: true,
+            emailVerificationRequired: false,
+            uniqueEmailRequired: true,
+            nameRequired: true,
+            fullNameRequired: false,
+            addressRequired: false,
+            uniqueAddressRequired: false,
+            phoneRequired: false,
+            uniquePhoneRequired: false,
+            customFields: [],
+            backgroundColor: '',
+            primaryColor: '',
+            secondaryColor: '',
+            tertiaryColor: '',
+            logoImageData: '',
+            userId: '',
+            shareWithOrg: false,
+          },
+          eventTemplateId: 0
+        }
+      ];
+      const mockDonations = [
+        {
+          id: 1,
+          eventInstanceId: 1,
+          email: 'test@example.com',
+          amount: 50,
+          dateCreated: '2024-11-01',
+          emailVerified: true,
+          donationInfo: {}
+        },
+        {
+          id: 2,
+          eventInstanceId: 1,
+          email: 'another@example.com',
+          amount: 25,
+          dateCreated: '2024-11-01',
+          emailVerified: true,
+          donationInfo: {}
+        }
+      ];
+      const expectedEvent: Event = {
+        id: 1,
+        userId: "user1",
+        templateName: "",
+        eventDate: "2024-11-01",
+        title: "Event 1",
+        starExpiryTime: "",
+        currentDonation: 75,
+        donationAmount: 100,
+        donationGoal: 200,
+        starDonationAmount: 600,
+        starDuration: 89,
+        selectedCharityId: 0,
+        selectedCharityTitle: "Charity A",
+        backgroundColor: "",
+        primaryColor: "",
+        secondaryColor: "",
+        tertiaryColor: "",
+        logoImageData: "",
+        emailRequired: true,
+        emailVerificationRequired: false,
+        uniqueEmailRequired: true,
+        nameRequired: true,
+        fullNameRequired: false,
+        addressRequired: false,
+        uniqueAddressRequired: false,
+        phoneRequired: false,
+        uniquePhoneRequired: false,
+        customFields: [
+        ],
+        attendees: 2,
+      };
+
+      mockAccountService.getValidToken.and.returnValue(of(mockToken));
+      mockApiService.get.and.returnValue(of(mockEventInstances));
+      mockDonationService.getDonations.and.returnValue(of(mockDonations));
+
+      service.getEvents().subscribe((events) => {
+        expect(events.length).toBe(1);

@@ -1,0 +1,158 @@
+import boto3
+import sys,os
+from dotenv import load_dotenv
+from io import BytesIO
+from sshtunnel import SSHTunnelForwarder
+import pymysql
+from datetime import datetime, timezone
+
+sys.path.append(os.path.abspath('../app'))
+load_dotenv()
+SSHUSER = os.getenv("SSHUSER")
+KPATH = os.getenv("KEYPATH")
+ADDRESS = os.getenv("ADDRESS")
+PORT = int(os.getenv("PORT"))
+DBUSER = os.getenv("DBUSER")
+DBPASS = os.getenv("PASS")
+HOST = os.getenv("HOST")
+DBNAME = os.getenv("MYDB")
+SSH = os.getenv("SSH") == "True"
+EC2 = os.getenv("EC2_ADDRESS")
+TESTDB = os.getenv("TESTDB")
+
+ACCESS_KEY = os.getenv("ACCESSKEY")
+SECRET_KEY = os.getenv('SECRETKEY')
+SESSION_TOKEN = os.getenv('SESSTOKEN')
+TEST = os.getenv("TEST") == 'True'
+LOCAL = os.getenv('LOCAL') == 'True'
+BUCKETNAME = os.getenv("BUCKETNAME")
+
+
+if not LOCAL:
+    s3_client = boto3.client('s3',    
+        aws_access_key_id=ACCESS_KEY,
+        aws_secret_access_key=SECRET_KEY,
+        aws_session_token=SESSION_TOKEN
+    )
+else:
+    if not os.path.isdir('videos'):
+        os.mkdir('videos')
+    if not os.path.isdir('chats'):
+        os.mkdir('chats')
+
+if(TEST):
+    DBNAME = TESTDB
+
+def list_buckets():
+    """
+    Lists all accessible S3 buckets.
+
+    Returns:
+        bool: True if listing is successful, False otherwise.
+    """
+    try:
+        response = s3_client.list_buckets()
+        print("Buckets accessible:")
+        for bucket in response['Buckets']:
+            print(f'{bucket["Name"]}')
+        return True
+    except Exception as e:
+        print(f'Failed to list buckets: {e}')
+        return False
+
+ 
+# Not sure if this one is needed    
+def create_bucket(bucket):
+    """
+    Creates a new S3 bucket with the specified name.
+
+    Args:
+        BUCKET (str): The name of the new bucket.
+
+    Returns:
+        bool: True if the bucket creation is successful, False otherwise.
+    """
+    location = {'LocationConstraint':'ca-central-1'}
+    s3_client.create_bucket(Bucket=bucket,CreateBucketConfiguration=location)
+    print("New bucket created")
+    return True
+    
+
+def already_existing_file(obj_path):
+    """
+    Checks if an object already exists in the specified S3 bucket.
+
+    Args:
+        obj_path (str): The object key (path) to check.
+
+    Returns:
+        bool: True if the object exists, False otherwise.
+    """
+    if not LOCAL:
+        try:
+            s3_client.head_object(Bucket=BUCKETNAME, Key=obj_path)
+            print(f"Object {obj_path} already exists in {BUCKETNAME}")
+            return True
+        except Exception as e:
+            print(f"Object {obj_path} does not exist in {BUCKETNAME}")
+            return False
+
+    else:
+        return os.path.exists(f'.{obj_path}')
+
+
+def upload_file(file_content,store_as=None):
+    """
+    Uploads file content to an S3 bucket.
+
+    Args:
+        file_content (bytes): The content of the file to upload.
+        store_as (str, optional): The object key (path) to store the file in S3.
+
+    Returns:
+        bool: True if the upload is successful, False otherwise.
+    """
+    if not LOCAL:
+        try:
+            if store_as is None:
+                raise ValueError("store_as must be specified to upload a file")
+           
+            file_stream = BytesIO(file_content.encode("UTF-8"))
+
+            s3_client.upload_fileobj(file_stream, BUCKETNAME, store_as)
+            return True
+        except Exception as e:
+            print(f"Failed to upload file content to {BUCKETNAME}/{store_as}: {e}")
+            return False
+
+    else:
+        try:
+            if store_as is None:
+                raise ValueError("store_as must be specified to upload a file")
+            with open(f'.{store_as}', 'w') as f:
+                f.write(file_content)
+            return True
+        except Exception as e:
+            print(f"Failed to upload file content to {BUCKETNAME}/{store_as}: {e}")
+            return False
+
+    
+def download_files(path_to_download, save_as=None):
+    """
+    Downloads a file from an S3 bucket.
+
+    Args:
+        path_to_download (str): The object key (path) of the file to download.
+        save_as (str, optional): The local path to save the downloaded file.
+
+    Returns:
+        bool: True if the download is successful, False otherwise.
+    """
+    if not LOCAL:
+        try:
+            obj_to_dl = path_to_download
+            s3_client.download_file(BUCKETNAME,obj_to_dl, save_as)
+            return True
+        except Exception as e:
+            print(f"Failed to download {path_to_download}: {e}")
+            return False

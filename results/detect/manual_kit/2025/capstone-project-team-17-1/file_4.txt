@@ -1,0 +1,135 @@
+import { fetchProjects } from "./projects.js";
+import { authFetch, hydratePortfolioAuthImages, isPrivateMode } from "./auth.js";
+import { loadPortfolio } from "./portfolio.js";
+import {
+  loadPortfolioCustomization,
+  savePortfolioCustomization,
+} from "./portfolioState.js";
+
+const AUTOSAVE_DELAY_MS = 1200;
+
+let previewProjectsCache = [];
+let portfolioEditorInitialized = false;
+let draggedFeaturedProjectId = null;
+let autosaveTimer = null;
+let isDirty = false;
+let isSaving = false;
+let lastSavedSnapshot = "";
+let activePortfolioProjectId = null;
+const livePreviewGalleryState = new Map();
+
+function sortPortfolioImagesCoverFirst(images) {
+  const list = Array.isArray(images) ? images.filter(Boolean) : [];
+  return [...list].sort((a, b) => {
+    const aCover = a?.is_cover ? 1 : 0;
+    const bCover = b?.is_cover ? 1 : 0;
+    if (aCover !== bCover) return bCover - aCover;
+    return Number(a?.sort_order || 0) - Number(b?.sort_order || 0);
+  });
+}
+
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function formatTemplateDisplayName(templateId) {
+  return String(templateId ?? "classic")
+    .trim()
+    .replaceAll("_", " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(" ");
+}
+
+// helper to support different portfolio theme layouts
+function buildProjectThemeDetails(project, override = {}) {
+  const templateId = String(override.templateId || "classic");
+  const images = Array.isArray(override.images) ? override.images : [];
+  const coverImage = images.find((img) => img?.is_cover) || images[0] || null;
+
+  const coverMarkup = coverImage?.id
+    ? `
+      <img
+        class="portfolio-theme-cover-image"
+        data-portfolio-auth-src="${escapeHtml(getPortfolioImageAuthPath(project.project_id, coverImage.id))}"
+        alt="${escapeHtml(project.project_id)} cover image"
+      />
+    `
+    : "";
+
+  if (templateId === "gallery") {
+    return `
+      <div class="portfolio-theme-layout portfolio-theme-gallery">
+        ${coverMarkup}
+        <div class="portfolio-theme-gallery-grid">
+          ${images
+            .slice(0, 6)
+            .map(
+              (image) => `
+                <div class="portfolio-theme-gallery-item">
+                  <img
+                    data-portfolio-auth-src="${escapeHtml(getPortfolioImageAuthPath(project.project_id, image.id))}"
+                    alt="${escapeHtml(image.caption || "Project image")}"
+                  />
+                  <p>${escapeHtml(image.caption || override.portfolioBlurb || "")}</p>
+                </div>
+              `
+            )
+            .join("")}
+        </div>
+      </div>
+    `;
+  }
+
+  if (templateId === "case_study") {
+    return `
+      <div class="portfolio-theme-layout portfolio-theme-case-study">
+        ${coverMarkup}
+        <div class="portfolio-theme-block">
+          <span class="portfolio-theme-label">Abstract</span>
+          <p>${escapeHtml(override.caseStudyAbstract || "")}</p>
+        </div>
+        <div class="portfolio-theme-block">
+          <span class="portfolio-theme-label">Overview</span>
+          <p>${escapeHtml(override.portfolioBlurb || "")}</p>
+        </div>
+        <div class="portfolio-theme-block">
+          <span class="portfolio-theme-label">My role</span>
+          <p>${escapeHtml(override.keyRole || "")}</p>
+        </div>
+        <div class="portfolio-theme-block">
+          <span class="portfolio-theme-label">Evidence of success</span>
+          <p>${escapeHtml(override.evidence || "")}</p>
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="portfolio-theme-layout portfolio-theme-classic">
+      ${coverMarkup}
+      <div class="portfolio-theme-block">
+        <span class="portfolio-theme-label">Summary</span>
+        <p>${escapeHtml(override.portfolioBlurb || "")}</p>
+      </div>
+      <div class="portfolio-theme-block">
+        <span class="portfolio-theme-label">Key role</span>
+        <p>${escapeHtml(override.keyRole || "")}</p>
+      </div>
+      <div class="portfolio-theme-block">
+        <span class="portfolio-theme-label">Evidence</span>
+        <p>${escapeHtml(override.evidence || "")}</p>
+      </div>
+    </div>
+  `;
+}
+
+async function fetchProjectPortfolioEntry(projectId) {
+  const res = await authFetch(`/portfolio/${encodeURIComponent(projectId)}`);

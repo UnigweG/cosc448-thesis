@@ -1,0 +1,145 @@
+import tkinter as tk
+from tkinter import ttk
+from .common import AsyncHandler
+from qeels.engine.peak_detection import peak_detection
+from qeels.gui.frame_canvas import CanvasFrame
+from .plasmon_section import PlasmonSelect, ResultBox, WidthComponent
+from qeels.engine.results import save_results
+from qeels.engine.spectrogram import (
+    load_spectrogram,
+    process_spectrogram,
+)
+
+EV_VALS = (15, 15.8, 16.7, 24.8, 25, 33)
+MATERIAL_OPTIONS = (
+    "Aluminium (15.0 ev)", "Germanium (15.8 ev)",
+    "Silicone (16.7 ev)", "Gold (24.8 ev)", "Silver (25.0 ev)",
+    "Diamond (33 ev)"
+)
+
+
+class MainWindow(tk.Tk):
+
+    def __init__(self):
+        super().__init__()
+        self.title("qEEls peak detection")
+        self.geometry("1200x700")
+
+        self.disable_redraw = False
+        self.radio_variable = tk.IntVar()
+        self.plasmon_array = []
+        self.width_array = []
+        self.results_array = []
+        self.spectrogram_data = None
+        self.spectrogram_processed = None
+
+        settings_frame = ttk.Frame(self)
+        settings_frame.pack(anchor='n', side="left")
+        inputs = ttk.Frame(settings_frame)
+
+        # Bulk Plasmons
+        self.bulk_plasmon1 = PlasmonSelect(
+            inputs, "Bulk Plasmon 1",
+            self.radio_variable, 0
+        )
+        self.plasmon_array.append(self.bulk_plasmon1)
+        self.bulk_plasmon2 = PlasmonSelect(
+            inputs, "Bulk Plasmon 2",
+            self.radio_variable, 1
+        )
+        self.plasmon_array.append(self.bulk_plasmon2)
+
+        self.bulk_width = WidthComponent(inputs)
+        self.bulk_plasmon1.grid(row=0, column=0, padx=2, pady=2)
+        self.bulk_plasmon2.grid(row=0, column=1, padx=2, pady=2)
+        self.bulk_width.grid(row=0, column=2, padx=2, pady=2, sticky="s")
+        self.width_array.append(self.bulk_width)
+
+        # Surface Plasmon Upper
+        self.upper_plasmon1 = PlasmonSelect(
+            inputs, "Surface Plasmon Upper 1",
+            self.radio_variable, 2
+        )
+
+        self.plasmon_array.append(self.upper_plasmon1)
+
+        self.upper_plasmon2 = PlasmonSelect(
+            inputs, "Surface Plasmon Upper 2",
+            self.radio_variable, 3
+        )
+        self.plasmon_array.append(self.upper_plasmon2)
+
+        self.upper_width = WidthComponent(inputs)
+        self.upper_plasmon1.grid(row=1, column=0, padx=2, pady=2)
+        self.upper_plasmon2.grid(row=1, column=1, padx=2, pady=2)
+        self.upper_width.grid(row=1, column=2, padx=2, pady=2, sticky="s")
+        self.width_array.append(self.upper_width)
+
+        # Surface Plasmon Lower
+        self.lower_plasmon1 = PlasmonSelect(
+            inputs, "Surface Plasmon Lower 1",
+            self.radio_variable, 4
+        )
+        self.plasmon_array.append(self.lower_plasmon1)
+
+        self.lower_plasmon2 = PlasmonSelect(
+            inputs, "Surface Plasmon Lower 2",
+            self.radio_variable, 5
+        )
+        self.plasmon_array.append(self.lower_plasmon2)
+
+        self.lower_width = WidthComponent(inputs)
+        self.lower_plasmon1.grid(row=2, column=0, padx=2, pady=2)
+        self.lower_plasmon2.grid(row=2, column=1, padx=2, pady=2)
+        self.lower_width.grid(row=2, column=2, padx=2, pady=2, sticky="s")
+        self.width_array.append(self.lower_width)
+
+        inputs.pack(anchor="w")
+
+        self.spectrogram_frame = ttk.Frame()
+
+        # Create the canvas
+        self.canvas = CanvasFrame(
+            self.spectrogram_frame,
+            self.canvas_click
+        )
+
+        middle_frame = ttk.Frame(settings_frame)
+        results = ttk.Frame(middle_frame)
+
+        ttk.Label(
+            results,
+            text=""
+        ).pack()
+
+        # Average Pixel
+        average_pixel = ResultBox(results, "Average Pixel", 10)
+        average_pixel.pack()
+
+        # Micro rad/pixel upper
+        rad_upper = ResultBox(results, "Micro rad/Pixel Upper", 0.0380)
+        rad_upper.pack()
+
+        # Micro rad/pixel lower
+        rad_lower = ResultBox(results, "Micro rad/Pixel Lower", 0.0380)
+        rad_lower.pack()
+
+        # Ev/Pixel
+        ev = ResultBox(results, "EV/Pixel", 0.0569)
+        ev.pack()
+
+        results.pack(side="left", padx=10, pady=1)
+
+        list_frame = ttk.Frame(middle_frame)
+
+        ttk.Label(
+            list_frame,
+            text="Select a material: "
+        ).pack()
+
+        self.material_list = ttk.Combobox(
+            list_frame,
+            values=MATERIAL_OPTIONS,
+            height=6,
+            state="readonly"
+        )

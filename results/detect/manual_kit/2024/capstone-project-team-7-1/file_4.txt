@@ -1,0 +1,108 @@
+"use client"
+import { Badge } from "@/app/components/shadcn/ui/badge"
+import { Button } from "@/app/components/shadcn/ui/button"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/app/components/shadcn/ui/card"
+import { Input } from "@/app/components/shadcn/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/shadcn/ui/select"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/app/components/shadcn/ui/tooltip"
+import { AlertTriangle, Check, Plus, RefreshCw, TrendingDown, TrendingUp, X } from "lucide-react"
+import React, { useContext, useEffect, useRef, useState } from "react"
+import { MdDeleteOutline, MdEdit } from "react-icons/md"
+import { CurrencyContext } from "../../../../contexts/CurrencyContext"
+import { useTransactions, PlaidCategory, CategoriesResponse } from "../../../../contexts/TransactionContext"
+import { CircleLoadingOverlay } from "../support/CircleLoadingOverlay"
+import {
+    Budget,
+    useBudgets
+} from "@/app/contexts/BudgetContext"
+import { colorThemes, getComponentColors } from "@/app/constants/colors"
+
+interface BudgetManagerProps {
+    onLoadingChange?: (isLoading: boolean) => void;
+    isModalView?: boolean;
+}
+
+export default function BudgetManager({ onLoadingChange, isModalView = false }: BudgetManagerProps) {
+    // Use CurrencyContext for currency formatting and conversion
+    const currencyContext = useContext(CurrencyContext);
+    
+    // Use the BudgetContext via hook
+    const {
+        fetchBudgets,
+        createBudget,
+        updateBudget,
+        deleteBudget,
+        checkBudgets
+    } = useBudgets();
+    
+    // Use the TransactionContext instead of useBudgetData
+    const {
+        transactions,
+        loading: transactionsLoading,
+        error: transactionsError,
+        refreshTransactions,
+        fetchCategories: contextFetchCategories,
+        getCategoryIcon
+    } = useTransactions();
+
+    // Function to fetch categories from the TransactionContext
+    const fetchCategories = async (): Promise<CategoriesResponse> => {
+        return await contextFetchCategories();
+    };
+
+    // State for categories - we'll fetch these directly
+    const [categories, setCategories] = useState<PlaidCategory[] | null>(null);
+    const [categoriesLoading, setCategoriesLoading] = useState(false);
+    const [categoriesError, setcategoriesError] = useState<string | null>(null);
+
+    // Fetch categories
+    useEffect(() => {
+        const loadCategories = async () => {
+            setCategoriesLoading(true);
+            try {
+                const data = await fetchCategories();
+                setCategories(data.categories);
+                setcategoriesError(null);
+            } catch (err: any) {
+                setcategoriesError(err.message);
+                console.error("Error fetching categories:", err);
+            } finally {
+                setCategoriesLoading(false);
+            }
+        };
+        
+        loadCategories();
+    }, []);
+
+    // Combine loading and error states
+    const dataLoading = transactionsLoading || categoriesLoading;
+    const dataError = transactionsError || categoriesError;
+
+    // Add logging to debug transaction data
+    useEffect(() => {
+        console.log("BudgetManager: Transaction count:", transactions?.length || 0);
+        console.log("BudgetManager: Sample transaction:", transactions?.[0]);
+    }, [transactions]);
+
+    // State management
+    const [budgets, setBudgets] = useState<Budget[]>([])
+    const [categoryGroups, setCategoryGroups] = useState<{ [key: string]: string[] }>({})
+    const [selectedCategory, setSelectedCategory] = useState("")
+    const [amount, setAmount] = useState("")
+    const [loading, setLoading] = useState(false)
+    const [initialLoading, setInitialLoading] = useState(true)
+    const [showCreateBudget, setShowCreateBudget] = useState(false)
+    const [error, setError] = useState<string | null>(null)
+    const [refreshing, setRefreshing] = useState(false)
+
+    // Edit state
+    const [editingBudgetId, setEditingBudgetId] = useState<number | null>(null)
+    const [editAmount, setEditAmount] = useState("")
+
+    // Refs
+    const hasCheckedBudgets = useRef(false)
+    const createBudgetRef = useRef<HTMLDivElement>(null)
+    const errorTimer = useRef<NodeJS.Timeout | null>(null)
+    const editInputRef = useRef<HTMLInputElement>(null)
+
+    // Add new state for duration selection

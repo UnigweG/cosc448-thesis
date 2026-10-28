@@ -1,0 +1,267 @@
+/* General Page Styling */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 0;
+  background-color: #e1b382;
+  color: #12343b; 
+  box-sizing: border-box;
+}
+
+/* Header Styling */
+header {
+  background-color: #2d545e; /* Night Blue Background */
+  color: white;
+  padding: 20px;
+  text-align: center;
+  box-shadow: 0 4px 6px rgba(18, 52, 59, 0.3);
+}
+
+header h1 {
+  margin: 0;
+  font-size: 2.5em;
+  letter-spacing: 1.5px;
+}
+
+/* Navigation Styling */
+nav {
+  margin-top: 10px;
+}
+
+nav a {
+  color: #e1b382;
+  margin: 0 15px;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s ease;
+}
+
+nav a:hover {
+  color: #c89666;
+}
+
+/* Main content styling */
+main {
+  padding: 40px;
+  text-align: center;
+}
+/* heading color attributes */
+main h2 {
+  color: #12343b; 
+  font-size: 1.8em;
+}
+
+/*Main paragraph*/
+main p {
+  font-size: 1.2em;
+  color: #12343b;
+}
+
+/* Consent button styling */
+.consent-button {
+  background-color: #2d545e; 
+  padding: 15px 30px;
+  font-size: 1.2em;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.consent-button:hover {
+  background-color: #12343b; /* Night Blue Shadow on hover */
+  transform: translateY(-2px); /* up on hover */
+}
+
+/* Footer Styling */
+footer {
+  background-color: #2d545e;
+  color: #e1b382; 
+  padding: 10px;
+  text-align: center;
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+  box-shadow: 0 -4px 6px rgba(18, 52, 59, 0.2);
+}
+
+/* Image Selection Styling for Survey */
+.image-selection {
+  display: flex;
+  justify-content: center;
+  gap: 20px; /* Spacing between images */
+  margin: 20px 0;
+}
+
+/* Style for each image container */
+.image-container {
+  text-align: center;
+}
+
+/* Style for images */
+.survey-image {
+  max-width: 300px;
+  border: 2px solid #2d545e; /* Border color */
+  border-radius: 5px;
+  transition: transform 0.3s ease;
+}
+
+/* Add hover effect to images */
+.survey-image:hover {
+  transform: scale(1.05);
+}
+
+/* Style for image labels */
+.image-label {
+  margin-top: 10px;
+  font-size: 1.2em;
+  font-weight: bold;
+  color: #2d545e;
+}
+
+/* Navigation Button Styling */
+.button {
+  padding: 10px 20px;
+  border: none;
+  background-color: #2d545e; /* Night Blue */
+  color: #ffffff; /* White text */
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s ease;
+}
+
+.button:hover {
+  background-color: #12343b; /* Night Blue Shadow */
+}
+
+.button-prev {
+  margin-right: 20px;
+}
+
+.button-next {
+  margin-left: 20px;
+}
+.navigation-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 20px; /* Space between the buttons */
+  margin-top: 20px;
+}
+
+.navigation-buttons button {
+  padding: 10px 20px;
+  border: none;
+  background-color: #2d545e; /* Night Blue */
+  color: #ffffff; /* White text */
+  font-size: 16px;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+
+.navigation-buttons button:hover {
+  background-color: #12343b; /* Night Blue Shadow */
+  transform: translateY(-2px); /* Lift the button on hover */
+}
+
+.navigation-buttons button:focus {
+  outline: none;
+}
+
+.navigation-buttons button:disabled {
+  background-color: #c89666; /* Gray out the button when disabled */
+  cursor: not-allowed;
+}
+
+/* Responsive Styling */
+* {
+  box-sizing: border-box;
+}
+
+body, header, main, footer {
+  width: 100%;
+}
+
+header h1, nav a, main h2, main p, .consent-button {
+  max-width: 100%;
+}
+
+main {
+  padding: 5%;
+}
+
+@media (max-width: 768px) {
+  header h1 {
+    font-size: 1.8em;
+  }
+
+  main {
+    padding: 20px;
+  }
+
+  .consent-button {
+    font-size: 1em;
+    padding: 10px 20px;
+  }
+
+  .image-selection {
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 480px) {
+  header {
+    padding: 10px;
+  }
+
+  header h1 {
+    font-size: 1.5em;
+  }
+
+  nav a {
+    margin: 0 10px;
+  }
+
+  main {
+    padding: 10px;
+  }
+
+  .consent-button {
+    font-size: 0.9em;
+    padding: 8px 15px;
+  }
+
+  footer {
+    padding: 5px;
+  }
+}
+
+.form-container {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  max-width: 600px;
+  margin: 20px auto;
+}
+
+.form-container h2 {
+  color: #12343b;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.form-container label {
+  font-weight: bold;
+  margin-bottom: 5px;
+  display: block;
+  color: #2d545e;
+}
+
+.form-container input,
+.form-container select {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;

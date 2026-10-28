@@ -1,0 +1,150 @@
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { toast } from 'react-toastify';
+import TicketPage from '../src/app/tickets/[...id]/page';
+import { useRouter, useParams } from 'next/navigation';
+import 'whatwg-fetch';
+
+// Mock react-icons
+jest.mock('react-icons/fa', () => ({
+  FaFilePdf: () => <div data-testid="file-pdf-icon">FilePDF</div>,
+  FaPlusCircle: () => <div data-testid="plus-circle-icon">PlusCircle</div>
+}));
+
+// Mock lucide-react icons - include X which is used in the component
+jest.mock('lucide-react', () => ({
+  Upload: () => <div data-testid="upload-icon">Upload</div>,
+  FolderOpen: () => <div data-testid="folder-icon">Folder</div>,
+  X: () => <div data-testid="x-icon">X</div>
+}));
+
+// Mock react-toastify
+jest.mock('react-toastify', () => ({
+  toast: {
+    error: jest.fn(),
+    success: jest.fn(),
+    info: jest.fn()
+  },
+  ToastContainer: () => <div data-testid="toast-container" />,
+}));
+
+// Mock shadcn components
+jest.mock('@/components/ui/button', () => ({
+  Button: ({ children, ...props }: { children: React.ReactNode }) => <button {...props}>{children}</button>
+}));
+
+jest.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-menu">{children}</div>,
+  DropdownMenuTrigger: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-trigger">{children}</div>,
+  DropdownMenuContent: ({ children }: { children: React.ReactNode }) => <div data-testid="dropdown-content">{children}</div>,
+  DropdownMenuItem: ({
+    children,
+    onClick
+  }: {
+    children: React.ReactNode;
+    onClick?: () => void;
+  }) => (
+    <div data-testid="dropdown-item" onClick={onClick || (() => {})}>
+      {children}
+    </div>
+  ),
+}));
+
+// Mock DocumentSelector component
+jest.mock('../src/app/components/DocumentSelector', () => ({
+  __esModule: true,
+  default: ({
+    isOpen,
+    onClose,
+    onSelect,
+    pdfNumber
+  }: {
+    isOpen: boolean;
+    onClose: () => void;
+    onSelect: (id: number, fileName: string, pdfNumber: number) => void;
+    pdfNumber: number;
+  }) =>
+    isOpen ? (
+      <div data-testid="document-selector">
+        Document Selector
+        <button onClick={() => onClose()}>Close</button>
+        <button onClick={() => onSelect(123, 'test.pdf', pdfNumber)}>Select Document</button>
+      </div>
+    ) : null
+}));
+
+// Mock useAdminStatus
+jest.mock('../src/app/components/useAdminStatus', () => ({
+  useAdminStatus: () => ({
+    isAdmin: false,
+    isManager: false,
+    token: 'mock-token',
+    isLoading: false
+  })
+}));
+
+// Update mock Next.js hooks
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+    back: jest.fn(),
+    replace: jest.fn(),
+    prefetch: jest.fn()
+  })),
+  useParams: jest.fn(),
+  usePathname: () => '',
+  useSearchParams: () => new URLSearchParams()
+}));
+
+// Mock i18n
+jest.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { changeLanguage: jest.fn() },
+    ready: true
+  })
+}));
+
+// Mock URL methods
+global.URL.createObjectURL = jest.fn(() => 'mock-url');
+global.URL.revokeObjectURL = jest.fn();
+
+describe('TicketPage Routing', () => {
+  const mockRouter = { push: jest.fn(), back: jest.fn() };
+  const mockParams = { id: '123' };
+  const mockFormData = new FormData();
+
+  // Mock environment variables
+  const originalEnv = process.env;
+  beforeAll(() => {
+    global.alert = jest.fn();
+    global.FormData = jest.fn(() => mockFormData) as any;
+    mockFormData.append = jest.fn();
+    process.env = {
+      ...originalEnv,
+      NEXT_PUBLIC_DB_URL: 'https://localhost/api',
+      NEXT_PUBLIC_SERVER_REDIRECT_PATH: '/app'
+    };
+  });
+
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+    (useParams as jest.Mock).mockReturnValue(mockParams);
+
+    // Mock fetch globally - update to always return empty comments array at minimum
+    global.fetch = jest.fn((url: string | URL | Request, options?: RequestInit) => {
+      const urlStr = url.toString();
+      const urlPath = urlStr.split('/').slice(-2).join('/');
+      console.log('Mock fetch called with URL:', urlStr);
+      console.log('URL path:', urlPath);
+
+      if (urlPath === 'tickets/get') {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              id: 123,

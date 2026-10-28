@@ -1,0 +1,252 @@
+.gradient-background {
+  background: linear-gradient(
+    83deg,
+    var(--color1),
+    var(--color2),
+    var(--color3),
+    var(--color4)
+  );
+  background-size: 240% 240%;
+  min-height: calc(100vh - var(--navbar-height));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  animation: gradient-animation 16s ease infinite;
+  position: relative;
+  padding: 50px 0;
+}
+
+@keyframes gradient-animation {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.vertical-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.4); /* Transparent card */
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 1000px;
+  padding: 2rem;
+  position: relative;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.header-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.title-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.page-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  background: none;
+  underline: none;
+}
+
+.tabs-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.generate-link-container {
+  display: flex;
+  align-items: center;
+}
+
+.search-container {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-wrapper {
+  display: flex;
+  align-items: center;
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 0.4rem 0.8rem;
+  border-radius: 0.5rem;
+}
+
+.search-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+}
+
+.search-input {
+  border: none;
+  outline: none;
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.tab-button {
+  height: 50px;
+  border-radius: 10px;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  transition: transform 0.2s, background-color 0.2s;
+}
+
+.tab-button.active {
+  background-color: #007bff;
+  color: white;
+  font-weight: 600;
+}
+
+
+.tab-button img {
+  width: 36px; /* Icon size */
+  height: 36px;
+}
+
+.tab-button.active,
+.generate-link-btn {
+  background-color: #007bff;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.tab-button:hover {
+  background-color: rgba(30, 121, 207, 0.4);
+  transform: scale(1.05);
+}
+
+.generate-link-container .btn {
+  height: 60px; /* Match the height of tab buttons */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 1.5rem; /* Add padding for a wider button */
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  background-color: #007bff;
+  border: none;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.generate-link-container .btn:hover {
+  transform: scale(1.05); /* Slight scaling on hover */
+}
+
+.generate-link-container .btn:focus {
+  outline: none;
+}
+
+.header-container {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.card-body {
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.7);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border-radius: 12px;
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 1rem;
+  padding-top: 0.5rem;
+  clip-path: inset(0 round 1rem); /* matches card border-radius */
+}
+
+.card-body::-webkit-scrollbar {
+  width: 8px;
+  border-radius: 10px;
+}
+
+.card-body::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.card-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.search-metrics-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 1rem;
+  gap: 1rem;
+  flex-wrap: wrap; /* fallback for smaller screens */
+}
+
+.search-container {
+  flex: 1;
+  padding-top: 0.7rem;
+  max-width: 400px;
+}
+
+
+.header-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: start;
+  width: 100%;
+}
+
+.left-column {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 0.75rem; /* spacing between message and search */
+  width: 100%;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;

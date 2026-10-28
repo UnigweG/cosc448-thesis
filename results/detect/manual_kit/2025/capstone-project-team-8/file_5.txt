@@ -1,0 +1,123 @@
+"""
+Tests for Resume Item Generator Service
+
+Tests cover:
+- Different project types (coding, writing, mixed)
+- Category-based generation (languages, frameworks, skills, content, git)
+- Framework-specific contextual templates
+- Content analysis integration with edge cases
+- Git contribution statistics (solo, collaborative, user matching)
+- Coverage tracking and non-overlapping generation
+- Minimal data scenarios and error handling
+"""
+
+import os
+import sys
+from datetime import datetime
+from django.test import TestCase
+
+# Add the project root to Python path so tests can be discovered
+project_root = os.path.join(os.path.dirname(__file__), '..')
+sys.path.insert(0, project_root)
+
+# Add the backend directory to the Python path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src', 'backend'))
+
+# Setup Django settings
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'src.settings')
+import django
+django.setup()
+
+from app.services.resume_item_generator import ResumeItemGenerator
+from app.services.analysis.analyzers.content_analyzer import ProjectContentSummary
+
+
+class ResumeItemGeneratorTests(TestCase):
+    """Test suite for resume item generator functionality"""
+
+    def setUp(self):
+        """Set up test fixtures"""
+        self.generator = ResumeItemGenerator()
+
+    # ===== Coding Projects =====
+
+    def test_coding_project_with_full_data(self):
+        """Test coding project with languages, frameworks, skills"""
+        project_data = {
+            'root': 'my-web-app',
+            'classification': {
+                'type': 'coding',
+                'languages': ['Python', 'JavaScript', 'HTML'],
+                'frameworks': ['Django', 'React'],
+                'resume_skills': ['Backend Development', 'RESTful APIs', 'Frontend Development']
+            },
+            'created_at': int(datetime(2023, 1, 15).timestamp()),
+            'end_date': int(datetime(2024, 6, 20).timestamp()),
+            'files': {
+                'code': [{'path': 'main.py'}, {'path': 'app.js'}],
+                'content': [{'path': 'README.md'}],
+                'image': [],
+                'unknown': []
+            },
+            'collaborative': False
+        }
+        
+        result = self.generator.generate_resume_items(project_data)
+        
+        self.assertIn('items', result)
+        self.assertIn('generated_at', result)
+        self.assertGreaterEqual(len(result['items']), 3)
+        
+        # Should contain framework-specific contextual templates or category bullets
+        items_text = ' '.join(result['items'])
+        self.assertTrue(
+            any('Python' in item or 'Django' in item or 'React' in item or 'JavaScript' in item 
+                for item in result['items'])
+        )
+
+    def test_coding_project_collaborative_with_git_stats(self):
+        """Test collaborative coding project with git contribution statistics"""
+        project_data = {
+            'root': 'team-project',
+            'classification': {
+                'type': 'coding',
+                'languages': ['Python'],
+                'frameworks': [],
+                'resume_skills': ['Web Backend']
+            },
+            'created_at': int(datetime(2022, 3, 10).timestamp()),
+            'end_date': int(datetime(2023, 12, 5).timestamp()),
+            'files': {
+                'code': [{'path': 'app.py'}],
+                'content': [],
+                'image': [],
+                'unknown': []
+            },
+            'collaborative': True,
+            'contributors': [
+                {
+                    'name': 'John Doe',
+                    'commits': 45,
+                    'lines_added': 2500,
+                    'lines_deleted': 300,
+                    'percent_commits': 60.0
+                },
+                {
+                    'name': 'Jane Smith',
+                    'commits': 30,
+                    'lines_added': 1800,
+                    'lines_deleted': 200,
+                    'percent_commits': 40.0
+                }
+            ]
+        }
+        
+        result = self.generator.generate_resume_items(project_data, user_name='John Doe')
+        
+        self.assertGreaterEqual(len(result['items']), 3)
+        
+        # Should contain git contribution information
+        items_text = ' '.join(result['items'])
+        self.assertTrue(
+            any('60' in item or '45' in item or 'commits' in item.lower() or 
+                'contributed' in item.lower() or 'version control' in item.lower()

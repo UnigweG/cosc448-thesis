@@ -1,0 +1,116 @@
+// dashboard.test.js
+
+import fetchMock from 'fetch-mock';
+import '@testing-library/jest-dom/extend-expect'; // Optional, for more DOM assertions
+
+// Mock dashboardData and imageData
+const dashboardData = {
+    stats: [
+        { label: 'Total Comparisons', value: '2,845', icon: 'chart-bar' },
+        { label: 'Active Users', value: '156', icon: 'users' },
+        { label: 'Images in Database', value: '482', icon: 'images' },
+        { label: 'AI Predictions', value: '1,294', icon: 'brain' }
+    ],
+    algorithms: [
+        { name: 'Generation Algorithm', status: 'Active', lastRun: '2 hours ago' },
+        { name: 'Aesthetic Prediction', status: 'Training', accuracy: '78%' }
+    ],
+    recentComparisons: [
+        { id: 1001, user: 'research_participant_1', time: '5 minutes ago' },
+        { id: 1002, user: 'research_participant_2', time: '15 minutes ago' },
+        { id: 1003, user: 'research_participant_3', time: '30 minutes ago' }
+    ],
+    metrics: {
+        responseTime: '3.2 seconds',
+        consistencyRate: '84%',
+        retention: '92%'
+    }
+};
+
+const imageData = [
+    { id: 1, path: '../../image/sample-pic-1-1.png', name: 'Sample 1' },
+    { id: 2, path: '../../image/sample-pic-1-2.png', name: 'Sample 2' },
+    { id: 3, path: '../../image/sample-pic-2-1.png', name: 'Sample 3' },
+    { id: 4, path: '../../image/sample-pic-2-2.png', name: 'Sample 4' },
+    { id: 5, path: '../../image/sample-pic-3-1.png', name: 'Sample 5' },
+    { id: 6, path: '../../image/sample-pic-3-2.png', name: 'Sample 6' }
+];
+// Mock the document structure
+document.body.innerHTML = `
+    <div id="statsGrid"></div>
+    <div id="imageGrid"></div>
+    <div id="algorithmStatus"></div>
+    <div id="recentComparisons"></div>
+    <div id="researchMetrics"></div>
+    <button id="viewFeedback">View Feedback</button>
+    <div id="viewFeedbackModal" class="modal">
+        <div class="modal-content"></div>
+    </div>
+`;
+
+// Import your functions here
+import { initializeStats, initializeImageGrid, initializeAlgorithmStatus, initializeRecentComparisons, initializeResearchMetrics } from './dashboard';
+
+// Test for initializeStats
+describe('initializeStats', () => {
+    test('renders stats correctly', () => {
+        initializeStats();
+        const statsGrid = document.getElementById('statsGrid');
+
+        // Check each stat item in statsGrid
+        dashboardData.stats.forEach(stat => {
+            expect(statsGrid).toHaveTextContent(stat.label);
+            expect(statsGrid).toHaveTextContent(stat.value);
+        });
+    });
+});
+
+// Test for initializeImageGrid
+describe('initializeImageGrid', () => {
+    test('renders image grid correctly with drag-and-drop area', () => {
+        initializeImageGrid();
+        const imageGrid = document.getElementById('imageGrid');
+
+        // Check that drag and drop area exists
+        expect(imageGrid.querySelector('.drag-drop-area')).toBeInTheDocument();
+
+        // Check each image in imageData
+        imageData.forEach(image => {
+            const imgElement = imageGrid.querySelector(`img[alt="${image.name}"]`);
+            expect(imgElement).toBeInTheDocument();
+            expect(imgElement.getAttribute('src')).toBe(image.path);
+        });
+    });
+});
+
+// Test for initializeAlgorithmStatus
+describe('initializeAlgorithmStatus', () => {
+    test('renders algorithm statuses correctly', () => {
+        initializeAlgorithmStatus();
+        const algorithmStatus = document.getElementById('algorithmStatus');
+
+        // Check each algorithm in dashboardData
+        dashboardData.algorithms.forEach(algo => {
+            expect(algorithmStatus).toHaveTextContent(algo.name);
+            expect(algorithmStatus).toHaveTextContent(algo.status);
+            if (algo.lastRun) expect(algorithmStatus).toHaveTextContent(algo.lastRun);
+            if (algo.accuracy) expect(algorithmStatus).toHaveTextContent(algo.accuracy);
+        });
+    });
+});
+
+// Test for initializeRecentComparisons
+describe('initializeRecentComparisons', () => {
+    test('renders recent comparisons correctly', () => {
+        initializeRecentComparisons();
+        const recentComparisons = document.getElementById('recentComparisons');
+
+        // Check each comparison in dashboardData
+        dashboardData.recentComparisons.forEach(comp => {
+            expect(recentComparisons).toHaveTextContent(comp.user);
+            expect(recentComparisons).toHaveTextContent(comp.time);
+        });
+    });
+});
+
+// Test for initializeResearchMetrics

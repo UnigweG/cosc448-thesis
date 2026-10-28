@@ -1,0 +1,171 @@
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { Tooltip } from "react-tooltip";
+
+export default function CreateAccount() {
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [errors, setErrors] = useState({
+    username: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
+  });
+
+  // See if user is logged in
+  if (localStorage.getItem('loggedIn') === 'true') {
+    window.location.href = "/Prompt";
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    console.log(e.target);
+
+    // SQL Injection dummy check
+    const maliciousPatterns = ["SELECT", "DROP", ";--", "INSERT", "DELETE"];
+    if (
+      maliciousPatterns.some(
+        (pattern) =>
+          username.toUpperCase().includes(pattern) ||
+          email.toUpperCase().includes(pattern)
+      )
+    ) {
+      alert("Potential SQL injection detected!");
+      return;
+    }
+
+    // Email format check
+    const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$/i;
+    if (!emailRegex.test(email)) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        email: "Invalid email format",
+      }));
+      return;
+    }
+
+    setErrors((prevErrors) => ({
+      ...prevErrors,
+      email: "",
+    }));
+
+    // Password length check
+    if (password.length < 6) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        password: "Password is too short",
+      }));
+      return;
+    }
+
+    setErrors((prevErrors) => ({
+      ...prevErrors,
+      password: "",
+    }));
+
+    // Password contains at least 1 number
+    const hasNumber = /\d/;
+    if (!hasNumber.test(password)) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        password: "PW needs one number & symbol",
+      }));
+      return;
+    }
+
+    setErrors((prevErrors) => ({
+      ...prevErrors,
+      password: "",
+    }));
+
+    // Password contains at least 1 symbol
+    const hasSymbol = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/;
+    if (!hasSymbol.test(password)) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        password: "PW needs one number & symbol",
+      }));
+      return;
+    }
+
+    setErrors((prevErrors) => ({
+      ...prevErrors,
+      password: "",
+    }));
+
+    // Password match check
+    if (password !== confirmPassword) {
+      setErrors((prevErrors) => ({
+        ...prevErrors,
+        confirmPassword: "Passwords do not match",
+      }));
+      return;
+    }
+
+    setErrors((prevErrors) => ({
+      ...prevErrors,
+      confirmPassword: "",
+    }));
+
+    const user = {
+      email: email,
+      username: username,
+      password: password,
+    };
+
+    // Create the POST requuest
+    console.log("Stuck on post!");
+    // var responseCode = 200;
+    // axios
+    //   .post("http://localhost:8000/add/", {
+    //     email: email,
+    //     username: username,
+    //     password: password,
+    //   })
+    //   .catch((err) => {
+    //     responseCode = err.response.status;
+    //     return err;
+    //   });
+
+    // if (responseCode !== 200) {
+    //   alert("Field is invalid!");
+    //   return;
+    // }
+    
+    // console.log("Successfully created an account: " + email);
+    // window.location.href = "/Login";
+
+    // Fetch API method
+    fetch("http://localhost:8000/add/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(user),
+    })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        } else {
+          return response.json();
+        }
+      })
+      .then(data => {
+        console.log("Successfully created an account: ", data);
+        window.location.href = "/Login";
+      })
+      .catch(error => {
+        return error;
+      });
+  };
+
+  return (
+    <div>
+      {/* Nav Bar */}
+      <nav class="bg-[#E2E2E2]">
+          <div class="flex justify-between mr-5 ml-2 py-2">
+              {/* General Area (Left side) */}
+              <div class="flex items-center space-x-1">
+                  {/* <div class="font-bold">(Logo) EduSynth</div> */}

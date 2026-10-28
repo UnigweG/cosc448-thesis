@@ -1,0 +1,114 @@
+from sqlalchemy import create_engine, Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Index, func, UniqueConstraint
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, joinedload
+from datetime import datetime, timezone
+import json
+import os
+from typing import List, Optional, Dict, Any
+
+
+# ============================================
+# DATABASE MODELS
+# ============================================
+
+
+Base = declarative_base()
+
+# Try to import user_config if it exists, but don't fail if it doesn't
+try:
+    from src.Databases import user_config  # registers UserConfig with Base
+except (ImportError, ModuleNotFoundError):
+    try:
+        # Try relative import if src module doesn't exist
+        from . import user_config  # registers UserConfig with Base
+    except (ImportError, ModuleNotFoundError):
+        # user_config module doesn't exist yet, that's okay
+        pass
+
+class Project(Base):
+    """Store comprehensive project information"""
+    __tablename__ = 'projects'
+    
+    id = Column(Integer, primary_key=True)
+    
+    # Basic info
+    name = Column(String(255), nullable=False, index=True)
+    file_path = Column(String(500), nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    
+    # Dates - FIXED: Use timezone-aware datetime
+    date_created = Column(DateTime, index=True)
+    date_modified = Column(DateTime, index=True)
+    date_scanned = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    
+    # Metrics
+    lines_of_code = Column(Integer, default=0)
+    word_count = Column(Integer, default=0) #for text documents
+    file_count = Column(Integer, default=0)
+    total_size_bytes = Column(Integer, default=0)
+    
+    # Type classification
+    project_type = Column(String(50), index=True)
+    collaboration_type = Column(String(50))
+    
+    # Importance and ranking
+    importance_score = Column(Float, default=0.0)
+    user_rank = Column(Integer, nullable=True)
+    is_featured = Column(Boolean, default=False)
+    is_hidden = Column(Boolean, default=False)
+    
+    # Languages & Frameworks (stored as JSON)
+    _languages = Column('languages', Text)
+    _frameworks = Column('frameworks', Text)
+    _skills = Column('skills', Text)
+    _tags = Column('tags', Text)
+    
+    # Success metrics
+    success_evidence = Column(Text, nullable=True)
+    resume_bullets = Column(Text, nullable=True)
+    thumbnail_path = Column(String(500), nullable=True)
+    content_hash = Column(String(64), nullable=True, index=True)
+
+    # User customizations
+    custom_description = Column(Text, nullable=True)
+    user_role = Column(String(100), nullable=True)
+    user_contribution_percent = Column(Float, nullable=True)
+    ai_description = Column(Text, nullable=True)
+    ai_analysis = Column(Text, nullable=True)   # full JSON from analyze_project_complete
+
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    
+    # Relationships
+    user = relationship('User', back_populates='projects')
+    files = relationship('File', back_populates='project', cascade='all, delete-orphan', lazy='select')
+    contributors = relationship('Contributor', back_populates='project', cascade='all, delete-orphan', lazy='select')
+    keywords = relationship('Keyword', back_populates='project', cascade='all, delete-orphan', lazy='select')
+    
+    # Timestamps - FIXED: Use timezone-aware datetime
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    
+    # Indexes
+    __table_args__ = (
+        Index('idx_project_type_date', 'project_type', 'date_modified'),
+        Index('idx_importance_featured', 'importance_score', 'is_featured'),
+        Index('idx_user_projects', 'user_id', 'date_modified'),
+    )
+    
+    # ── JSON property helpers ─────────────────────────────────────────────────
+
+    @staticmethod
+    def _safe_json_loads(value, fallback):
+        """Parse a JSON string safely, returning fallback on any error."""
+        if not value:
+            return fallback
+        try:
+            return json.loads(value)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return fallback
+
+    # Properties for JSON fields
+    @property
+    def languages(self) -> List[str]:
+        return self._safe_json_loads(self._languages, [])
+    
+    @languages.setter

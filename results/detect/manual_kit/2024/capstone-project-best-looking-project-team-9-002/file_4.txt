@@ -1,0 +1,116 @@
+import i18n from 'i18next';
+import { initReactI18next } from 'react-i18next';
+import LanguageDetector from 'i18next-browser-languagedetector';
+
+const resources = {
+  en: {
+    translation: {
+      greeting: {
+        hello: "Hello",
+      },
+      adminDashboard: {
+        title: "Admin Dashboard",
+        addButton: "Add New",
+        editSurvey: "Edit Survey",
+        exportData: "Export Data",
+        exportAnalysis: "Export Analysis",
+        uploadSurvey: "Upload Survey",
+        editSurveyHover: "Edit the questions of the current survey online",
+        uploadSurveyHover: "Upload a new survey configuration file. This will override the existing survey configuration",
+        exportDataHover: "Export all user data and responses as a zip file",
+        exportAnalysisHover: "Export advanced analysis results as zip file(Entropy, Cramers V)",
+        OpenVisualizationHover: "View preliminary analysis of the collected data",
+        statistics: "Dashboard Statistics",
+        totalResponses: "Total Responses",
+        surveysCompleted: "Surveys Completed",
+        activeUsers: "Active Users",
+      },
+      survey1: {
+        name: "Survey 1",
+        description: "This is a description of Survey 1"
+      },
+      survey2: {
+        name: "Survey 2",
+        description: "This is a description of Survey 2"
+      },
+      survey3: {
+        name: "Survey 3",
+        description: "This is a description of Survey 3"
+      },
+      createdOn: "Created On",
+      edit: "Edit",
+      emailId: {
+        title: "Email ID",
+        description: "Enter email ID"
+      },
+      password: {
+        title: "Password",
+        description: "Enter password"
+      },
+      login: "Login",
+      logout: "Logout",
+      surveyName: "Survey Name",
+      description: "Description",
+      createdOn: "Created On",
+      actions: "Actions",
+      edit: "Edit",
+      delete: "Delete",
+      editSurvey: {
+        title: "Edit Survey",
+        surveyNameLabel: "Survey Name",
+        surveyNamePlaceholder: "Enter survey name",
+        descriptionLabel: "Description",
+        descriptionPlaceholder: "Enter survey description",
+        saveButton: "Save",
+        cancelButton: "Cancel",
+      },
+      action: {
+        edit: "Edit",
+        delete: "Delete",
+      },
+      enterSurveyName: "Enter survey name",
+      enterSurveyDescription: "Enter survey description",
+      createSurveyTitle: "Create Survey",
+      createSurvey: {
+        imageAltA: "Image A",
+        imageAltB: "Image B",
+        deletePair: "Delete Pair",
+        upload: {
+          title: "Upload New Image Pair",
+          button: "Upload Pair",
+          success: "Image pair uploaded successfully!",
+          error: "Failed to upload image pair.",
+          errorMissingImages: "Please select both images."
+        },
+        title: "Create Survey",
+        questionLabel: "Question",
+        addQuestionButton: "Add a Question",
+        alertNoImagesSelected: "Please select at least two images for the new question.",
+        alertNewQuestionSuccess: "New question added successfully!",
+        alertNewQuestionFail: "Failed to add the new question. Please try again.",
+        selectImagesForNewQuestion: "Select Images for New Question",
+        submit: "Submit",
+        cancel: "Cancel"
+      },
+      importSurvey: "Import Survey",
+      save: "Save",
+      cancel: "Cancel",
+      deleteSuccess: "Survey deleted successfully.",
+      deleteError: "Failed to delete the survey.",
+      viewSurvey: {
+        title: "Aesthetics Survey",
+        consentTitle: "Consent to Participate / Consentement à participer",
+        consentMessage: "We would like to store your survey responses for research purposes. Do you consent to participate? \n \n Nous aimerions stocker vos réponses au sondage à des fins de recherche. Consentez-vous à participer?",
+        downloadDetailedConsentForm: "Download detailed consent form \\ Télécharger le formulaire de consentement détaillé",
+        accept: "Accept",
+        decline: "Decline",
+        loading: "Loading questions...",
+        questionPrompt: "Which image is more aesthetic?",
+        back: "Previous Question",
+        nextQuestion: "Next Question",
+        submit: "Submit",
+        completionAlert: "Survey completed! Thank you for your responses.",
+        quickResponseWarning: "Please slow down and take your time in answering the questions.",
+      },
+      mainPage: {
+        heading: "Welcome to the Aesthetics Survey",

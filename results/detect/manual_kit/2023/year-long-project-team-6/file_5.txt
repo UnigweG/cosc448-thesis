@@ -1,0 +1,268 @@
+/* Reset some default styles for the page */
+body,
+h1,
+p {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    min-width: 600px;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    height: 100%;
+    width: 250px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #333;
+    padding-top: 20px;
+    z-index: 100;
+}
+
+.sidebar h2 {
+    color: #fff;
+    text-align: center;
+}
+
+.sidebar ul {
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li {
+    margin-bottom: 10px;
+}
+
+.sidebar a {
+    text-decoration: none;
+    color: #fff;
+    display: block;
+    padding: 10px;
+    transition: 0.3s;
+}
+
+.sidebar a:hover,
+a.active {
+    background-color: #555;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    /* Fixed position to cover the entire viewport */
+    z-index: 10000;
+    /* Sit on top */
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Full width */
+    height: 100%;
+    /* Full height */
+    overflow: auto;
+    /* Enable scroll if needed */
+    background-color: rgba(0, 0, 0, 0.4);
+    /* Black overlay with opacity */
+    color: black;
+}
+
+/* Modal Content/Box */
+.modal-content {
+    position: fixed;
+    /* Fixed position to center within the viewport */
+    background-color: #fefefe;
+    top: 50%;
+    /* Center vertically */
+    left: 50%;
+    /* Center horizontally */
+    transform: translate(-50%, -50%);
+    /* Centering trick */
+    padding: 20px;
+    border: 2px solid #888;
+    width: 80%;
+}
+
+/* The Close Button */
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+/* Top Bar Styles */
+/* Add a black background color to the top navigation */
+.topnav {
+    background-color: white;
+    overflow: hidden;
+    margin-left: 50px;
+    border-bottom: 1px solid lightgray;
+}
+
+/* Style the links inside the navigation bar */
+.topnav a {
+    float: left;
+    color: gray;
+    text-align: center;
+    padding: 14px 40px;
+    text-decoration: none;
+    font-size: 17px;
+    transition: color 0.3s ease;
+    border-right: 0.1px solid lightgray;
+}
+
+/* Change the color of links on hover */
+.topnav a:hover {
+    color: black;
+}
+
+/* Add a color to the active/current link */
+.topnav a.active {
+    color: black;
+}
+
+/* Right-aligned section inside the top navigation */
+.topnav-right {
+    float: right;
+    text-align: center;
+}
+
+/* Sidebar Styles */
+.sidebar {
+    height: calc(100% - 80px);
+    width: 50px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background-color: #373c53;
+    padding-top: 80px;
+    /* Adjust to account for the top bar's height */
+}
+
+.sidebar ul {
+    color: white;
+    list-style-type: none;
+    padding: 0;
+}
+
+.sidebar li {
+    margin-bottom: 10px;
+}
+
+.sidebar a {
+    position: relative;
+    text-decoration: none;
+    color: #fff;
+    display: block;
+    padding: 10px;
+    transition: 0.3s;
+    text-align: center;
+    border-radius: 10px;
+    margin: 5px;
+    width: 20px;
+}
+
+
+.sidebar img {
+    width: 20px;
+}
+
+.bot-set {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    border-top: 1px white solid;
+}
+
+.bot-set li {
+    margin-bottom: 10px;
+}
+
+.tooltiptext {
+    visibility: hidden;
+    width: 120px;
+    background-color: black;
+    color: #fff;
+    text-align: center;
+    border-radius: 6px;
+    padding: 5px 0;
+
+    /* Position the tooltip */
+    position: absolute;
+    z-index: 1;
+}
+
+.sidebar a:hover {
+    background-color: #555;
+}
+
+.sidebar li:hover .tooltiptext {
+    visibility: visible;
+}
+
+.bot-set li:hover .tooltiptext {
+    visibility: visible;
+    position: absolute;
+    z-index: 1;
+    bottom: 100%;
+    left: 50%;
+    margin-left: -25px;
+}
+
+/* Content Styles */
+.content {
+    margin-left: 50px;
+    padding: 20px;
+
+}
+
+.addgroup {
+    padding: 20px;
+}
+
+.creategroup {
+    padding: 20px;
+}
+
+.Modal input[type="text"] {
+    width: 200px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    margin: 10px;
+    outline: none;
+}
+
+.topnav button {
+    background-color: white;
+    color: black;
+    border: 1px solid black;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    margin: 10px;
+    transition: all 0.4s ease;
+    width: 120px;
+}
+
+.topnav button:hover {
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+    transform: translateY(-3.5px);
+}
+
+p#resultContainer {
+    text-align: center;
+    font-size: 18px;
+    margin-top: 20px;
+    color: #333;
+}

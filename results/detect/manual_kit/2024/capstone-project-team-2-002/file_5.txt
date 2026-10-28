@@ -1,0 +1,153 @@
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react';
+import AdminPage from '../src/app/admin/page';
+import { redirect } from 'next/navigation';
+import { useAdminStatus } from '@/app/components/useAdminStatus';
+
+// Mock the redirect function
+jest.mock('next/navigation', () => ({
+  redirect: jest.fn(),
+}));
+
+// Utility to set or clear cookies in tests
+const setCookie = (name: string, value: string) => {
+  document.cookie = `${name}=${value}`;
+};
+
+const clearCookies = () => {
+  document.cookie = '';
+};
+
+// //expect(redirect).toHaveBeenCalledWith('/dashboard')
+global.fetch = jest.fn();
+
+describe('AdminPage Component', () => {
+  beforeEach(() => {
+    // Mock fetch to return a valid Response object
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () =>
+          Promise.resolve([
+            { firstName: 'John', lastName: 'Doe', email: 'john.doe@example.com' },
+            { firstName: 'Jane', lastName: 'Smith', email: 'jane.smith@example.com' },
+            { firstName: 'Bob', lastName: 'Johnson', email: 'bob.johnson@example.com' },
+          ]),
+      } as Response)
+    );
+
+    global.confirm = jest.fn(() => true);
+    global.alert = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+    clearCookies();
+  });
+
+  test('loads and displays users', async () => {
+
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ isAdmin: false })
+    });
+    await act(async () => {
+      render(<AdminPage />);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('John')).toBeInTheDocument();
+      expect(screen.getByText('Doe')).toBeInTheDocument();
+    });
+  });
+
+  test('handles Create User button click', async () => {
+
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ isAdmin: false })
+    });
+    await act(async () => {
+      render(<AdminPage />);
+    });
+
+    const createUserButton = screen.getByLabelText('Create User');
+    fireEvent.click(createUserButton);
+
+    // Ensure alert is called when clicking the Create User button
+    alert('Create User button clicked!');
+  });
+
+  test('handles Change Password button click', async () => {
+
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ isAdmin: false })
+    });
+    await act(async () => {
+      render(<AdminPage />);
+    });
+    
+    const changePasswordButtons = screen.getAllByLabelText('Change Password');
+    fireEvent.click(changePasswordButtons[0]);
+
+    alert('Change Password button clicked!');
+    
+  });  
+
+  test('redirects to dashboard if not admin', async () => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ isAdmin: false }), // Mock the response correctly
+    });
+  
+    await act(async () => {
+      render(<AdminPage />);
+    });
+  
+    await waitFor(() => {
+      expect(redirect).toHaveBeenCalledWith('/dashboard');
+    });
+  });
+
+  test('redirects to /login if user not logged in',async() => {
+    (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false, // Response status indicates failure
+      status: 401, // HTTP status code for unauthorized
+      json: jest.fn().mockResolvedValue({ msg: 'Unauthorized' }), // Optional: You can mock the response body
+    });
+    
+    // Ensure cookies are cleared, simulating no JWT token
+    await act(async () => {
+      render(<AdminPage />);
+    });
+
+    // Expect the redirect function to be called with /login
+    expect(redirect).toHaveBeenCalledWith('/');
+  });
+
+  test('does not redirect if user logged in', async() => {
+     // Mock the useAdminStatus hook to return token as false
+     (fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ isAdmin: true }), // Mock the response correctly
+    });
+
+    await act(async () => {
+      render(<AdminPage />);
+    });
+
+    // Assert that redirect to /login was NOT called
+    expect(redirect).not.toHaveBeenCalled();
+  });
+
+  test('shows delete confirmation modal when deleting user', async () => {
+    // Mock fetch response with test data
+    (fetch as jest.Mock).mockImplementation(() => Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve([{
+            id: 1,
+            firstName: 'Test',
+            lastName: 'User',
+            email: 'test@example.com'
+        }])

@@ -1,0 +1,139 @@
+import base64
+import glob
+import io
+import logging
+from mailbox import Message
+from pydoc_data import topics
+import subprocess
+import time
+from urllib.parse import unquote_to_bytes
+from flask import after_this_request, flash, session
+from datetime import datetime
+import os
+import re
+import random
+import string
+from click import wrap_text
+from flask import Flask, jsonify, render_template, request, send_from_directory, url_for, Response, send_file, make_response, redirect
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfbase.pdfmetrics import stringWidth
+from flask_cors import CORS
+import openai 
+import matplotlib.pyplot as plt
+from io import BytesIO
+from pymongo import MongoClient
+from gridfs import GridFS, NoFile
+from PyPDF2 import PdfReader
+from werkzeug.utils import secure_filename
+from bson.objectid import ObjectId
+
+from flask_bcrypt import Bcrypt
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from pymongo import MongoClient
+from bson.objectid import ObjectId
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail
+from flask_mail import Mail, Message
+from pptx import Presentation
+from flask import send_file, abort
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, SubmitField, SelectField, RadioField, TextAreaField
+from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
+from datetime import datetime
+from docx import Document
+import tempfile
+import subprocess
+import os
+from PIL import Image
+from urllib.parse import quote
+import shutil
+from pathlib import Path
+from pptx.util import Pt
+
+import subprocess
+from collections import defaultdict
+from collections import Counter
+
+
+
+class RegistrationForm(FlaskForm):
+    '''Registration form class. Inherits from FlaskForm. '''
+    first_name = StringField('First Name', validators=[DataRequired()])
+    last_name = StringField('Last Name', validators=[DataRequired()])
+    email = StringField('Email', validators=[DataRequired(), Email()])
+    password = PasswordField('Password', validators=[
+        DataRequired(),
+        Length(min=8, message='Password must be at least 8 characters long.'),
+        EqualTo('confirm_password', message='Passwords must match.')
+    ])
+    confirm_password = PasswordField('Confirm Password')
+    birth_date = SelectField('Birth Date', choices=[(str(i), str(i)) for i in range(1, 32)])
+    birth_month = SelectField('Birth Month', choices=[(str(i), str(i)) for i in range(1, 13)])
+    birth_year = SelectField('Birth Year', choices=[(str(i), str(i)) for i in range(1900, 2022)])
+    gender = RadioField('Gender', choices=[('Male', 'Male'), ('Female', 'Female'), ('Custom', 'Custom')])
+    custom_gender = TextAreaField('Custom Gender')
+    submit = SubmitField('Register')
+
+
+
+app = Flask(__name__, template_folder='my_templates')
+CORS(app)
+bcrypt = Bcrypt(app)
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
+openai.api_key = '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'
+
+
+app.secret_key = 'coursifyai1234'
+
+serializer = URLSafeTimedSerializer(app.secret_key)
+
+
+
+
+# Setup MongoDB connection
+client = MongoClient('mongodb+srv://Remy:1234@cluster0.vgzdbrr.mongodb.net/')
+db = client['new_pdfs']
+db2=client['Login_details']
+db3=client['reviews']
+fs = GridFS(db)
+users_collection=db2.users
+reviews_collection=db3.reviews
+
+app.config['MAIL_SERVER'] = 'smtp-mail.outlook.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'coursify@outlook.com'  
+app.config['MAIL_PASSWORD'] = 'Gunners4Eva$'
+
+mail = Mail(app)
+
+
+
+# User model
+class User(UserMixin):
+    '''User class for Flask-Login.'''
+    def __init__(self, user_id, email):
+        self.user_id = str(user_id)
+        self.email = email
+
+    def get_id(self):
+        return self.user_id
+
+# User Loader
+@login_manager.user_loader
+def load_user(user_id):
+    '''Function to load a user from the database.'''
+    user = users_collection.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        return None
+    return User(user_id=user["_id"], email=user["email"])
+@app.route('/')
+def home():
+    '''Function to render the homepage.'''
+
+    # If the user is authenticated, redirect to the dashboard
+    if current_user.is_authenticated:

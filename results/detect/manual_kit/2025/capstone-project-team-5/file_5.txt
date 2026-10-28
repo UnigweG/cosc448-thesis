@@ -1,0 +1,135 @@
+import { useEffect, useState } from 'react'
+import { useApp } from '../../app/context/AppContext'
+import EmptyState from '../../components/EmptyState'
+import InlineError from '../../components/InlineError'
+import PageHeader from '../../components/PageHeader'
+import PdfViewer from '../../components/PdfViewer'
+import { getProjectItems } from '../../lib/projects'
+import {
+  DEFAULT_RESUME_TEMPLATE,
+  EMPTY_RESUME_FORM,
+  RESUME_TEMPLATE_OPTIONS,
+  buildResumeDraft,
+  formatBulletSource,
+  formatResumeDate,
+  getAvailableResumeProjects,
+  hasResumeProfile,
+  normalizeResumeItems,
+  parseSnapshotInput,
+  prepareBulletPoints,
+  sortResumesByUpdatedAt,
+} from '../../lib/resumes'
+
+function ReadinessItem({ label, ready, detail, onClick }) {
+  return (
+    <div
+      className={`group flex items-start justify-between gap-3 border-b border-border/70 py-2 last:border-b-0 last:pb-0 ${
+        onClick ? 'cursor-pointer hover:bg-elevated/50 -mx-2 px-2 rounded transition-colors' : ''
+      }`}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick() } } : undefined}
+    >
+      <div className="min-w-0">
+        <div className={`text-xs font-semibold ${onClick ? 'text-ink group-hover:text-accent transition-colors' : 'text-ink'}`}>{label}</div>
+        <div className="mt-0.5 text-2xs text-muted">{detail}</div>
+      </div>
+      <span
+        className={`mt-0.5 rounded border px-2 py-0.5 font-mono text-2xs uppercase tracking-widest ${
+          ready
+            ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+            : 'border-border bg-elevated text-muted'
+        }`}
+      >
+        {ready ? 'Ready' : 'Missing'}
+      </span>
+    </div>
+  )
+}
+
+function downloadBlobFile(bytes, contentType, filename) {
+  const url = URL.createObjectURL(new Blob([bytes], { type: contentType || 'application/pdf' }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename || 'resume.pdf'
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function cacheKey(username) {
+  return `resume_preview_${username}`
+}
+
+function cachePreviewToStorage(username, state) {
+  try {
+    const bytes = state.bytes instanceof ArrayBuffer ? state.bytes : state.bytes?.buffer ?? state.bytes
+    const base64 = btoa(
+      new Uint8Array(bytes).reduce((data, byte) => data + String.fromCharCode(byte), '')
+    )
+    localStorage.setItem(
+      cacheKey(username),
+      JSON.stringify({
+        base64,
+        filename: state.filename,
+        contentType: state.contentType,
+      })
+    )
+  } catch {
+    // localStorage quota exceeded or unavailable — silently skip
+  }
+}
+
+function loadCachedPreview(username) {
+  try {
+    const raw = localStorage.getItem(cacheKey(username))
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+    const binary = atob(parsed.base64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+
+    return {
+      filename: parsed.filename || 'resume.pdf',
+      bytes: bytes.buffer,
+      contentType: parsed.contentType || 'application/pdf',
+      stale: true,
+    }
+  } catch {
+    return null
+  }
+}
+
+function clearCachedPreview(username) {
+  try {
+    localStorage.removeItem(cacheKey(username))
+  } catch {
+    // ignore
+  }
+}
+
+export default function ResumesPage() {
+  const { user, apiOk, setPage } = useApp()
+
+  const [resumes, setResumes] = useState([])
+  const [projects, setProjects] = useState([])
+  const [profile, setProfile] = useState(null)
+  const [workCount, setWorkCount] = useState(0)
+  const [educationCount, setEducationCount] = useState(0)
+  const [llmConfig, setLlmConfig] = useState({ is_allowed: false, model_preferences: [] })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const [showForm, setShowForm] = useState(false)
+  const [editingProjectId, setEditingProjectId] = useState(null)
+  const [form, setForm] = useState(EMPTY_RESUME_FORM)
+  const [useAiAssist, setUseAiAssist] = useState(false)
+  const [draftLoading, setDraftLoading] = useState(false)
+  const [draftStatus, setDraftStatus] = useState('')
+  const [formError, setFormError] = useState('')
+  const [saving, setSaving] = useState(false)

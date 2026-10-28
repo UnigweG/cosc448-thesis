@@ -1,0 +1,139 @@
+"""
+Static web portfolio export service.
+
+Produces a downloadable ZIP archive containing a self-contained single-page
+web portfolio:
+  - index.html        — page structure and inline rendering of Part A sections
+  - portfolio_data.js — embedded JSON snapshot of all portfolio parts + figures data
+  - style.css         — visual styles
+  - filter.js         — client-side gallery search/filter/sort logic
+  - figures.js        — contribution map and skill timeline visualizations
+
+The static bundle requires no server — it is the "public mode" deliverable.
+Images are base64-encoded inline so the ZIP is fully self-contained.
+"""
+
+import base64
+import io
+import json
+import urllib.request
+import zipfile
+from datetime import date, datetime
+from typing import Any, Optional
+
+from sqlmodel import Session
+
+from src.database.api.CRUD.portfolio import load_portfolio, get_project_cards_for_portfolio
+from src.database import get_project_report_models_by_names, get_most_recent_user_config
+from src.database.api.CRUD.projects import get_project_report_model_by_name
+from src.utils.errors import KeyNotFoundError
+
+
+_CODING_LANGUAGE_DISPLAY = {
+    "PYTHON": "Python", "JAVASCRIPT": "JavaScript", "TYPESCRIPT": "TypeScript",
+    "JAVA": "Java", "CPP": "C++", "C": "C", "CSHARP": "C#", "PHP": "PHP",
+    "RUBY": "Ruby", "SWIFT": "Swift", "GO": "Go", "RUST": "Rust",
+    "HTML": "HTML", "CSS": "CSS", "SQL": "SQL", "SHELL": "Shell", "R": "R",
+}
+
+
+def _normalize_lang_key(key: str) -> str:
+    """Normalize a language key from any serialization format to display name."""
+    if key.startswith("__enum__:"):
+        return key.rsplit(":", 1)[-1]
+    if "." in key:
+        member = key.rsplit(".", 1)[-1]
+        return _CODING_LANGUAGE_DISPLAY.get(member, member)
+    return key
+
+
+def _aggregate_languages(cards_data: list[dict]) -> dict:
+    """Aggregate language ratios across all cards into display-name keyed totals."""
+    totals: dict = {}
+    for card in cards_data:
+        for key, ratio in (card.get("languages") or {}).items():
+            lang = _normalize_lang_key(str(key))
+            totals[lang] = totals.get(lang, 0.0) + float(ratio)
+    return {k: v for k, v in sorted(totals.items(), key=lambda x: -x[1]) if v > 0}
+
+
+def _json_default(obj: Any) -> Any:
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, bytes):
+        return base64.b64encode(obj).decode("utf-8")
+    raise TypeError(f"Object of type {type(obj)} is not JSON serialisable")
+
+
+_HTML_TEMPLATE = """\
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title}</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1 id="portfolio-title">{title}</h1>
+    <p class="portfolio-updated">Last updated: {last_updated}</p>
+  </header>
+
+  <nav id="section-nav">{nav_html}</nav>
+
+  <!-- Part A: Narrative sections -->
+  <section id="narrative">
+{sections_html}
+  </section>
+
+  <!-- Figures: language breakdown + contribution map + skill timeline -->
+  <section id="figures">
+    <h2>Figures</h2>
+    <div id="language-breakdown"></div>
+    <div id="contribution-map"></div>
+    <div id="skill-timeline"></div>
+  </section>
+
+  <!-- Part B + C: Project gallery -->
+  <section id="gallery">
+    <h2>Projects</h2>
+
+    <div id="gallery-filters">
+      <input type="text" id="search-input" placeholder="Search by name, tag, skill..." />
+      <label>Themes: <input type="text" id="filter-themes" placeholder="e.g. web, ml" /></label>
+      <label>Tone: <input type="text" id="filter-tones" placeholder="e.g. professional" /></label>
+      <label>Tags: <input type="text" id="filter-tags" placeholder="e.g. python, api" /></label>
+      <label>Skills: <input type="text" id="filter-skills" placeholder="e.g. React" /></label>
+      <button id="clear-filters">Clear</button>
+    </div>
+
+    <div id="cards-container"></div>
+  </section>
+
+  <script src="portfolio_data.js"></script>
+  <script src="filter.js"></script>
+  <script src="figures.js"></script>
+</body>
+</html>
+"""
+
+_CSS = """\
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #f0f0f0;
+  color: #111111;
+  line-height: 1.6;
+}
+
+header {
+  padding: 2rem;
+  border-bottom: 1px solid #e0e0e0;
+  background: #ffffff;
+}
+
+header h1 {
+  font-size: 2rem;

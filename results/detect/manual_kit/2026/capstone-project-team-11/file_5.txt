@@ -1,0 +1,117 @@
+import { matchPath } from "react-router-dom";
+import type { UserRole } from "../types/auth";
+import { readTabSearchParam } from "../utils/tabSearchParams";
+import type {
+  GuideChapter,
+  GuideStep,
+  GuideTrigger,
+} from "./guideTypes";
+
+export type { GuideTrigger } from "./guideTypes";
+
+export const AUTO_GUIDE_PROFILE_TIP_CHAPTER_IDS = {
+  instructor: "instructor-dashboard-guide-preferences",
+  admin: "admin-dashboard-guide-preferences",
+} as const satisfies Record<UserRole, string>;
+
+type GuideDefinitionShape = {
+  id: string;
+  title: string;
+  version: number;
+  roles: readonly UserRole[];
+  steps: readonly GuideStep[];
+};
+
+export const GUIDE_DEFINITIONS = [
+  {
+    id: "instructor-dashboard",
+    title: "Instructor Dashboard",
+    version: 5,
+    roles: ["instructor"],
+    steps: [
+      {
+        id: "welcome",
+        title: "Welcome to Exam Generator",
+        description:
+          "This short tour introduces your instructor workspace and the main places where you will create courses, reuse shared questions, and begin building exams.",
+      },
+      {
+        id: "course-summary",
+        title: "Review your course summary",
+        description:
+          "These cards show your total, active, and archived course counts so you can see the state of your course workspaces at a glance.",
+        target: "dashboard.course-summary",
+        preferredPlacement: "bottom",
+        fallbackDescription:
+          "Course summary cards appear after the dashboard finishes loading.",
+        importance: "supplemental",
+      },
+      {
+        id: "create-course",
+        title: "Create a course workspace",
+        description:
+          "Use New Course to set up a class section before adding students, questions, or exams.",
+        target: "dashboard.new-course",
+        preferredPlacement: "bottom",
+      },
+      {
+        id: "course-card-overview",
+        title: "Understand a course workspace",
+        description:
+          "Each course card represents a complete course workspace. It identifies the course, section, term, and status, and opens the students, questions, exams, and analytics for that class.",
+        target: "dashboard.course-card",
+        preferredPlacement: "right",
+        fallbackDescription:
+          "A course card appears after your first course is created.",
+      },
+      {
+        id: "course-card-actions",
+        title: "Organize and personalize course cards",
+        description:
+          "Use a card's grip to reorder courses, or choose Customize appearance to give the course a recognizable color and pattern.",
+        target: "dashboard.course-actions",
+        preferredPlacement: "bottom",
+        fallbackDescription:
+          "Course-card controls appear after your first course is created.",
+        importance: "supplemental",
+      },
+      {
+        id: "course-list",
+        title: "Open a course workspace",
+        description:
+          "Select a course card to open its students, questions, exams, and analytics. Active and archived courses remain in separate sections.",
+        target: "dashboard.course-list",
+        preferredPlacement: "top",
+        fallbackDescription:
+          "Course cards will appear here after your first course is created.",
+        importance: "supplemental",
+      },
+      {
+        id: "dashboard-navigation",
+        title: "Return to your course overview",
+        description:
+          "Dashboard brings you back to your active and archived course workspaces from anywhere in the application.",
+        target: "navigation.dashboard",
+        preferredPlacement: "right",
+        importance: "supplemental",
+      },
+      {
+        id: "shared-banks",
+        title: "Reuse shared questions",
+        description:
+          "Shared Banks contains question banks other instructors have made available to you.",
+        target: "navigation.shared-banks",
+        preferredPlacement: "right",
+      },
+      {
+        id: "page-help-navigation",
+        title: "Revisit guidance at any time",
+        description:
+          "Page Help reopens the guide for the page you are viewing, even after you finish it or turn off automatic guides.",
+        target: "navigation.page-help",
+        preferredPlacement: "right",
+      },
+      {
+        id: "profile-navigation",
+        title: "Customize your profile and security",
+        description:

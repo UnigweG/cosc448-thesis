@@ -1,0 +1,104 @@
+import signal, threading
+from uuid import uuid4
+import json, os, sys, re, shutil, contextlib, zipfile
+from pathlib import Path
+from typing import Iterable, List, Optional, Tuple, Dict, Any
+
+from src.project_timeline import (
+    get_projects_with_skills_timeline_from_projects,
+    get_skill_timeline_from_projects,
+)
+from src.analyzers.badge_engine import (
+    ProjectAnalyticsSnapshot,
+    assign_badges,
+    build_fun_facts,
+)
+from datetime import datetime
+
+from src.ZipParser import parse_zip_to_project_folders, toString, extract_zip
+from src.analyzers.ProjectMetadataExtractor import ProjectMetadataExtractor
+from src.FileCategorizer import FileCategorizer
+from src.analyzers.language_detector import detect_language_per_file, analyze_language_share
+from src.analyzers.contribution_analyzer import ContributionAnalyzer, ContributionStats
+from utils.RepoFinder import RepoFinder
+from src.managers.ProjectManager import ProjectManager
+from src.managers.FileHashManager import FileHashManager
+from src.models.Project import Project
+from src.models.Report import Report
+from src.models.ReportProject import ReportProject, PortfolioDetails
+from src.ProjectFolder import ProjectFolder
+from src.analyzers.SkillAnalyzer import SkillAnalyzer
+from src.generators.ResumeInsightsGenerator import ResumeInsightsGenerator
+from src.generators.PortfolioGenerator import PortfolioGenerator
+from src.managers.ConfigManager import ConfigManager
+from src.ProjectRanker import ProjectRanker
+from src.analyzers.RepoProjectBuilder import RepoProjectBuilder
+from utils.file_hashing import compute_file_hash
+from src.exporters.ReportExporter import ReportExporter
+from src.managers.ReportManager import ReportManager
+from src.services.ReportEditor import ReportEditor
+from src.services.InsightEditor import InsightEditor
+from src.analyzers.role_inference_analyzer import RoleInferenceAnalyzer
+from collections import defaultdict
+import subprocess
+
+MIN_DISPLAY_CONFIDENCE = 0.5  # only show skills with at least this confidence
+
+
+class ProjectAnalyzer:
+    """The main entry point of our program. Caller to all of our dedicated analysis-classes."""
+
+    def __init__(self, config_manager: ConfigManager, root_folders: List[ProjectFolder], zip_path: Path):
+        self.root_folders: List[ProjectFolder] = root_folders
+        self.zip_path: Path = zip_path
+        self._config_manager = config_manager
+
+        self.file_categorizer = FileCategorizer()
+        self.repo_finder = RepoFinder()
+        self.project_manager = ProjectManager()
+        self.file_hash_manager = FileHashManager()
+        self.contribution_analyzer = ContributionAnalyzer()
+
+        self.cached_extract_dir: Optional[Path] = None
+        self.cached_projects: List[Project] = []
+        self.import_batch_id: str = uuid4().hex
+        self.changed_project_names: set = set()  # tracks new/changed projects for run_all
+
+        self.report_manager = ReportManager()
+        self.report_exporter = ReportExporter()
+
+        self.role_inference_analyzer = RoleInferenceAnalyzer()
+
+        if threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGINT, self._signal_cleanup)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @contextlib.contextmanager
+    def suppress_output(self):
+        """Temporarily suppress stdout and stderr."""
+        with open(os.devnull, "w") as devnull:
+            old_stdout, old_stderr, sys.stdout, sys.stderr = sys.stdout, sys.stderr, devnull, devnull
+            try:
+                yield
+            except Exception:
+                sys.stdout, sys.stderr = old_stdout, old_stderr
+                raise
+            finally:
+                sys.stdout, sys.stderr = old_stdout, old_stderr
+
+    @staticmethod
+    def clean_path(raw_input: str) -> Path:
+        """Cleans and validates a user-provided file path."""
+        stripped = raw_input.strip().strip("'").strip('"')
+        if os.name == "nt":
+            return Path(os.path.expanduser(stripped))
+        return Path(os.path.expanduser(re.sub(r'\\(.)', r'\1', stripped)))
+
+    def _get_projects(self) -> List[Project]:
+        """Ensures cached_projects is populated, fetching from DB if needed."""
+        if not self.cached_projects:
+            self.cached_projects = list(self.project_manager.get_all())
+        return self.cached_projects

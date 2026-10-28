@@ -1,0 +1,114 @@
+@extends('layouts.app')
+
+@section('content')
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fullcalendar/3.10.2/fullcalendar.min.css" />
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar-scheduler@1.10.4/dist/scheduler.min.css' rel='stylesheet' />
+    <style>
+
+/* calender style */
+#bookings_event_{
+    max-width: 900px;
+    margin: 20px auto;
+}
+
+/* the block below the calender page */
+#your_booking {  
+color: white;
+background-color: #3CB371;
+width: 100px;
+display: inline-block;
+margin-right: 5px;
+margin-bottom: 5px;
+}
+#other_booking {
+color: white;
+background-color: #3a87ad;
+width: 100px;
+display: inline-block;
+margin-bottom: 5px;
+}
+.fc-view-container { 
+overflow-x: scroll; 
+}
+.fc-axis {
+    position: sticky;
+    /* background:#87CEFA; */
+    background: #e6f3ff;
+}  
+.fc-resource-cell
+{
+    position: sticky;
+    left: 0;
+    background: #e6f3ff;
+} 
+.fc .fc-agendaDay-view .fc-bg tr > td{
+    background-color: white;
+} 
+
+</style>
+</head>
+
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-10">
+            <div class="card">
+                <div class="card-header">
+                    {{ __('Calendar View') }}
+                </div> 
+                <div class="card-body">
+                    <div id="alert_container" style="display:none"></div>
+                    <!-- Search Modal -->
+                    <form action="{{ route('calendar') }}" class="row g-2" >
+                        @csrf
+                        <!-- Campus Selection -->
+                        <div class="col-2">
+                            <label for="campus" class="label label-default">Campus</label>
+                            <select id="campus" class="form-select @error('campus_id')is-invalid @enderror" name="campus_id" required>
+                                <option disabled hidden selected></option>
+                                @foreach ($campuses as $campus)
+                                    <option value="{{$campus->id}}">{{$campus->name}} Campus</option>
+                                @endforeach
+                            </select>
+                            @error('campus_id')
+                                <div class='alert alert-danger'>{{$message}}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Building Selection -->
+                        <div class="col-2">
+                            <label for="building" class="label label-default">Building</label>
+                            <select id="building" class="form-select @error('building_id')is-invalid @enderror" name="building_id" disabled required>
+                                <option disabled selected hidden></option>
+                            </select>
+                            @error('building_id')
+                                <div class='alert alert-danger'>{{$message}}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Floor Selection -->
+                        <div class="col-2 ">
+                            <label for="floor" class="label label-default">Floor</label>
+                            <select id="floor" class="form-select @error('floor_id')is-invalid @enderror" name="floor_id" disabled required>
+                                <option disabled selected hidden></option>
+                            </select>
+                            @error('floor_id')
+                                <div class='alert alert-danger'>{{$message}}</div>
+                            @enderror
+                        </div>
+
+                        <!-- Room Selection -->
+                        <div class="col-2 ">
+                            <label for="room" class="label label-default">Room</label>
+                            <select id="room" class="form-select @error('room_id')is-invalid @enderror" name="room_id" disabled required>
+                                <option disabled selected hidden></option>
+                            </select>
+                            @error('room_id')
+                                <div class='alert alert-danger'>{{$message}}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-2 row ">

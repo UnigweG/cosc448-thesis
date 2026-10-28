@@ -1,0 +1,108 @@
+import React, { useEffect, useState, useRef } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import "../component/CSS/post.css";
+import { initializeWebRTC, cleanupWebRTC } from './webrtc';
+
+function PostPage() {
+    const [showWebRTC, setShowWebRTC] = useState(false);
+    const [userId, setUserId] = useState("");
+    const [selectedGroup, setSelectedGroup] = useState("");
+    const [postHistory, setPostHistory] = useState([]);
+    const [isPlaying, setIsPlaying] = useState(false);
+    const signalingClientRef = useRef(null);
+    const peerConnectionRef = useRef(null);
+    const localView = useRef(null);
+    const [mediaRecorder, setMediaRecorder] = useState(null);
+    const [recordedChunks, setRecordedChunks] = useState([]);
+    const navigate = useNavigate();
+    const [isRecordingStopped, setIsRecordingStopped] = useState(false);
+    const [recordedVideo, setRecordedVideo] = useState(null);
+    const [blurFace, setBlurFace] = useState(false);
+    const [groups, setGroups] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const location = useLocation();
+    const groupIdFromState = location.state?.groupId;
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [progress, setProgress] = useState(0);
+
+
+    const channelARN = 'arn:aws:kinesisvideo:us-east-1:466618866658:channel/webrtc-499/1701571372732';
+    useEffect(() => {
+        const sessionUser = sessionStorage.getItem('user');
+        console.log("Sessopm User: " + sessionUser);
+        if (!sessionUser) {
+            navigate('/login');
+        } else {
+            const user = JSON.parse(sessionUser);
+            setUserId(user.userid);
+            console.log("User Id: " + user.userid);
+        }
+    }, []);
+
+    useEffect(() => {
+        if (userId) {
+            fetch(`http://localhost:5001/post-history/${userId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const arr = [];
+                    for (let i in data) {
+                        let o = {};
+                        o[i] = data[i];
+                        arr.push(o);
+                    }
+                    console.log(arr[0].data);
+                    setPostHistory(arr[0].data);
+                })
+                .catch(error => console.error('Error fetching post history:', error));
+
+            // Fetch groups
+            fetch(`http://localhost:5001/user-groups/${userId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok for fetching user groups');
+                    }
+                    return response.json();
+                })
+                .then(groupsData => {
+                    setGroups(groupsData);
+                    const selectedGroupFromState = groupsData.find(group => group.groupid == groupIdFromState);
+                    console.log(selectedGroupFromState);
+                    if (selectedGroupFromState) {
+                        setSelectedGroup(selectedGroupFromState.groupid);
+                    }
+                })
+                .catch(error => console.error('Error fetching user groups:', error));
+        }
+    }, [userId]);
+
+    const handleSubmit = async (event) => {
+        event.preventDefault();
+        setIsLoading(true);
+        setIsSubmitting(true);
+
+        const formData = new FormData(event.target);
+        const postTitle = formData.get('post_title').trim();
+        const postText = formData.get('post_text').trim();
+        const groupid = formData.get('groupid');
+        let videoKey = '';
+        if (!postTitle || !postText || !groupid || groupid === "") {
+            setIsLoading(false);
+            setIsSubmitting(false);
+            alert('Please ensure all fields are filled out correctly.');
+            return;
+        }
+
+        if (recordedVideo) {
+            try {
+
+                const uploadResult = await uploadVideoWithProgress(recordedVideo, postTitle, (progressEvent) => {
+                    const progress = (progressEvent.loaded / progressEvent.total) * 100;
+                    setProgress(progress);
+                });
+                videoKey = uploadResult.key;
+                console.log('Video uploaded successfully');

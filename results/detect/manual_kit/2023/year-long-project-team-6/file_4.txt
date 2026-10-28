@@ -1,0 +1,132 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams, Link } from "react-router-dom";
+import { FaChevronDown } from 'react-icons/fa';
+import ReactModal from 'react-modal';
+
+import '../component/CSS/MembersPage.css';
+import testPicture from '../component/image/profileDefault.jpg';
+
+ReactModal.setAppElement('#root');
+
+function MembersPage() {
+    const [userId, setUserId] = useState('');
+    const navigate = useNavigate();
+    const { groupId } = useParams();
+    const [members, setMembers] = useState([]);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('All Roles');
+    const [admin, setAdmin] = useState([]);
+    const [adminid, setAdminid] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [selectedMember, setSelectedMember] = useState(null);
+
+    const [isOpen, setIsOpen] = useState(true);
+
+    const toggleDropdown = () => setIsOpen(!isOpen);
+
+    const [userDetails, setUserDetails] = useState(null);
+    const [showModal2, setShowModal2] = useState(false);
+    const [code, setCode] = useState([]);
+
+
+    useEffect(() => {
+        const sessionUser = sessionStorage.getItem('user');
+        if (!sessionUser) {
+            navigate('/login');
+        } else {
+            const user = JSON.parse(sessionUser);
+            setUserId(user.userid);
+            console.log("User Id: " + user.userid);
+        }
+    }, []);
+    const navigateToGroupPostMember = (memberId) => () => {
+        navigate(`/groupPost/${groupId}/${memberId}`);
+    };
+
+    const handleSearchChange = (event) => {
+        setSearchTerm(event.target.value);
+    };
+
+    const handleRoleChange = (event) => {
+        setRoleFilter(event.target.value);
+    };
+
+    const removeUserFromGroup = async (memberId) => {
+        try {
+            fetch(`http://localhost:5001/admin-group/${groupId}/user/${memberId}`, {
+                method: 'DELETE'
+            }).then(
+                response => {
+                    console.log('User removed:', response.data);
+                    alert("Successfully removed user from group!");
+                    window.location.reload();
+                }
+            )
+                .catch(
+                    error => {
+                        console.error('Error:', error);
+                    }
+                );
+        } catch (error) {
+            console.error('Error removing user from group:', error);
+        }
+    };
+
+    const deleteGroup = async (groupId) => {
+        try {
+            fetch(`http://localhost:5001/delete-group/${groupId}`, {
+                method: 'DELETE'
+            }).then(
+                response => {
+                    console.log('User updated:', response.data);
+                    alert("Successfully deleted the group!");
+                    navigate(`/`);
+                }
+            )
+                .catch(
+                    error => {
+                        console.error('Error:', error);
+                    }
+                );
+        } catch (error) {
+            console.error('Error deleting group:', error);
+        }
+    };
+
+
+    const navigateToPostPage = () => {
+        navigate('/PostPage', { state: { groupId } });
+    };
+
+
+    const navigateToAnnounce = () => {
+        navigate('/announcement', { state: { groupId } });
+    }
+    const navigateToView = () => {
+        navigate('/view-announce', { state: { groupId } });
+    };
+
+    useEffect(() => {
+        if (userId) {
+            fetch(`http://localhost:5001/groups-users/${groupId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log(userId);
+                    console.log('Fetched data:', data);
+                    const updatedMembers = data.map(member => {
+                        if (member.user_image) {
+                            member.user_image = `data:image/*;base64,${member.user_image}`;
+                        } else {
+                            member.user_image = testPicture;
+                        }
+                        return member;
+                    });
+                    setMembers(updatedMembers);
+                })
+                .catch(error => {
+                    console.error('Error fetching posts:', error);

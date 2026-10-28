@@ -1,0 +1,133 @@
+import { shallowMount } from '@vue/test-utils';
+import { mount } from '@vue/test-utils';
+import App from '@/App.vue';
+import {isLoggedInState} from '@/state/authstate.js';
+
+jest.mock('@/state/authstate.js', () => ({
+  isLoggedInState: { value: false },
+}));
+
+describe('App.vue', () => {
+  let wrapper;
+
+  beforeEach(() => {
+    // Mock the sidenav DOM element
+    const sidenav = document.createElement('div');
+    sidenav.id = 'mySidenav';
+    isLoggedInState.value = false;
+    document.body.appendChild(sidenav);
+
+    wrapper = shallowMount(App, {
+      global: {
+        mocks: {
+          $router: {
+            push: jest.fn(), // Mock router push function
+          },
+        },
+      },
+    });
+
+    // Mock localStorage
+    jest.spyOn(window.localStorage.__proto__, 'getItem');
+    jest.spyOn(window.localStorage.__proto__, 'setItem');
+    jest.spyOn(window.localStorage.__proto__, 'removeItem');
+    window.localStorage.getItem.mockImplementation((key) => {
+      if (key === 'access_token') {
+        return null; // Default to no token
+      }
+    });
+
+    // Mock alert and location.reload
+    jest.spyOn(window, 'alert').mockImplementation(() => {});
+    delete window.location;
+    window.location = { reload: jest.fn() };
+  });
+
+  afterEach(() => {
+    // Clean up DOM and mocks
+    document.body.innerHTML = '';
+    jest.clearAllMocks();
+  });
+
+  it('opens the sidebar when the menu button is clicked', async () => {
+    const wrapper = mount(App, {
+      attachTo: document.body, // Ensures elements exist in the test DOM
+    });
+  
+    await wrapper.vm.$nextTick(); // Wait for DOM updates
+  
+    const menuButton = document.querySelector(".menu-button-container");
+    expect(menuButton).not.toBeNull(); // Ensure it exists
+  
+    wrapper.vm.openNav();
+    await wrapper.vm.$nextTick();
+  
+    const sidenav = document.getElementById("mySidenav");
+    expect(sidenav.style.width).toBe("20vw"); // Confirm it's open
+  });
+
+  it('closes the sidebar when the close button is clicked', async () => {
+    const wrapper = mount(App, {
+      attachTo: document.body,
+    });
+  
+    await wrapper.vm.$nextTick(); 
+  
+    const menuButton = document.querySelector(".menu-button-container");
+    expect(menuButton).not.toBeNull(); 
+
+    wrapper.vm.openNav(); // Open the sidebar first
+    wrapper.vm.openNav(); // Call it again to close the sidebar
+    await wrapper.vm.$nextTick();
+    const sidenav = document.getElementById('mySidenav');
+    expect(sidenav.style.width).toBe('0px');
+  });
+
+  it('renders the login button when user is not logged in', () => {
+    expect(wrapper.find('#login-button').text()).toContain('login-link');
+    expect(wrapper.find('#login-button').exists()).toBe(true);
+  });
+
+  it('renders the logout button when user is logged in', async () => {
+    // Simulate the logged-in state
+    isLoggedInState.value = true;
+
+    // Mount the component
+    const wrapper = mount(App);
+
+    // Assert that the Logout button is visible
+    const logoutButton = wrapper.find('#login-button'); // Find the button by its ID
+    expect(logoutButton.exists()).toBe(true);
+    expect(logoutButton.text()).toContain('logout-link');
+  });
+  
+
+  it('logs out the user and reloads the page when the logout button is clicked', async () => {
+    window.localStorage.getItem.mockReturnValue('test_token'); // Simulate logged-in state
+    wrapper.vm.handleLogout(); // Call the logout method
+    expect(window.localStorage.removeItem).toHaveBeenCalledWith('access_token');
+    expect(window.alert).toHaveBeenCalledWith('loggedout-successful');
+    expect(window.location.reload).toHaveBeenCalled();
+  });
+
+  it('navigates to /questions when the Survey button is clicked', async () => {
+    const $router = {     // Mock Vue Router push method
+      push: jest.fn(), // Mock the push method
+    };
+
+    isLoggedInState.value = true; 
+
+    
+    const wrapper = mount(App, {  // Mount the component with mocked router
+      global: {
+        mocks: {
+          $router, // Make sure to pass the mocked router to the component
+        },
+      },
+    });
+    const buttons = wrapper.findAll('.sidebar-btn-design'); // Check how many buttons are rendered
+    
+    const reportsButton = buttons.at(2);  // Ensure the questions button exists (index 2 for questions)
+    expect(reportsButton.exists()).toBe(true);  // Check if the questions button exists
+    
+    await reportsButton.trigger('click'); // Simulate the click event

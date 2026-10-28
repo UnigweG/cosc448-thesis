@@ -1,0 +1,236 @@
+.resultDashboard {
+  margin-top: 12vh;
+  overflow-x: scroll !important;
+  flex-wrap: wrap !important;
+  height: 100vh;
+  max-width: 125vw;
+}
+
+.tab-header {
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  text-align: center;
+  width: 100%;
+}
+
+.tab-header .title {
+  display: flex;
+  width: 100%; 
+  margin-bottom: 10px;
+}
+.tab-header .title h1 {
+  font-size: 25px;
+  font-weight: 300;
+  display: flex;
+  margin: 0; 
+  padding: 0; 
+  color: var(--text-color);
+}
+.tab-header .selectionContainer {
+  display: flex;
+  overflow-x: auto;
+  text-align: left;
+  justify-content: left;
+  background-color: transparent;
+  cursor: pointer;
+  color: var(--text-color);
+  padding-bottom: 20px; 
+  width: 100%; 
+  margin: 0; 
+}
+.tab-header .selectionContainer .selection {
+  border: 1px solid rgb(199, 199, 199);
+  flex-direction: row;
+  background-color: var(--adminOverview);
+  display: flex;
+  width: 100%; 
+  margin: 0px 30px; 
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+
+}
+
+.tab-header .selection button {
+  padding: 10px 40px;
+  cursor: pointer;
+  background: none;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #7D7D7D;
+  font-weight: bold;
+  font-size: 20px;
+}
+
+.tab-header .selection button:hover {
+  color: var(--dash-font-hover);
+}
+
+.tab-header .title {
+  color: var(--dash-font-hover);
+  margin-left: 30px;
+}
+
+.tab-header button.active {
+  color: var(--dash-font-hover);
+  text-decoration: underline var(--text-change);
+}
+
+.tab-content {
+  z-index: 1;
+  color: var(--dash-font-hover);
+  width: 100%;
+  margin: 0px 30px 0 30px; 
+  height: 100%;
+  overflow: auto;
+}
+
+.tab-container {
+  overflow-x: scroll;
+  flex-wrap: wrap;
+  display: flex;
+  width: 100%; 
+  overflow: auto;
+}
+ 
+.summary-container {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  flex-wrap: wrap;
+  min-height: fit-content; 
+  overflow: hidden;
+}
+
+.summary-container .summaryData {
+  display: flex;
+  flex-direction: column;
+}
+
+.summaryData .summary {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+  flex-direction: column;
+}
+
+.summary .summarySurveyDetailsContainer {
+  width: 99.7%;
+  display: flex; 
+  margin-bottom: 10px; 
+  background-color: var(--adminOverview);
+  border: 1px solid rgb(199, 199, 199);
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+}
+
+.summarySurveyDetailsContainer .summarySurveyDetails {
+  display: flex; 
+  flex-direction: column;
+  width: 100%; 
+  text-align: left;
+  padding: 0 15px 0 15px;
+  margin-bottom: 10px; 
+}
+
+.summarySurveyDetails .summarySurveyDetailsItem {
+  display: flex; 
+  width: 50%;
+  flex-direction: row;
+  justify-content: space-between;
+}
+.summarySurveyDetailsItems {
+  display: flex; 
+  width: 75%; 
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.summarySurveyDetailsContainer .summarySurveyDetails .summarySurveyDetailsItemInside {
+  padding: 10px; 
+  width: fit-content;
+}
+.summarySurveyDetails h3 {
+  margin: 10px 0 10px 0; 
+  padding: 0; 
+}
+.summarySurveyDetails p {
+  margin: 5px 0 5px 0;  
+}
+
+.summary .summary-tabs {
+  flex-direction: row;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.summary-tabs .summary-items {
+  justify-content: space-between;
+  display: flex;
+  flex-direction: row;
+  border: 1px solid rgb(199, 199, 199);
+  background-color: var(--adminOverview);
+  cursor: pointer;
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+  height: 90px;
+  max-width: 20px;
+  min-width: 200px;
+  align-items: center;
+  justify-content: center;
+}
+
+.summary-tabs .summary-items .summaryLeftItem {
+  text-align: left;
+  display: flex;
+  align-items: left;
+  flex-direction: column;
+  padding-left: 10px;
+  justify-content: space-around;
+}
+
+.summaryLeftItem p {
+  font-size: 12px;
+  color: var(--text-color);
+}
+
+.summaryLeftItem h3 {
+  color: var(--text-color);
+  font-weight: 700;
+  font-size: 20px;
+  margin: 0;
+  padding: 0; 
+
+}
+
+.summary-tabs .summary-items .summaryRightItem {
+  align-items: right;
+  display: flex;
+  margin: 10px;
+}
+
+.summary-tabs .summary-items .summaryRightItem img {
+  width: 5vw;
+  height: 7vh;
+}
+
+.graphSummaryData {
+  margin-top: 20px;
+  width: 100%; 
+  padding: 5px; 
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap !important;
+  overflow: auto !important;
+}
+
+.graph-items {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;

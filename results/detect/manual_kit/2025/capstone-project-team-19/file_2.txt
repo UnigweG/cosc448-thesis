@@ -1,0 +1,155 @@
+import { Fragment, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import type { ReactNode } from "react";
+import TopBar from "../components/TopBar";
+import { getUsername } from "../auth/user";
+import { tokenStore } from "../auth/token";
+import { changePassword, deleteAccount, logout } from "../api/auth";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Eye, EyeOff, Globe, KeyRound, LogOut, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import MinimalConfirmDialog from "../components/shared/MinimalConfirmDialog";
+import { Link, useBlocker } from "react-router-dom";
+import {
+  getProfile,
+  updateProfile,
+  getEducation,
+  replaceEducation,
+  getCertifications,
+  replaceCertifications,
+  type UserProfile,
+  type UserEducationEntry,
+  getExperience,
+  replaceExperience,
+  type UserExperienceEntry,
+} from "../api/profile";
+import {
+  getPortfolioSettings,
+  updatePortfolioSettings,
+  type PortfolioSettings,
+} from "../api/portfolioSettings";
+import { listResumes, type ResumeListItem } from "../api/outputs";
+import { PageContainer, PageHeader } from "../components/shared";
+
+type EditableEducationEntry = Omit<UserEducationEntry, "entry_id" | "entry_type" | "display_order" | "created_at" | "updated_at">;
+type EditableExperienceEntry = Omit<UserExperienceEntry, "entry_id" | "display_order" | "created_at" | "updated_at">;
+
+type FieldKind = "input" | "textarea";
+type FieldSpec<T extends Record<string, unknown>> = {
+  key: keyof T;
+  label: string;
+  required?: boolean;
+  placeholder?: string;
+  kind?: FieldKind;
+  rows?: number;
+  colSpan?: 1 | 2;
+};
+
+function ProfileSectionCard({
+  title,
+  description,
+  actionLabel,
+  onAction,
+  actionDisabled,
+  contentClassName,
+  headerClassName,
+  children,
+}: {
+  title: ReactNode;
+  description?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  actionDisabled?: boolean;
+  contentClassName?: string;
+  headerClassName?: string;
+  children: ReactNode;
+}) {
+  return (
+    <Card className="rounded-2xl border-slate-200/80 bg-white shadow-sm">
+      <CardHeader
+        className={[
+          "flex flex-row items-start justify-between gap-4 border-b border-slate-100 px-6 py-3",
+          headerClassName ?? "",
+        ].join(" ")}
+      >
+        <div>
+          <CardTitle className="text-base text-slate-900">{title}</CardTitle>
+          {description ? (
+            <CardDescription className="text-slate-500">{description}</CardDescription>
+          ) : null}
+        </div>
+        {actionLabel && onAction ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-1 gap-2"
+            onClick={onAction}
+            disabled={actionDisabled}
+          >
+            <Pencil className="size-4" />
+            {actionLabel}
+          </Button>
+        ) : null}
+      </CardHeader>
+      <CardContent className={["space-y-4 pt-2", contentClassName ?? ""].join(" ")}>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileFormField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="mb-1 block text-xs font-medium text-slate-600">
+        {label}
+        {required ? " (required)" : " (optional)"}
+      </label>
+      <Input
+        value={value}
+        placeholder={placeholder}
+        className="placeholder:text-slate-400 placeholder:italic"
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function EditableList<T extends Record<string, any>>({
+  entries,
+  setEntries,
+  emptyRow,
+  fields,
+  addLabel = "Add another",
+  requiredKey,
+}: {
+  entries: T[];
+  setEntries: (next: T[]) => void;
+  emptyRow: T;
+  fields: Array<FieldSpec<T>>;
+  addLabel?: string;
+  requiredKey: keyof T;
+}) {
+  const gridFields = fields.filter((f) => (f.kind ?? "input") === "input");
+  const textareaFields = fields.filter((f) => (f.kind ?? "input") === "textarea");
+
+  function updateEntry(index: number, key: keyof T, value: string) {
+    setEntries(entries.map((e, i) => (i === index ? { ...e, [key]: value } : e)));
+  }
+
+  function addEntry() {
+    setEntries([...entries, { ...emptyRow }]);
+  }

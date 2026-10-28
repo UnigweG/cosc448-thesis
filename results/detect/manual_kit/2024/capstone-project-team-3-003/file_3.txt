@@ -1,0 +1,211 @@
+import { readFile } from "node:fs/promises";
+import { response } from "express";
+import { addNewTransaction } from "../src/controllers/dbPlaid";
+import { SimpleTransaction } from "../src/types/simpleTransactionObject";
+import { response1, response2 } from "./seed/AISeedData";
+
+const prisma = require("./prisma");
+const bcrypt = require("bcryptjs");
+
+async function main() {
+  // Store all upserts into promise array, then run them all.
+  const promiseArray: Promise<any>[] = [];
+  const salt = process.env.SALT_ROUNDS
+    ? Number.parseInt(process.env.SALT_ROUNDS)
+    : 10;
+  const hash = bcrypt.hashSync("password", salt);
+  const data = [
+    {
+      name: "testUser",
+      email: "test@test.com",
+      password: hash,
+    },
+    {
+      name: "admin",
+      email: "admin@admin.com",
+      password: hash,
+    },
+    {
+      name: "testUser2",
+      email: "test2@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser3",
+      email: "test3@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser4",
+      email: "test4@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser5",
+      email: "test5@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser6",
+      email: "test6@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser7",
+      email: "test7@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser8",
+      email: "test8@test.com",
+      password: hash,
+    },
+    {
+      name: "testUser9",
+      email: "test9@test.com",
+      password: hash,
+    },
+  ];
+  for (const user of data) {
+    promiseArray.push(
+      prisma.User.upsert({
+        where: {
+          email: user.email,
+        },
+        update: {},
+        create: {
+          email: user.email,
+          name: user.name,
+          password: user.password,
+          confirmed: true,
+          preferredCurrency: "USD",
+        },
+      }),
+    );
+  }
+
+  await Promise.all(promiseArray);
+
+  // query testing user
+  await prisma.User.upsert({
+    where: {
+      email: "query@test.com",
+    },
+    update: {},
+    create: {
+      email: "query@test.com",
+      name: "querytest",
+      password: hash,
+      confirmed: true,
+      preferredCurrency: "USD",
+      uuid: "QueryTest",
+    },
+  });
+
+  const admin = await prisma.User.findUnique({
+    where: {
+      email: "admin@admin.com",
+    },
+  });
+  const createAdmin = await prisma.Admin.upsert({
+    where: {
+      userId: admin.id,
+    },
+    update: {},
+    create: {
+      userId: admin.id,
+    },
+  });
+
+  const sampleUser = await prisma.User.findUnique({
+    where: {
+      email: "test@test.com",
+    },
+  });
+
+  const sampleItem = await prisma.Item.upsert({
+    where: {
+      id: "testItem",
+    },
+    update: {},
+    create: {
+      id: "testItem",
+      accessToken: "testAccessToken",
+      userId: sampleUser.id,
+    },
+  });
+
+  const sampleAccount = await prisma.Account.upsert({
+    where: {
+      id: "testAccount",
+    },
+    update: {},
+    create: {
+      id: "testAccount",
+      itemId: sampleItem.id,
+      name: "Sample Account",
+    },
+  });
+
+  // create account for query test
+  const sampleUserQuery = await prisma.User.findUnique({
+    where: {
+      email: "query@test.com",
+    },
+  });
+
+  const sampleItemQuery = await prisma.Item.upsert({
+    where: {
+      id: "testItemQuery",
+    },
+    update: {},
+    create: {
+      id: "testItemQuery",
+      accessToken: "testAccessTokenQuery",
+      userId: sampleUserQuery.id,
+    },
+  });
+
+  const sampleAccountQuery = await prisma.Account.upsert({
+    where: {
+      id: "testAccountQuery",
+    },
+    update: {},
+    create: {
+      id: "testAccountQuery",
+      itemId: sampleItemQuery.id,
+      name: "Sample Account Query",
+    },
+  });
+
+  // create accounts and items for each numbered sample user
+  const sampleUsers = [];
+  const sampleItems = [];
+  const sampleAccounts = [];
+
+  for (let i = 2; i < 10; i++) {
+    const sampleUser = await prisma.User.findUnique({
+      where: {
+        email: `test${i}@test.com`,
+      },
+    });
+    sampleUsers.push(sampleUser);
+
+    const sampleItem = await prisma.Item.upsert({
+      where: {
+        id: `testItem${i}`,
+      },
+      update: {},
+      create: {
+        id: `testItem${i}`,
+        accessToken: `testAccessToken${i}`,
+        userId: sampleUser.id,
+      },
+    });
+    sampleItems.push(sampleItem);
+
+    const sampleAccount = await prisma.Account.upsert({
+      where: {
+        id: `testAccount${i}`,
+      },
+      update: {},

@@ -1,0 +1,157 @@
+"""
+Skill Extraction Module
+
+Extracts professional skills from detected languages, frameworks, libraries,
+tools, and file types in a project. Skill mappings are loaded from YAML
+configuration for easy maintenance.
+
+Main functions:
+    - analyze_project_skills(): Comprehensive project skill analysis
+    - extract_resume_skills(): Extract all skills from a project
+    - extract_skills_from_languages(): Get skills from programming languages
+    - extract_skills_from_frameworks(): Get skills from frameworks/libraries
+    - extract_skills_from_files(): Get skills from file types
+    - analyze_code_patterns(): Regex-based skill detection from code
+"""
+
+import json
+import logging
+import os
+import re
+from collections import Counter, defaultdict
+from datetime import datetime
+from functools import lru_cache
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Union, Any
+
+import yaml
+
+from src.core.constants import SKIP_DIRECTORIES
+
+logger = logging.getLogger(__name__)
+
+# Path to skills configuration
+SKILLS_YAML_PATH = Path(__file__).parent.parent / "rules" / "skills.yml"
+
+
+@lru_cache(maxsize=1)
+def _load_skills_config() -> Dict[str, Any]:
+    """Load and cache skills configuration from YAML."""
+    if not SKILLS_YAML_PATH.exists():
+        logger.warning(
+            "Skills config not found at %s, using empty config", SKILLS_YAML_PATH
+        )
+        return {}
+
+    with open(SKILLS_YAML_PATH, "r", encoding="utf-8") as f:
+        return yaml.safe_load(f) or {}
+
+
+def _get_skill_mapping(key: str) -> Dict[str, List[str]]:
+    """Get a skill mapping dict from config, with empty fallback."""
+    config = _load_skills_config()
+    return config.get(key, {})
+
+
+# Lazy-loaded skill mappings from YAML
+def _get_language_skills() -> Dict[str, List[str]]:
+    return _get_skill_mapping("language_skills")
+
+
+def _get_framework_skills() -> Dict[str, List[str]]:
+    return _get_skill_mapping("framework_skills")
+
+
+def _get_library_skills() -> Dict[str, List[str]]:
+    return _get_skill_mapping("library_skills")
+
+
+def _get_tool_skills() -> Dict[str, List[str]]:
+    return _get_skill_mapping("tool_skills")
+
+
+def _get_file_type_skills() -> Dict[str, List[str]]:
+    return _get_skill_mapping("file_type_skills")
+
+
+def _get_composite_rules() -> Dict[str, List[Dict]]:
+    """Get composite skill rules from config."""
+    config = _load_skills_config()
+    return config.get("composite_rules", {})
+
+
+def _get_tool_category_skills() -> Dict[str, str]:
+    """Get tool category to skill mapping."""
+    config = _load_skills_config()
+    return config.get("tool_category_skills", {})
+
+
+def _get_file_threshold_rules() -> List[Dict]:
+    """Get file-based threshold rules."""
+    config = _load_skills_config()
+    return config.get("file_threshold_rules", [])
+
+
+def _get_single_file_triggers() -> List[str]:
+    """Get extensions that trigger skills with just 1 file."""
+    config = _load_skills_config()
+    return config.get("single_file_triggers", [])
+
+
+# =============================================================================
+# Regex-based code pattern detection
+# =============================================================================
+
+SUPPORTED_LANGUAGES_FOR_PATTERNS = {
+    "javascript",
+    "typescript",
+    "java",
+    "python",
+    "c",
+    "c++",
+    "c#",
+    "go",
+    "rust",
+    "php",
+    "ruby",
+    "shell",
+    "powershell",
+    "html",
+    "css",
+    "yaml",
+    "json",
+    "markdown",
+    "sql",
+}
+
+
+def get_skill_mapping_path(language: str) -> Optional[str]:
+    """
+    Get the path to the skill mapping JSON file for a language.
+
+    Args:
+        language: Programming language name
+
+    Returns:
+        Path to the mapping file if it exists, None otherwise
+    """
+    base_dir = Path(__file__).parent.parent.parent / "data"
+    mapping = base_dir / f"skill_mapping_{language.lower()}.json"
+    return str(mapping) if mapping.exists() else None
+
+
+def _load_skill_mapping(path: str) -> Dict[str, List[str]]:
+    """Load skill mapping from JSON file."""
+    with open(path, "r", encoding="utf-8") as f:
+        return {entry["skill"]: entry["identifiers"] for entry in json.load(f)}
+
+
+def _safe_read_file(path: str) -> str:
+    """Read file safely with fallback encodings."""
+    for enc in ["utf-8", "latin-1"]:
+        try:
+            with open(path, "r", encoding=enc) as f:
+                return f.read()
+        except Exception:
+            pass
+    with open(path, "r", encoding="utf-8", errors="ignore") as f:

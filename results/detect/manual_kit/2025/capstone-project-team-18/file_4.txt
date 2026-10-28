@@ -1,0 +1,139 @@
+import json
+import os
+import hashlib
+import re
+from typing import Any
+
+from pydantic import BaseModel
+
+from src.core.ML.models.azure_foundry_manager import AzureFoundryManager
+from src.core.ML.models.azure_openai_runtime import azure_openai_enabled
+from src.core.ML.models.readme_analysis.permissions import ml_extraction_allowed
+from src.infrastructure.log.logging import get_logger
+from src.core.ML.models.contribution_analysis.summary_constants import (
+    SUMMARY_STYLE_EXAMPLE,
+    SUMMARY_BANNED_PHRASES,
+    SUMMARY_DOMAIN_KEYWORDS,
+    SUMMARY_PHRASE_NORMALIZATION_REPLACEMENTS,
+)
+
+logger = get_logger(__name__)
+
+
+class UserSummaryOutput(BaseModel):
+    summary: str
+
+
+class ExperienceStageOutput(BaseModel):
+    stage: str
+    confidence: float
+
+
+USER_SUMMARY_PROMPT = """
+You write concise professional portfolio summaries. Return strict JSON matching the provided schema.
+Task: write a first-person developer summary using only FACTS_JSON.
+Constraints:
+- Exactly 3 sentences.
+- 36 to 92 words total.
+- Mention at least two anchors from facts across skills, languages, tools, role, or activities.
+- Include delivery/outcome wording.
+- Do not mention project names.
+"""
+
+
+EXPERIENCE_STAGE_PROMPT = """
+Classify career stage from structured profile facts. Return strict JSON.
+Pick one stage from: student, early-career, experienced.
+Confidence must be between 0.0 and 1.0.
+"""
+
+USER_SUMMARY_DIVERSITY_REWRITE_PROMPT = """
+Rewrite the user summary using the same facts but with clearly different wording and sentence flow.
+Return strict JSON matching the provided schema.
+Constraints:
+- Exactly 3 sentences.
+- Keep factual meaning aligned with FACTS_JSON.
+- Do not mention project names.
+- Do not include percentages.
+"""
+
+_CACHE: dict[str, str] = {}
+_RECENT_USER_SUMMARIES: list[str] = []
+
+_PROMPT_ECHO_PATTERNS: tuple[re.Pattern[str], ...] = (
+    re.compile(r"^\s*example\b", re.IGNORECASE),
+    re.compile(r"\bexample\s*\d+\b", re.IGNORECASE),
+    re.compile(r"\binput\s+draft\b", re.IGNORECASE),
+    re.compile(r"\boutput\s+draft\b", re.IGNORECASE),
+    re.compile(r"\boutput\s*:", re.IGNORECASE),
+    re.compile(r"\bfollowing\s+context\b", re.IGNORECASE),
+    re.compile(r"\byou\s+will\s+see\b", re.IGNORECASE),
+    re.compile(r"\bafter\s+reading\b", re.IGNORECASE),
+    re.compile(r"\bfacts_json\b", re.IGNORECASE),
+    re.compile(r"\bhard\s+constraints?\b", re.IGNORECASE),
+    re.compile(r"\breturn\s+exactly\b", re.IGNORECASE),
+    re.compile(r"\bvalid\s+json\b", re.IGNORECASE),
+    re.compile(r"\bjson\s+object\b", re.IGNORECASE),
+    re.compile(r"\bschema\b", re.IGNORECASE),
+    re.compile(r"\bdo\s+not\s+copy\b", re.IGNORECASE),
+    re.compile(r"^\s*rewritten\b", re.IGNORECASE),
+    re.compile(r"^\s*rewrite[d]?\s*:", re.IGNORECASE),
+)
+
+
+def _ml_required() -> bool:
+    """
+    Return whether callers explicitly require ML-generated summaries.
+
+    When true, deterministic fallback summaries are disabled so the caller
+    can enforce strict model-only behavior.
+    """
+    return os.environ.get("ARTIFACT_MINER_SIGNATURE_REQUIRE_ML") == "1"
+
+
+def _signature_diagnostics_enabled() -> bool:
+    """Enable detailed signature-validator diagnostics via env."""
+    raw = os.environ.get("ARTIFACT_MINER_SIGNATURE_DIAGNOSTICS")
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _load_model():
+    """Compatibility shim; local non-Azure model generation is removed."""
+    return None, None
+
+
+def _facts_hash(facts: dict[str, Any]) -> str:
+    """Create a stable cache key for a facts payload."""
+    serialized = json.dumps(facts, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _cache_enabled() -> bool:
+    """Allow disabling summary cache for strict per-run ML generation checks."""
+    return os.environ.get("ARTIFACT_MINER_SUMMARY_CACHE_DISABLE", "0") != "1"
+
+
+def _env_int(name: str, default: int) -> int:
+    """Read integer env var safely."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read float env var safely."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return default
+
+
+def _summary_similarity(a: str, b: str) -> float:
+    """Token-level Jaccard similarity for diversity checks."""

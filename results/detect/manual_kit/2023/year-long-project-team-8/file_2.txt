@@ -1,0 +1,149 @@
+import React, {
+  useState,
+  useEffect,
+  useContext,
+  useImperativeHandle,
+  forwardRef,
+} from "react";
+import {
+  View,
+  Pressable,
+  Keyboard,
+  Modal,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  TouchableWithoutFeedback,
+  ImageBackground,
+  Alert,
+} from "react-native";
+import CustomText from "../CustomText";
+import { MaterialIcons } from "@expo/vector-icons";
+import LoginStyles from "./LoginStyles";
+import ButtonLogin from "./ButtonLanding";
+import InputField from "./InputField";
+import { fetchListingById } from "../helperFunctions/apiHelpers";
+import { baseEndpoint } from "../../config/config";
+import AuthContext from "../../context/AuthContext";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import Preloader from "../../context/Preloader";
+import Toast from "react-native-root-toast";
+
+// Login component for user authentication
+const Login = forwardRef(({ onSwitch, navigation }, ref) => {
+  // Local state variables to manage email and password input values
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  // State variable to manage preloader visibility
+  const [loading, setLoading] = useState(false);
+
+  // State variables for validation error messages
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [authError, setAuthError] = useState("");
+  const [isForgotPasswordModalVisible, setForgotPasswordModalVisible] =
+    useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordError, setForgotPasswordError] = useState("");
+
+  //State variable for show password
+  const [showPassword, setShowPassword] = useState(false);
+
+  const [isAuthErrorIcon, setIsAuthErrorIcon] = useState(false);
+  const [isEmailErrorIcon, setIsEmailErrorIcon] = useState(false);
+  const [isPassErrorIcon, setIsPassErrorIcon] = useState(false);
+
+  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+
+  const { loginUser, authTokens } = useContext(AuthContext);
+
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  // Reset form fields
+  // Function to reset form fields
+  const resetFields = () => {
+    setPassword("");
+    setPasswordError("");
+    setAuthError("");
+    setIsPassErrorIcon(false);
+    setEmail("");
+    setEmailError("");
+    setIsAuthErrorIcon(false);
+    setIsEmailErrorIcon(false);
+  };
+
+  // Export the reset function for the parent to call
+  useImperativeHandle(ref, () => ({
+    resetFields,
+  }));
+
+  const login = async () => {
+    await loginUser(email, password); // loginUser should return a Promise
+    navigation.navigate("Tabs");
+  };
+  // Handle opening and closing the forgot password modal
+  const handleOpenForgotPasswordModal = () => {
+    setForgotPasswordModalVisible(true);
+    setPassword("");
+    setPasswordError("");
+    setAuthError("");
+    setIsPassErrorIcon(false);
+    setEmail("");
+    setEmailError("");
+    setIsAuthErrorIcon("");
+    setIsEmailErrorIcon("");
+  };
+
+  const showToastSuccess = (message) => {
+    Toast.show(message, {
+      duration: Toast.durations.SHORT,
+      position: Toast.positions.TOP,
+      shadow: true,
+      animation: true,
+      hideOnPress: true,
+      backgroundColor: "#D5FDCE", // Green for success
+      textColor: "black",
+      opacity: 1,
+    });
+  };
+
+  const showToastError = (message) => {
+    Toast.show(message, {
+      duration: Toast.durations.SHORT,
+      position: Toast.positions.TOP,
+      shadow: true,
+      animation: true,
+      hideOnPress: true,
+      backgroundColor: "#FDCECE", // Red for error
+      textColor: "black",
+      opacity: 1,
+    });
+  };
+
+  const showToastWarning = (message) => {
+    Toast.show(message, {
+      duration: Toast.durations.SHORT,
+      position: Toast.positions.TOP,
+      shadow: true,
+      animation: true,
+      hideOnPress: true,
+      backgroundColor: "#FDF9CE", // Yellow for warning
+      textColor: "#black",
+      opacity: 1,
+    });
+  };
+
+  // Handle sending forgot password email
+  const handleForgotPassword = async () => {
+    try {
+      // Validate email format
+      const emailRegex = /^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$/;
+      if (!emailRegex.test(forgotPasswordEmail)) {
+        setForgotPasswordError("Invalid email format");
+        setIsEmailErrorIcon(true);
+        return;
+      }
+
+      const lowercaseEmail = forgotPasswordEmail.toLowerCase();

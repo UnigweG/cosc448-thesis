@@ -1,0 +1,132 @@
+import os
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate
+from django.contrib.auth import login as auth_login
+from django.contrib.auth import logout as auth_logout, get_user_model
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.template.loader import render_to_string
+from django.contrib.sites.shortcuts import get_current_site
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import EmailMessage
+from django.forms import formset_factory
+from .presentationGenerator import SlideToBeUpdated
+from .utils import error
+import fitz  # type: ignore
+from .presentationManager import MissingPlaceholderError
+from .forms import (
+    ExerciseRepromptForm,
+    LoginForm,
+    RegisterForm,
+    RepromptForm,
+    TransformerForm,
+    UpdateEmailForm,
+    UpdatePasswordForm,
+    ProfileUpdateForm,
+    AccountDeletionForm,
+    SubscriptionDeletionForm,
+    ExerciseForm,
+    LoginForm,
+    RegisterForm,
+    TransformerForm,
+)
+from .models import (
+    Conversion,
+    File,
+    ModelChoice,
+    Product,
+    Profile,
+    Subscription,
+    Exercise,
+    SlideTypes,
+)
+from .tokens import account_activation_token
+from .generator import generate_exercise
+from .models import Conversion, File, ModelChoice, Product, Profile, Subscription
+from .tokens import account_activation_token
+from .generator import generate_presentation, reprompt_slides
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth.decorators import login_required
+import stripe
+from django.conf import settings
+from django.views import View
+from django.views.decorators.csrf import csrf_exempt
+from .subscriptionManager import (
+    has_valid_subscription,
+    give_subscription_to_user,
+    has_premium_subscription,
+    delete_subscription,
+)
+from django.contrib.auth.models import User
+from datetime import date, timedelta
+
+
+def index(request: HttpRequest) -> HttpResponse:
+    return render(request, "index.html")
+
+
+def home(request: HttpRequest) -> HttpResponse:
+    return render(request, "home.html")
+
+
+def about(request: HttpRequest) -> HttpResponse:
+    return render(request, "about.html")
+
+
+def register(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = RegisterForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.is_active = False
+            user.save()
+            email = form.cleaned_data.get("email")
+            if email:
+                activateEmail(request, user, email)
+                messages.success(request, "Account successfully created.")
+                return redirect("login")
+            else:
+                messages.error(request, "Email is required.")
+        else:
+            messages.error(request, "Error in the form submission.")
+    else:
+        form = RegisterForm()
+    return render(request, "register.html", {"form": form})
+
+
+def login(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            username = form.cleaned_data["email"]
+            password = form.cleaned_data["password"]
+            user = authenticate(request, username=username, password=password)
+            if user:
+                auth_login(request, user)
+                return redirect("transform")
+            else:
+                messages.error(request, "Incorrect Credentials.")
+    else:
+        form = LoginForm()
+    return render(request, "login.html", {"form": form})
+
+
+@login_required(login_url="login")
+def logout(request: HttpRequest) -> HttpResponse:
+    auth_logout(request)
+    messages.success(request, "Logged Out Successfully.")
+    return redirect("login")
+
+
+def transform(request: HttpRequest) -> HttpResponse:
+    if has_valid_subscription(request.user.id):  # type: ignore
+        if request.method == "POST":
+            TForm = TransformerForm(request.POST)
+            EForm = ExerciseForm(request.POST)
+            input_files: list[File] = []
+
+            if TForm.is_valid():
+                try:
+                    conversion = Conversion.objects.create(

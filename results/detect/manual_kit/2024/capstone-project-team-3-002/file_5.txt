@@ -1,0 +1,152 @@
+'use client';
+
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext'; // Import useAuth for auth checks
+import { useRouter } from 'next/router';
+import { Button } from '../components/Shadcn/button'; // Add this import
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from '../components/Shadcn/card';
+import { UsersIcon, ShieldIcon, KeyIcon, TrashIcon } from 'lucide-react';
+import { useToast } from '../../hooks/use-toast';
+
+interface User {
+  id: string;
+  email: string;
+  f_name: string;
+  l_name: string;
+  createdAt: string;
+  role: string;
+}
+
+const Users: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [roles, setRoles] = useState<string[]>([]);
+  const [newRole, setNewRole] = useState<string>('');
+  const { isAuthenticated, isAdmin } = useAuth();
+  const router = useRouter();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (!isAuthenticated || !isAdmin) {
+      router.push('/login'); // Redirect to login if not authorized
+      toast({
+        title: 'Access Denied',
+        description: 'You need admin permissions to access this page',
+        variant: 'destructive',
+      });
+    }
+
+    const fetchRoles = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.BACKEND_URL}/api/users/roles`
+        );
+        const data = await response.json();
+        setRoles(data);
+      } catch (error) {
+        console.error('Error fetching roles: ', error);
+        toast({
+          title: 'Error Loading Roles',
+          description: 'Failed to load user roles',
+          variant: 'destructive',
+        });
+      }
+    };
+
+    fetchRoles();
+  }, [isAuthenticated, isAdmin, router, toast]);
+
+  const handleUserSelect = (userId: string) => {
+    setSelectedUserId(userId === selectedUserId ? null : userId);
+  };
+
+  const resetUserPassword = async () => {
+    if (!selectedUserId) {
+      toast({
+        title: 'Selection Required',
+        description: 'Please select a user to reset the password',
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      const response = await fetch(
+        `${process.env.BACKEND_URL}/api/users/reset-password-default`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: selectedUserId }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Error resetting password:', data.message);
+        toast({
+          title: 'Password Reset Failed',
+          description: data.message || 'Failed to reset password',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      toast({
+        title: 'Password Reset',
+        description: data.message || 'User password has been reset',
+        variant: 'default',
+      });
+    } catch (error) {
+      console.error('Error resetting user password:', error);
+      toast({
+        title: 'Password Reset Error',
+        description: 'An error occurred while resetting the password',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleRoleChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setNewRole(event.target.value);
+  };
+
+  const deleteUser = async () => {
+    if (!selectedUserId) {
+      toast({
+        title: 'Selection Required',
+        description: 'Please select a user to delete',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Find user data before deletion for the toast message
+    const userToDelete = users.find((user) => user.id === selectedUserId);
+    const userEmail = userToDelete?.email || 'the selected user';
+
+    try {
+      const response = await fetch(
+        `${process.env.BACKEND_URL}/api/users/${selectedUserId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error deleting user:', errorData.message);
+        toast({
+          title: 'Delete Failed',
+          description: errorData.message || 'Failed to delete user',
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Remove user from list and reset selected user
+      setUsers(users.filter((user) => user.id !== selectedUserId));

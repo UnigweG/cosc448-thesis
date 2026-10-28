@@ -1,0 +1,138 @@
+using UnityEngine;
+using UnityEditor;
+using System.Collections.Generic;
+using System.Reflection;
+
+namespace Pathfinding {
+	[CustomEditor(typeof(AstarPath))]
+	public class AstarPathEditor : Editor {
+		/// <summary>List of all graph editors available (e.g GridGraphEditor)</summary>
+		static Dictionary<string, CustomGraphEditorAttribute> graphEditorTypes = new Dictionary<string, CustomGraphEditorAttribute>();
+
+		/// <summary>
+		/// Holds node counts for each graph to avoid calculating it every frame.
+		/// Only used for visualization purposes
+		/// </summary>
+		static Dictionary<NavGraph, KeyValuePair<float, KeyValuePair<int, int> > > graphNodeCounts;
+
+		/// <summary>List of all graph editors for the graphs</summary>
+		GraphEditor[] graphEditors;
+
+		System.Type[] graphTypes {
+			get {
+				return script.data.graphTypes;
+			}
+		}
+
+		static int lastUndoGroup = -1000;
+
+		/// <summary>Used to make sure correct behaviour when handling undos</summary>
+		static uint ignoredChecksum;
+
+		const string scriptsFolder = "Assets/AstarPathfindingProject";
+
+		#region SectionFlags
+
+		static bool showSettings;
+		static bool customAreaColorsOpen;
+		static bool editTags;
+
+		FadeArea settingsArea;
+		FadeArea colorSettingsArea;
+		FadeArea editorSettingsArea;
+		FadeArea aboutArea;
+		FadeArea optimizationSettingsArea;
+		FadeArea serializationSettingsArea;
+		FadeArea tagsArea;
+		FadeArea graphsArea;
+		FadeArea addGraphsArea;
+		FadeArea alwaysVisibleArea;
+
+		#endregion
+
+		/// <summary>AstarPath instance that is being inspected</summary>
+		public AstarPath script { get; private set; }
+
+		#region Styles
+
+		static bool stylesLoaded;
+		public static GUISkin astarSkin { get; private set; }
+
+		static GUIStyle level0AreaStyle, level0LabelStyle;
+		static GUIStyle level1AreaStyle, level1LabelStyle;
+
+		static GUIStyle graphDeleteButtonStyle, graphInfoButtonStyle, graphGizmoButtonStyle, graphEditNameButtonStyle;
+
+		public static GUIStyle helpBox  { get; private set; }
+		public static GUIStyle thinHelpBox  { get; private set; }
+
+		#endregion
+
+
+		/// <summary>Enables editor stuff. Loads graphs, reads settings and sets everything up</summary>
+		public void OnEnable () {
+			script = target as AstarPath;
+
+			// Make sure all references are set up to avoid NullReferenceExceptions
+			script.ConfigureReferencesInternal();
+
+			Undo.undoRedoPerformed += OnUndoRedoPerformed;
+
+			// Search the assembly for graph types and graph editors
+			if (graphEditorTypes == null || graphEditorTypes.Count == 0)
+				FindGraphTypes();
+
+			try {
+				GetAstarEditorSettings();
+			} catch (System.Exception e) {
+				Debug.LogException(e);
+			}
+
+			LoadStyles();
+
+			// Load graphs only when not playing, or in extreme cases, when data.graphs is null
+			if ((!Application.isPlaying && (script.data == null || script.data.graphs == null || script.data.graphs.Length == 0)) || script.data.graphs == null) {
+				LoadGraphs();
+			}
+
+			CreateFadeAreas();
+		}
+
+		void CreateFadeAreas () {
+			if (settingsArea == null) {
+				aboutArea                 = new FadeArea(false, this, level0AreaStyle, level0LabelStyle);
+				optimizationSettingsArea  = new FadeArea(false, this, level0AreaStyle, level0LabelStyle);
+				graphsArea                = new FadeArea(false, this, level0AreaStyle, level0LabelStyle);
+				serializationSettingsArea = new FadeArea(false, this, level0AreaStyle, level0LabelStyle);
+				settingsArea              = new FadeArea(showSettings, this, level0AreaStyle, level0LabelStyle);
+
+				addGraphsArea             = new FadeArea(false, this, level1AreaStyle, level1LabelStyle);
+				colorSettingsArea         = new FadeArea(false, this, level1AreaStyle, level1LabelStyle);
+				editorSettingsArea        = new FadeArea(false, this, level1AreaStyle, level1LabelStyle);
+				alwaysVisibleArea         = new FadeArea(true, this, level1AreaStyle, level1LabelStyle);
+				tagsArea                  = new FadeArea(editTags, this, level1AreaStyle, level1LabelStyle);
+			}
+		}
+
+		/// <summary>Cleans up editor stuff</summary>
+		public void OnDisable () {
+			Undo.undoRedoPerformed -= OnUndoRedoPerformed;
+
+			if (target == null) {
+				return;
+			}
+
+			SetAstarEditorSettings();
+			CheckGraphEditors();
+
+			SaveGraphsAndUndo();
+
+			script = null;
+		}
+
+		/// <summary>Reads settings frome EditorPrefs</summary>
+		void GetAstarEditorSettings () {
+			FadeArea.fancyEffects = EditorPrefs.GetBool("EditorGUILayoutx.fancyEffects", true);
+		}
+
+		void SetAstarEditorSettings () {

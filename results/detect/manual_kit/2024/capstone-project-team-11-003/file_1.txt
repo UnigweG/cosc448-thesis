@@ -1,0 +1,121 @@
+<div class="page-header">
+  <h1>{{ "app.events.title" | translate }}</h1>
+  <!-- When clicked, the flag is set to true and the create form appears -->
+  <button
+    class="create-event-button"
+    (click)="showCreateForm = !showCreateForm"
+  >
+    <img
+      src="assets/UI-Icons/create.png"
+      alt="{{ 'app.event.createevent' | translate }}"
+    />
+    <span>{{ "app.event.createevent" | translate }}</span>
+  </button>
+</div>
+
+<div class="events-container">
+  <!-- Event Listings -->
+  <div class="event-page-section" id="events">
+    <ng-container *ngFor="let category of ['Upcoming Events', 'Past Events']">
+      <h5>
+        {{
+          category === "Upcoming Events"
+            ? ("app.event.upcomingevents" | translate)
+            : ("app.event.pastevents" | translate)
+        }}
+      </h5>
+      <div class="scroll-container-wrapper">
+        <div class="scroll-container">
+          <ng-container *ngFor="let event of events">
+            <kendo-card
+              *ngIf="
+                (category === 'Upcoming Events' &&
+                  isUpcoming(event.eventDate)) ||
+                (category === 'Past Events' && !isUpcoming(event.eventDate))
+              "
+              [ngStyle]="
+                isToday(event.eventDate)
+                  ? {
+                      'border-width': '5px',
+                      'border-color': 'var(--primary)'
+                    }
+                  : {}
+              "
+            >
+              <kendo-card-header class="k-card-header">
+                <h2 class="k-card-title">{{ event.title }}</h2>
+                <h3 class="k-card-subtitle">
+                  {{ "app.event.charity" | translate }}
+                  {{ event.selectedCharityTitle }}
+                </h3>
+
+                <button
+                  kendoButton
+                  #settingsanchor
+                  [svgIcon]="icons.gear"
+                  (click)="toggleEventSettings(event.id)"
+                  class="settings-button"
+                ></button>
+                <kendo-popup
+                  [anchor]="settingsanchor"
+                  *ngIf="selectedEventId === event.id"
+                  name="showEventSettings"
+                  [popupAlign]="popupAlign"
+                >
+                  <div class="settings-popup">
+                    <button
+                      kendoButton
+                      [svgIcon]="icons.star"
+                      (click)="setStarExpiry(event)"
+                      class="popup-button"
+                      [ngStyle]="
+                        !isUpcoming(event.eventDate)
+                          ? {
+                              opacity: '70%',
+                              'pointer-events': 'none',
+                              cursor: 'not-allowed',
+                              color: 'var(--gray-medium)'
+                            }
+                          : {}
+                      "
+                    >
+                      {{ "app.event.power" | translate }}
+                    </button>
+                    <button
+                      kendoButton
+                      [svgIcon]="icons.wrench"
+                      (click)="setEventToEdit(event)"
+                      class="popup-button"
+                    >
+                      {{ "app.event.edit" | translate }}
+                    </button>
+                    <button
+                      kendoButton
+                      [svgIcon]="icons.x"
+                      (click)="deleteEvent(event.id)"
+                      class="popup-button"
+                    >
+                      {{ "app.event.delete" | translate }}
+                    </button>
+                  </div>
+                </kendo-popup>
+              </kendo-card-header>
+              <kendo-card-body>
+                <h5>{{ event.eventDate | date : "shortDate" }}</h5>
+                <div class="progress-container">
+                  <div
+                    class="progress-bar"
+                    [style.width]="
+                      getProgress(event.currentDonation, event.donationGoal) +
+                      '%'
+                    "
+                  ></div>
+                </div>
+                <p>${{ event.currentDonation }} / ${{ event.donationGoal }}</p>
+              </kendo-card-body>
+              <div class="k-button-group">
+                <button
+                  kendoButton
+                  (click)="navigateToEventDashboardPage(event.id)"
+                  class="k-button"
+                >

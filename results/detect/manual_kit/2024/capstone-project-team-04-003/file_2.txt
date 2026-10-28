@@ -1,0 +1,108 @@
+﻿using KelownaSoftware.Application.Interfaces;
+using KelownaSoftware.Domain.AggregateRoots.Events;
+using KelownaSoftware.Persistence.Repositories;
+using Moq;
+using Moq.EntityFrameworkCore;
+using KelownaSoftware.Domain.Common.ValueObjects.PostalAddresses;
+using FluentAssertions;
+using KelownaSoftware.Application.Common.Models.Dto;
+using Xunit.Sdk;
+using KelownaSoftware.Domain.Common.Entities.Countries;
+using System;
+using System.Linq.Expressions;
+
+namespace KelownaSoftware.Persistence.Tests.EventRepositoryTests
+{
+    public class EventRepositoryTests
+    {
+        private readonly Mock<IKSDbContext> _mockContext;
+        private readonly IEventRepository _eventRepository;
+
+        public EventRepositoryTests()
+        {
+            _mockContext = new Mock<IKSDbContext>();
+            _eventRepository = new EventRepository(_mockContext.Object);
+        }
+
+        [Fact]
+        public async Task InsertEventAsync_InsertEventSuccess_ShouldReturnTrue()
+        {
+            // Arrange
+            _mockContext.Setup(c => c.Events)
+                .ReturnsDbSet(new List<Event>());
+
+            _mockContext.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(1);
+
+            // Act
+            var result = await _eventRepository.InsertEventAsync(It.IsAny<Event>(), It.IsAny<CancellationToken>());
+
+            // Assert
+            Assert.True(result);
+        }
+
+        [Fact]
+        public async Task InsertEventAsync_InsertEventFail_ShouldReturnFalse()
+        {
+            // Arrange
+            _mockContext.Setup(c => c.Events)
+                .ReturnsDbSet(new List<Event>());
+
+            _mockContext.Setup(c => c.SaveChangesAsync(It.IsAny<CancellationToken>()))
+                .ReturnsAsync(0);
+
+            // Act
+            var result = await _eventRepository.InsertEventAsync(It.IsAny<Event>(), It.IsAny<CancellationToken>());
+
+            // Assert
+            Assert.False(result);
+        }
+
+        [Fact]
+        public async Task GetAllEventsByVendorAsync_ValidVendorId_ReturnsEvents()
+        {
+            //Arrange
+            List<Event> events = [
+                new Event("Event1", "desiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 1000, new GlobalCharity(), "test description", 0, false),
+                new Event("Event2", "undesiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 2000, new GlobalCharity(), "test description", 0, false)
+                ];
+            _mockContext.Setup(c => c.Events).ReturnsDbSet(events);
+
+            //Act
+            List<EventDto> result = await _eventRepository.GetAllEventsByVendorAsync("desiredUser", CancellationToken.None);
+
+            //Assert
+            result.Should().NotBeNullOrEmpty();
+            result.Should().BeOfType<List<EventDto>>();
+            result.Should().HaveCount(1);
+            result[0].UserId.Should().Be("desiredUser");
+        }
+
+        [Fact]
+        public async Task GetAllEventsByVendorAsync_NullVendorId_ReturnsEmptyList()
+        {
+            //Arrange
+            List<Event> events = [
+                new Event("Event1", "desiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 1500, new GlobalCharity(), "test description", 0, false),
+                new Event("Event2", "undesiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 2500, new GlobalCharity(), "test description", 0, false)
+                ];
+            _mockContext.Setup(c => c.Events).ReturnsDbSet(events);
+
+            //Act
+            List<EventDto> result = await _eventRepository.GetAllEventsByVendorAsync(null, CancellationToken.None);
+
+            //Assert
+            result.Should().HaveCount(0);
+            result.Should().BeOfType<List<EventDto>>();
+        }
+
+        [Fact]
+        public async Task GetAllEventsByVendorAsync_NonExistentVendorId_ReturnsEmptyList()
+        {
+            //Arrange
+            List<Event> events = [
+                new Event("Event1", "desiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 1500, new GlobalCharity(), "test description", 0, false),
+                new Event("Event2", "undesiredUser", DateTime.Now, DateTime.MaxValue, new PostalAddress(), 10, 2000, new GlobalCharity(), "test description", 0, false)
+                ];
+            _mockContext.Setup(c => c.Events).ReturnsDbSet(events);
+

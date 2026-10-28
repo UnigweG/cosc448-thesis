@@ -1,0 +1,137 @@
+const dashboardData = {
+    stats: [
+        { label: 'Total Comparisons', value: '2,845', icon: 'chart-bar' },
+        { label: 'Enrolled Users', value: '156', icon: 'users' },
+        { label: 'Images in Database', value: '482', icon: 'images' },
+    ],
+    images: [
+        { id: 1, path: '../../image/sample-pic-1-1.png', name: 'Sample 1' },
+        { id: 2, path: '../../image/sample-pic-1-2.png', name: 'Sample 2' },
+        { id: 3, path: '../../image/sample-pic-2-1.png', name: 'Sample 3' },
+        { id: 4, path: '../../image/sample-pic-2-2.png', name: 'Sample 4' },
+        { id: 5, path: '../../image/sample-pic-3-1.png', name: 'Sample 5' },
+        { id: 6, path: '../../image/sample-pic-3-2.png', name: 'Sample 6' }
+    ]
+};
+// Initialize Dashboard
+document.addEventListener('DOMContentLoaded', () => {
+    initializeStats();
+    initializeImageGrid();
+    initializeAlgorithmStatus();
+    initializeRecentComparisons();
+    initializeResearchMetrics();
+    initializeEventListeners();
+});
+
+// Initialize Statistics
+function initializeStats() {
+    const statsGrid = document.getElementById('statsGrid');
+    statsGrid.innerHTML = dashboardData.stats.map(stat => `
+        <div class="stat-card">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <p style="color: #888; font-size: 14px;">${stat.label}</p>
+                    <p style="font-size: 24px; font-weight: bold;">${stat.value}</p>
+                </div>
+                <i class="fas fa-${stat.icon}" style="font-size: 24px; color: #78B97B;"></i>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Initialize Image Grid
+function initializeImageGrid() {
+    const imageGrid = document.getElementById('imageGrid');
+
+    // Add drag and drop area
+    const dragDropArea = document.createElement('div');
+    dragDropArea.className = 'drag-drop-area';
+    dragDropArea.innerHTML = `
+        <i class="fas fa-cloud-upload-alt" style="font-size: 24px; color: #78B97B;"></i>
+        <p>Drag and drop images here or click to upload</p>
+        <input type="file" multiple accept="image/*" style="display: none;" id="fileInput">
+    `;
+
+    // Image grid content
+    const gridContent = document.createElement('div');
+    gridContent.className = 'image-grid';
+    imageGrid.appendChild(dragDropArea);
+    imageGrid.appendChild(gridContent);
+
+    dragDropArea.addEventListener('click', () => {
+        document.getElementById('fileInput').click();
+    });
+
+    document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+    setupDragAndDrop(dragDropArea);
+    fetchImages();
+}
+
+async function fetchImages() {
+    try {
+        const response = await fetch('https://localhost:3000/api/images');
+        if (!response.ok) {
+            throw new Error('Failed to fetch images');
+        }
+
+        const images = await response.json();
+        console.log(images)
+        const reversedImages = images.reverse();
+        reversedImages.forEach(image => {
+            addImageToGrid({
+                id: image.image_id,
+                path: image.url,
+                name: `Image ${image.image_id}`
+            });
+        });
+    } catch (error) {
+        console.error('Error fetching images:', error);
+    }
+}
+function showNotification(message, type = 'success') {
+    // Create a notification element
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.innerText = message;
+
+    // Add the notification to the body
+    document.body.appendChild(notification);
+
+    // Remove the notification after 3 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function setupDragAndDrop(dropArea) {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+    });
+
+    dropArea.addEventListener('drop', handleDrop);
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+}
+
+function handleDrop(e) {
+    const dt = e.dataTransfer;
+    const files = dt.files;
+    handleFiles(files);
+}
+
+function handleFileSelect(e) {
+    const files = e.target.files;
+    handleFiles(files);
+}
+
+function handleFiles(files) {
+    [...files].forEach(file => {
+        if (file.type.startsWith('image/')) {
+            uploadFile(file);
+        }
+    });
+}
+
+async function uploadFile(file) {

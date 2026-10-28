@@ -1,0 +1,175 @@
+import * as PIXI from "pixi.js";
+// @ts-ignore
+import Stats from "stats.js";
+
+import { Options, Neighbour, Force, PointInfo, Vector } from "../model/types";
+import { Util, Position } from "./util";
+import { COLORS, UI_COLORS, TYPES, BUILD_ENV } from "./constants";
+import { Boid } from "../model/boid";
+import {environment} from "../../../../environments/environment";
+
+// Types for which we care about neighbours
+const neighbourTypes = [
+  TYPES.SEPARATION,
+  TYPES.ALIGNMENT,
+  TYPES.COHESION,
+];
+
+/* Reusable objects to reduce GC */
+const pointInfo: PointInfo = {
+  isVisible: false,
+  angle: 0,
+};
+const neighbourCoords: Position = {
+  x: 0,
+  y: 0,
+};
+const neighbour: Neighbour = {
+  x: 0,
+  y: 0,
+  rotation: 0,
+  magnitude: 0,
+};
+const weightedVector: Vector = {
+  x: 0,
+  y: 0,
+  rotation: 0,
+};
+// Forces that determine flocking
+const forces: {
+  [key: string]: Force,
+} = {};
+const neighbours: any = {};
+
+export class Renderer {
+  private app: PIXI.Application;
+  private maxX: number;
+  private maxY: number;
+  private maxD: number; // the max of both axis
+
+  private boids: Boid[] = [];
+  private boidWithCrown: Boid | undefined;
+  private crownTexture!: PIXI.Texture;
+  private boidTexture1!: PIXI.Texture;
+  private boidTexture2!: PIXI.Texture;
+  private boidTexture3!: PIXI.Texture;
+  private boidTexture4!: PIXI.Texture;
+  private boidContainer!: PIXI.Container;
+
+  private heatmapTexture!: PIXI.Texture;
+  private heatmapContainer!: PIXI.ParticleContainer;
+  private heatmapCells: PIXI.Sprite[][] = [];
+  private heatmapHistory: number[][] = [];
+  private heatmapMax: number = 10;
+
+  // private stats: Stats;
+
+  // store the radius^2 for speed
+  private radius!: {
+    [key: string]: number;
+  };
+  private visionAngle!: number; // in radians
+
+  constructor(private options: Options) {
+    const container = document.getElementById(this.options.containerId)!;
+
+    this.app = new PIXI.Application({
+      resizeTo: container,
+      resolution: devicePixelRatio,
+      autoDensity: true,
+      transparent: true,
+    });
+
+
+    this.maxX = container.clientWidth;
+    this.maxY = container.clientHeight;
+    this.maxD = Math.max(this.maxX, this.maxY);
+
+    // this.stats = new Stats();
+    // this.stats.showPanel(0);
+    // document.body.appendChild(this.stats.dom);
+
+    this.reset();
+    this.updateSettings();
+
+    // Render the app
+    container.appendChild(this.app.view);
+
+    // Pause on spacebar
+    document.body.onkeyup = (e: KeyboardEvent) => {
+      if (e.keyCode == 32) {
+        this.togglePause();
+      }
+    };
+
+    this.app.ticker.autoStart = false;
+
+    // Setup animation loop
+    this.app.ticker.add(delta => {
+      // this.stats.begin();
+
+      this.cooldownHeatmap();
+      this.updateBoids(delta);
+
+      // this.stats.end();
+    });
+
+    this.start();
+  }
+
+  public reset = () => {
+    this.stop();
+
+    this.radius = {};
+    Object.values(TYPES).forEach(type => {
+      this.radius[type] = Math.pow(this.options.radius[type], 2);
+    });
+    this.visionAngle = (this.options.visionAngle * Math.PI) / 180;
+
+    this.app.stage.removeChildren();
+    this.boids = [];
+
+    if (!(BUILD_ENV === 'development')) {
+      // this.boidContainer = new PIXI.ParticleContainer(this.options.number, {
+      //   position: true,
+      //   rotation: true,
+      //   tint: false
+      // });
+      this.boidContainer = new PIXI.Container();
+    } else {
+      this.boidContainer = new PIXI.Container();
+    }
+
+    this.boidContainer.interactiveChildren = false;
+    this.boidContainer.zIndex = 2;
+    this.app.stage.addChild(this.boidContainer);
+
+    this.initBoidTexture();
+    this.initHeatmap();
+
+    // // Initialize boids
+    // for (let i = 0; i < this.options.number; i++) {
+    //   let boid;
+    //   switch(i%4) {
+    //     case 0:
+    //       boid = new Boid(this.options, this.maxX, this.maxY, this.boidTexture1);
+    //       break;
+    //     case 1:
+    //       boid = new Boid(this.options, this.maxX, this.maxY, this.boidTexture2);
+    //       break;
+    //     case 2:
+    //       boid = new Boid(this.options, this.maxX, this.maxY, this.boidTexture3);
+    //       break;
+    //     default:
+    //       boid = new Boid(this.options, this.maxX, this.maxY, this.boidTexture4);
+    //       break;
+    //   }
+    //
+    //   boid.interactiveChildren = false;
+    //
+    //   this.boidContainer.addChild(boid);
+    //   this.boids.push(boid);
+    //
+    //   this.updateHeatmapCell(boid.x, boid.y);d
+    // }
+    this.options.number = 0;

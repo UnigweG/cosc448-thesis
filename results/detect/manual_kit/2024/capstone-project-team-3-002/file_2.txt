@@ -1,0 +1,191 @@
+'use client';
+
+import React, { useCallback, useEffect, useState } from 'react';
+import '../app/fontawesome';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faBurger,
+  faUtensils,
+  faUmbrellaBeach,
+  faBowlFood,
+  faMoneyBillTransfer,
+  faPlane,
+  faTaxi,
+} from '@fortawesome/free-solid-svg-icons';
+import {
+  ShoppingCartIcon,
+  CreditCardIcon,
+  GlobeAmericasIcon,
+} from '@heroicons/react/24/solid';
+import { Button } from '../components/Shadcn/button';
+import { useAuth } from '../context/AuthContext';
+import TransactionFilters from '../components/TransactionFilters';
+import router from 'next/router';
+import { CSVService } from '../services/csvService';
+import { useToast } from '../../hooks/use-toast';
+
+// Define types for transactions and bank accounts
+interface Transaction {
+  transactionId: string;
+  amount: number;
+  date: string;
+  categories: string[];
+  description: string;
+  accountId: string;
+}
+
+interface BankAccount {
+  id: string;
+  accountName: string;
+  last4: string;
+  institutionName: string;
+  status: string;
+  recentActivity: string[];
+}
+
+// Define income and spending categories
+const incomeCategories: string[] = [
+  'Deposit',
+  'Payroll',
+  'Transfer Deposit',
+  'Transfer Payroll',
+  'Transfer Deposit Check',
+  'Transfer Payroll Ben',
+  'Transfer Keep the Change Savings Program',
+];
+
+const spendingCategories: string[] = [
+  'Food and Drink',
+  'Restaurants',
+  'Coffee Shop',
+  'Fast Food',
+  'Travel',
+  'Taxi',
+  'Airlines and Aviation Services',
+  'Recreation',
+  'Gyms and Fitness Centers',
+  'Sporting Goods',
+  'Shops',
+  'Credit Card',
+  'Payment',
+  'Debit',
+  'Service',
+  'Healthcare',
+  'Bank Fees',
+  'Tax',
+  'Cash Advance',
+];
+
+const categoryGroups = [
+  {
+    name: 'Food & Dining',
+    categories: ['Food and Drink', 'Restaurants', 'Coffee Shop', 'Fast Food'],
+  },
+  {
+    name: 'Travel & Transportation',
+    categories: [
+      'Travel',
+      'Taxi',
+      'Airlines and Aviation Services',
+      'Ride Sharing',
+    ],
+  },
+  {
+    name: 'Recreation & Fitness',
+    categories: ['Recreation', 'Gyms and Fitness Centers', 'Sporting Goods'],
+  },
+  {
+    name: 'Shopping',
+    categories: ['Shops'],
+  },
+  {
+    name: 'Healthcare',
+    categories: ['Healthcare'],
+  },
+  {
+    name: 'Financial',
+    categories: [
+      'Credit Card',
+      'Payment',
+      'Debit',
+      'Service',
+      'Bank Fees',
+      'Tax',
+      'Cash Advance',
+    ],
+  },
+  {
+    name: 'Income',
+    categories: [
+      'Deposit',
+      'Payroll',
+      'Transfer Deposit',
+      'Transfer Payroll',
+      'Transfer Deposit Check',
+      'Transfer Payroll Ben',
+      'Transfer Keep the Change Savings Program',
+    ],
+  },
+];
+
+const getCategoryIcon = (category: string) => {
+  switch (category) {
+    case 'Food and Drink':
+      return (
+        <FontAwesomeIcon
+          icon={faBowlFood}
+          className="text-blue-500 inline-block mr-1"
+        />
+      );
+    case 'Restaurants':
+      return (
+        <FontAwesomeIcon
+          icon={faUtensils}
+          className="text-grey-500 inline-block mr-1"
+        />
+      );
+    case 'Recreation':
+      return (
+        <FontAwesomeIcon
+          icon={faUmbrellaBeach}
+          className="text-blue-500 inline-block mr-1"
+        />
+      );
+    case 'Travel':
+      return (
+        <GlobeAmericasIcon className="h-4 w-4 text-yellow-500 inline-block mr-1" />
+      );
+    case 'Fast Food':
+      return (
+        <FontAwesomeIcon
+          icon={faBurger}
+          className="text-brown-500 inline-block mr-1"
+        />
+      );
+    case 'Credit Card':
+      return <CreditCardIcon className="h-4 w-4 inline-block mr-1" />;
+    case 'Transfer':
+      return (
+        <FontAwesomeIcon
+          icon={faMoneyBillTransfer}
+          className="h-4 w-4 inline-block mr-1"
+        />
+      );
+    case 'Airlines and Aviation Services':
+      return (
+        <FontAwesomeIcon icon={faPlane} className="h-4 w-4 inline-block mr-1" />
+      );
+    case 'Taxi':
+      return (
+        <FontAwesomeIcon icon={faTaxi} className="h-4 w-4 inline-block mr-1" />
+      );
+    default:
+      return <ShoppingCartIcon className="h-4 w-4 inline-block mr-1" />;
+  }
+};
+
+const UserDashboard: React.FC = () => {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [averageMonthlySpent, setAverageMonthlySpent] = useState<number>(0);

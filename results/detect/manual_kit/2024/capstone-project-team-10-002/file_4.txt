@@ -1,0 +1,209 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap');
+
+:root {
+  --primary-color: #2373FF;
+  --primary-light: #5290FF;
+  --primary-dark: #1756CC;
+  --secondary-color: #00C853;
+  --secondary-light: #4FDB85;
+  --secondary-dark: #009640;
+  --background: #FAFAFA;
+  --text-primary: #1F2937;
+  --text-secondary: #4B5563;
+  --text-tertiary: #9CA3AF;
+  --shadow-sm: 0 4px 6px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  --border-radius: 12px;
+  --content-width: 1200px;
+  --color1: #1E3A8A;
+  --color2: #3B82F6;
+  --color3: #06B6D4;
+  --color4: #4F46E5;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  color: var(--text-primary);
+  background-color: var(--background);
+}
+
+.landing-page {
+  position: relative;
+  overflow: hidden;
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* Background */
+.animated-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: -1;
+  overflow: hidden;
+}
+
+.gradient-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    83deg,
+    var(--color1, #1E3A8A),
+    var(--color2, #3B82F6),
+    var(--color3, #06B6D4),
+    var(--color4, #4F46E5)
+  );
+  background-size: 240% 240%;
+  animation: gradient-animation 16s ease infinite;
+  opacity: 0.9;
+}
+
+@keyframes gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes text-style-animation {
+  0% {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.shape {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.4;
+}
+
+.shape-1 {
+  bottom: -100px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(to right, var(--color2), var(--color3));
+  animation: float 30s ease-in-out infinite;
+}
+
+.shape-2 {
+  top: -150px;
+  left: -100px;
+  width: 600px;
+  height: 600px;
+  background: linear-gradient(to right, var(--color4), var(--color1));
+  animation: float 25s ease-in-out infinite reverse;
+}
+
+.shape-3 {
+  top: 40%;
+  right: 10%;
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(to right, var(--color3), var(--color2));
+  animation: float 20s ease-in-out infinite;
+}
+
+.shape-4 {
+  bottom: 30%;
+  left: 15%;
+  width: 250px;
+  height: 250px;
+  background: linear-gradient(to right, var(--color1), var(--color4));
+  animation: float 22s ease-in-out infinite reverse;
+}
+
+@keyframes float {
+  0% { transform: translate(0, 0); }
+  25% { transform: translate(-20px, 20px); }
+  50% { transform: translate(20px, 40px); }
+  75% { transform: translate(40px, -20px); }
+  100% { transform: translate(0, 0); }
+}
+
+/* Hero Section */
+.hero-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  max-width: var(--content-width);
+  padding: 80px 24px;
+  margin: 0 auto;
+  gap: 40px;
+  color: var(--white);
+}
+
+.hero-content {
+  width: 50%;
+  max-width: 600px;
+  position: relative;
+  z-index: 2;
+}
+
+.bright-blob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 130%;
+  height: 130%;
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.25) 0%, rgba(255, 255, 255, 0) 70%);
+  z-index: -1;
+  filter: blur(50px);
+}
+
+.logo-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.welcome-text {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 8px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.app-name {
+  font-family: 'Manrope', sans-serif;
+  font-size: 4.5rem;
+  font-weight: 800;
+  background: linear-gradient(90deg, #ffffff, #e0e7ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.1;
+  letter-spacing: -1.5px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.5);
+}
+
+.hero-description {
+  font-size: 1.25rem;
+  line-height: 1.6;

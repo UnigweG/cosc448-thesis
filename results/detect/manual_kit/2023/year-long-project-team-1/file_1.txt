@@ -1,0 +1,171 @@
+/*
+ * Copyright [2023] [Privacypal Authors]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+"use server";
+
+import { S3ServiceException } from "@aws-sdk/client-s3";
+import { ViewableAppointment } from "@lib/appointment";
+import { CognitoUser, getUsrInGroupList, getUsrList } from "@lib/cognito";
+import db from "@lib/db";
+import { deleteArtifact, getOutputBucket, getTmpBucket } from "@lib/s3";
+import { UserRole } from "@lib/userRole";
+import { getUserHubSlug } from "@lib/utils";
+import { Appointment } from "@prisma/client";
+import { User } from "next-auth";
+import { redirect } from "next/navigation";
+import { auth } from "src/auth";
+
+/**
+ * Get all users from the database
+ */
+export async function getAllUserData() {
+  const users = await getUsrList();
+  return users;
+}
+
+export async function getUserByUsername(
+  username: string,
+): Promise<CognitoUser | null> {
+  try {
+    const users = await getUsrList("username", username);
+    if (users && users.length > 0) {
+      return users[0];
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching user by username:", error);
+    return null;
+  }
+}
+
+export async function getUserAppointments(user: User) {
+  const appointments = await db.appointment.findMany({
+    where: {
+      OR: [
+        {
+          clientUsrName: user.username,
+        },
+        {
+          proUsrName: user.username,
+        },
+      ],
+    },
+  });
+
+  if (!appointments) {
+    return null;
+  }
+
+  const appointmentsWithUsers = await Promise.all(
+    appointments.map(async (appointment) => {
+      const clientRes = await getUsrList("username", appointment.clientUsrName);
+      const professionalRes = await getUsrList(
+        "username",
+        appointment.proUsrName,
+      );
+      const client =
+        clientRes && clientRes.length > 0 ? clientRes[0] : undefined;
+      const professional =
+        professionalRes && professionalRes.length > 0
+          ? professionalRes[0]
+          : undefined;
+
+      return {
+        professional: `${professional?.firstName} ${professional?.lastName}`,
+        client: `${client?.firstName} ${client?.lastName}`,
+        ...appointment,
+      };
+    }),
+  );
+  return appointmentsWithUsers;
+}
+
+export async function getUserAppointmentsDate(user: User) {
+  const appointments = await db.appointment.findMany({
+    where: {
+      OR: [
+        {
+          clientUsrName: user.username,
+        },
+        {
+          proUsrName: user.username,
+        },
+      ],
+    },
+  });
+
+  const appointmentsWithUsers = appointments.map((appointment) => ({
+    professional: `${appointment.proUsrName}`,
+    client: `${appointment.clientUsrName}`,
+    time: new Date(appointment.time).toLocaleString(),
+  }));
+  return appointmentsWithUsers;
+}
+
+export async function getProfessionals() {
+  const professionals = await getUsrInGroupList(UserRole.PROFESSIONAL);
+
+  return professionals;
+}
+
+/**
+ * Get logged in user data
+ */
+export async function getLoggedInUser(): Promise<null | User> {
+  const session = await auth();
+  if (session) {
+    return session.user;
+  } else {
+    return null;
+  }
+}
+
+// TODO: change this to a real message interface from prisma
+export interface Message {
+  content: string;
+  date: string;
+  sender: string;
+}
+
+export async function getUserRecentMessages(
+  username: string,
+): Promise<Message[] | null> {
+  // TODO: fetch real messages
+  const messages: Message[] = [
+    {
+      sender: "Dr. Peters",
+      content: "That is normal.",
+      date: new Date(2023, 9, 10).toLocaleDateString(),
+    },
+    {
+      sender: "Dr. Parker",
+      content: "We I will forward your results to the lab.",
+      date: new Date(2023, 10, 14).toLocaleDateString(),
+    },
+  ];
+
+  return messages;
+}
+
+/**
+ * Appointments
+ */
+
+export async function createAppointment(
+  clientUsrname: string | undefined,
+): Promise<number> {
+  const professional = await getLoggedInUser();
+  if (!professional || professional?.role !== UserRole.PROFESSIONAL)

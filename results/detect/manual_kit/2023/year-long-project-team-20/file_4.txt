@@ -1,0 +1,139 @@
+/***************************************************************************
+ * The contents of this file were generated with Amplify Studio.           *
+ * Please refrain from making any modifications to this file.              *
+ * Any changes to this file will be overwritten when running amplify pull. *
+ **************************************************************************/
+
+/* eslint-disable */
+import * as React from "react";
+import { getOverrideProps } from "./utils";
+import LogoWithText from "./LogoWithText";
+import MyIcon from "./MyIcon";
+import { Flex, Image, Text } from "@aws-amplify/ui-react";
+export default function NavBarSide(props) {
+  const { overrides, ...rest } = props;
+  return (
+    <Flex
+      gap="10px"
+      direction="row"
+      width="385px"
+      height="762px"
+      justifyContent="flex-start"
+      alignItems="flex-start"
+      position="relative"
+      padding="32px 0px 32px 0px"
+      {...getOverrideProps(overrides, "NavBarSide")}
+      {...rest}
+    >
+      <Flex
+        gap="32px"
+        direction="column"
+        width="unset"
+        height="unset"
+        justifyContent="flex-start"
+        alignItems="flex-start"
+        grow="1"
+        shrink="1"
+        basis="0"
+        alignSelf="stretch"
+        position="relative"
+        padding="0px 0px 0px 0px"
+        {...getOverrideProps(overrides, "Frame 32129767087")}
+      >
+        <Flex
+          gap="32px"
+          direction="column"
+          width="unset"
+          height="unset"
+          justifyContent="flex-start"
+          alignItems="flex-start"
+          grow="1"
+          shrink="1"
+          basis="0"
+          alignSelf="stretch"
+          position="relative"
+          padding="0px 32px 0px 32px"
+          {...getOverrideProps(overrides, "Frame 32129767088")}
+        >
+          <LogoWithText
+            width="127.88px"
+            height="18.91px"
+            display="block"
+            gap="unset"
+            alignItems="unset"
+            justifyContent="unset"
+            shrink="0"
+            position="relative"
+            padding="0px 0px 0px 0px"
+            color="brand"
+            {...getOverrideProps(overrides, "LogoWithText")}
+          ></LogoWithText>
+          <Flex
+            gap="16px"
+            direction="column"
+            width="unset"
+            height="unset"
+            justifyContent="flex-start"
+            alignItems="flex-start"
+            shrink="0"
+            position="relative"
+            padding="0px 0px 0px 0px"
+            {...getOverrideProps(overrides, "Frame 414")}
+          >
+            <Flex
+              gap="8px"
+              direction="row"
+              width="unset"
+              height="unset"
+              justifyContent="flex-start"
+              alignItems="center"
+              shrink="0"
+              position="relative"
+              padding="0px 0px 0px 0px"
+              {...getOverrideProps(overrides, "Frame 322")}
+            >
+              <Flex
+                gap="0"
+                direction="row"
+                width="unset"
+                height="unset"
+                justifyContent="flex-start"
+                alignItems="flex-start"
+                shrink="0"
+                position="relative"
+                borderRadius="4px"
+                padding="6px 6px 6px 6px"
+                backgroundColor="rgba(233,249,252,1)"
+                {...getOverrideProps(overrides, "icon39443712")}
+              >
+                <MyIcon
+                  width="18px"
+                  height="18px"
+                  display="block"
+                  gap="unset"
+                  alignItems="unset"
+                  justifyContent="unset"
+                  overflow="hidden"
+                  shrink="0"
+                  position="relative"
+                  padding="0px 0px 0px 0px"
+                  type="home"
+                  {...getOverrideProps(overrides, "MyIcon39443713")}
+                ></MyIcon>
+              </Flex>
+              <Text
+                fontFamily="Inter"
+                fontSize="16px"
+                fontWeight="400"
+                color="rgba(4,125,149,1)"
+                lineHeight="24px"
+                textAlign="left"
+                display="block"
+                direction="column"
+                justifyContent="unset"
+                letterSpacing="0.01px"
+                width="unset"
+                height="unset"
+                gap="unset"
+                alignItems="unset"
+                shrink="0"

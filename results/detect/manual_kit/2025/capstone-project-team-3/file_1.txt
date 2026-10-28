@@ -1,0 +1,105 @@
+/**
+ * @file SystemVerilog 1800-2023 Parser
+ * @author Gonzalo M. Larumbe <gonzalomlarumbe@gmail.com>
+ * @license MIT
+ */
+
+/* eslint-disable arrow-parens */
+/* eslint-disable camelcase */
+/* eslint-disable-next-line spaced-comment */
+/* eslint-disable-no-undef */
+/* eslint-disable-no-unused-vars */
+
+/// <reference types="tree-sitter-cli/dsl" />
+// @ts-check
+
+'use strict';
+
+const PREC = {
+  // Table 11-2—Operator precedence and associativity
+  PARENTHESIS: 37,         // () [] :: .                                          Left
+  UNARY: 36,               // + - ! ~ & ~& | ~| ^ ~^ ^~ ++ -- (unary)
+  POWER: 35,               // **                                                  Left
+  MULTIPLY: 34,            // * / %                                               Left
+  ADD: 33,                 // + - (binary)                                        Left
+  SHIFT: 32,               // << >> <<< >>>                                       Left
+  RELATIONAL: 31,          // < <= > >= inside dist                               Left
+  EQUAL: 30,               // == != === !== ==? !=?                               Left
+  BITWISE_AND: 29,         // & (binary)                                          Left
+  EXCLUSIVE_OR: 28,        // ^ ~^ ^~ (binary)                                    Left
+  BITWISE_OR: 27,          // | (binary)                                          Left
+  MATCHES: 26,             // A.10.30: The matches operator shall have higher
+                           // precedence than the && and || operators
+  LOGICAL_AND: 25,         // &&                                                  Left
+  LOGICAL_OR: 24,          // ||                                                  Left
+  CONDITIONAL: 23,         // ?: (conditional operator)                           Right
+  IMPLICATION: 22,         // -> <->                                              Right
+  ASSIGN: 21,              // = += -= *= /= %= &= ^= |= <<= >>= <<<=              None
+                           // >>>= := :/ <=
+  CONCAT: 20,              // {} {{}}                                             Concatenation
+
+  // Table 16-3—Sequence and property operator precedence and associativity
+  SEQ_PARENTHESIS: 19,     // [* ] [= ] [-> ]
+  SEQ_SHARP2: 18,          // ##                                                  Left
+  SEQ_THROUGHOUT: 17,      // throughout                                          Right
+  SEQ_WITHIN: 16,          // within                                              Left
+  SEQ_INTERSECT: 15,       // intersect                                           Left
+  PROP_NEXTTIME: 14,       // not, nexttime, s_nexttime                           —
+  PROP_SEQ_AND: 13,        // and                                                 Left
+  PROP_SEQ_OR: 12,         // or                                                  Left
+  PROP_IFF: 11,            // iff                                                 Right
+  PROP_UNTIL: 10,          // until, s_until, until_with, s_until_with, implies   Right
+  PROP_INCIDENCE: 9,       // |->, |=>, #-#, #=#                                  Right
+  PROP_ALWAYS: 8           // always, s_always, eventually, s_eventually,          —
+                           // if-else, case , accept_on, reject_on,
+                           // sync_accept_on, sync_reject_on
+};
+
+const BINARY_OP_TABLE = [
+  ['+',   PREC.ADD],
+  ['-',   PREC.ADD],
+  ['*',   PREC.MULTIPLY],
+  ['/',   PREC.MULTIPLY],
+  ['%',   PREC.MULTIPLY],
+  ['==',  PREC.EQUAL],
+  ['!=',  PREC.EQUAL],
+  ['===', PREC.EQUAL],
+  ['!==', PREC.EQUAL],
+  ['==?', PREC.EQUAL],
+  ['!=?', PREC.EQUAL],
+  ['&&',  PREC.LOGICAL_AND],
+  ['||',  PREC.LOGICAL_OR],
+  ['**',  PREC.POWER],
+  ['>',   PREC.RELATIONAL],
+  ['<',   PREC.RELATIONAL],
+  ['>=',  PREC.RELATIONAL],
+  ['<=',  PREC.RELATIONAL],
+  ['&',   PREC.BITWISE_AND],
+  ['|',   PREC.BITWISE_OR],
+  ['^',   PREC.EXCLUSIVE_OR],
+  ['^~',  PREC.EXCLUSIVE_OR],
+  ['~^',  PREC.EXCLUSIVE_OR],
+  ['>>',  PREC.SHIFT],
+  ['<<',  PREC.SHIFT],
+  ['>>>', PREC.SHIFT],
+  ['<<<', PREC.SHIFT],
+  ['->',  PREC.IMPLICATION],
+  ['<->', PREC.IMPLICATION],
+]
+
+const BINARY_MOD_PATH_OP_TABLE = [
+  ['==', PREC.EQUAL],
+  ['!=', PREC.EQUAL],
+  ['&&', PREC.LOGICAL_AND],
+  ['||', PREC.LOGICAL_OR],
+  ['&',  PREC.BITWISE_AND],
+  ['|',  PREC.BITWISE_OR],
+  ['^',  PREC.EXCLUSIVE_OR],
+  ['^~', PREC.EXCLUSIVE_OR],
+  ['~^', PREC.EXCLUSIVE_OR],
+]
+
+const BINARY_MACRO_OP_TABLE = [
+  ['&&',  PREC.LOGICAL_AND],
+  ['||',  PREC.LOGICAL_OR],
+  ['->',  PREC.IMPLICATION],

@@ -1,0 +1,136 @@
+import os
+import boto3
+import random
+import string
+import re
+import jinja2
+
+from flask import Blueprint, request, session, jsonify, current_app
+from rsa import generate_key
+
+import database
+from . import bcrypt
+
+auth = Blueprint('auth', __name__)
+
+LOCAL = os.getenv("LOCAL") == 'True'
+
+if not LOCAL:
+    ACCESS_KEY = os.getenv("ACCESSKEY")
+    SECRET_KEY = os.getenv('SECRETKEY')
+    SESSION_TOKEN = os.getenv('SESSTOKEN')
+    ses_client = boto3.client(
+    'ses', 
+    region_name='ca-central-1',
+    aws_access_key_id=ACCESS_KEY,
+    aws_secret_access_key=SECRET_KEY,
+    aws_session_token=SESSION_TOKEN
+    )
+else:
+    if not os.path.isdir('verificationCode'):
+        os.mkdir('verificationCode')
+
+@auth.route('/signup', methods=['POST'])
+def signup():
+    email = request.form.get('email')
+    password = request.form.get('password')
+    firstname = request.form.get('firstname')
+    lastname = request.form.get('lastname')
+    
+    # Ensure request is valid
+    if email is None:
+        return jsonify({'error': 'Missing email'}), 400
+    if password is None:
+        return jsonify({'error': 'Missing password'}), 400
+    if firstname is None:
+        return jsonify({'error': 'Missing first name'}), 400
+    if lastname is None:
+        return jsonify({'error': 'Missing last name'}), 400
+    if len(password) < 8:
+        return jsonify({"error": "Password less than 8 characters"}), 502
+    elif re.search('[0-9]',password) is None:
+        return jsonify({"error": "Password has no numbers"}), 502
+    elif re.search('[A-Z]',password) is None: 
+        return jsonify({"error": "Password has no capital letters"}), 502
+    specialchars = '@_!#$%^&*()<>?/\\|}{~:'
+    howmany = 0
+    for i in range(len(specialchars)):
+        char = specialchars[i]
+        if char in password:
+            howmany += 1
+    if howmany == 0:
+            return jsonify({"error": "Password has no special characters"}), 502
+
+    # Ensure user doesn't already exist
+    existing_user = database.query_records(table_name='userprofile', fields='email', condition=f'email = %s', condition_values=(email,))
+    if existing_user:
+        return jsonify({'error': 'User already exists'}), 409
+    
+    salt_hash = os.urandom(64)
+    private_key_seed = password + salt_hash.hex()
+    private_key = generate_key(private_key_seed)
+    public_key = private_key.publickey().export_key('PEM')
+
+    hashed_password = bcrypt.generate_password_hash(password).decode()
+
+    #Create verification code
+    created_code = ''.join(random.choices(string.digits, k=6))
+    result = database.insert_user(email=email, password=hashed_password, firstname=firstname, lastname=lastname, salthash=salt_hash, pubKey=public_key, verifyKey=created_code, verifiedAcc='False')
+    
+    if result != 1:
+        return jsonify({'error': 'Unknown error adding user'})
+    
+    #Save code locally if Local is true
+    if LOCAL:
+        obj_path = f"./verificationCode"
+        completeName = os.path.join(obj_path, "code.txt")   
+        file = open(completeName, "w")
+        file.write(created_code)
+        file.close()
+        return jsonify({"status": "success", "message": "code saved locally"}), 200
+    
+    else:
+        #Send user an email with code
+        sender_email = 'safemovnow@gmail.com'
+        # Compose the email message
+        subject = "Confirm your account"
+        html_body = """
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Welcome to Safemov</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    margin: 0;
+                    padding: 0;
+                    background-color: #f4f4f4;
+                    text-align: center;
+                }
+
+                .container {
+                    max-width: 600px;
+                    margin: 20px auto;
+                    background-color: #fff;
+                    padding: 20px;
+                    border-radius: 8px;
+                    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+                }
+
+                h1 {
+                    color: #333;
+                }
+
+                p {
+                    color: #666;
+                }
+
+                .verification-code {
+                    font-size: 24px;
+                    font-weight: bold;
+                    color: #3498db;
+                }
+
+                .footer {

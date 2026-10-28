@@ -1,0 +1,157 @@
+const express = require('express');
+const cors = require('cors');
+const sqlite3 = require('sqlite3');
+const drop_tables = require('./drop_tables.js');
+const create_tables = require('./create_tables.js');
+const insert_sample_data = require('./insert_sample_data.js');
+const list_tables = require('./list_tables.js');
+const userGroupData = require('/usr/src/app/data/users.json');
+
+const fs = require('fs'); 
+const path = require('path');
+const configPath = '/usr/src/app/data/config.json';
+console.log('Config file path:', configPath);
+
+const AdmZip = require('adm-zip');
+const multer = require('multer');
+
+const { Agent } = require('https');
+
+const app = express();
+
+// Use the PORT environment variable if it is set, otherwise default to 5040
+const port = process.env.PORT || 5040;
+
+// Enable CORS for specific origins
+const cors_options = {
+  origin: 'http://localhost:5041',
+};
+app.use(cors(cors_options));
+app.use(express.json());
+// Path to the SQLite database file inside the container
+const db_path = '/usr/src/app/data/database.db';
+
+
+// Connect to the SQLite database
+const db = new sqlite3.Database(db_path, async (err) => {
+  if (err) {
+    console.error('Error opening database:', err);
+  } else {
+    console.log('Connected to the SQLite database.');
+
+    db.run('BEGIN TRANSACTION', async (err) => {
+      if (err) {
+        console.error('Error starting transaction:', err);
+        return;
+      }
+
+      try {
+        await drop_tables(db);
+        console.log('All tables dropped.');
+        await create_tables(db);
+        console.log('All tables created.');
+        await insert_sample_data(db);
+        console.log('Inserted sample data.');
+        await list_tables(db);
+        
+        startStatusChecker();
+        
+        await db.run('COMMIT');
+        
+        // Start the server
+        app.listen(port, () => {
+          console.log(`Server is running on http://localhost:${port}`);
+        });
+      } catch (error) {
+        await db.run('ROLLBACK');
+        console.error('Error during database setup:', error);
+      }
+    });
+  }
+});
+
+const updateSurveyStatuses = async () => {
+  const currentDate = new Date().toISOString().split('T')[0];
+
+  // First, set all surveys to inactive
+  await db.run("UPDATE Survey SET status = 'inactive'");
+
+  // Find surveys where current date is between start and end dates
+  const activeSurveys = await new Promise((resolve, reject) => {
+    db.all(
+      `SELECT id, start_date, end_date FROM Survey 
+       WHERE ? BETWEEN start_date AND end_date
+       ORDER BY id ASC`, 
+      [currentDate],
+      (err, rows) => {
+        if (err) reject(err);
+        else resolve(rows);
+      }
+    );
+  });
+
+  // If there are active surveys, activate the one with the lowest ID
+  if (activeSurveys.length > 0) {
+    const primarySurvey = activeSurveys[0]; // Take the first one (lowest ID)
+    await db.run(
+      "UPDATE Survey SET status = 'active' WHERE id = ?",
+      [primarySurvey.id]
+    );
+    
+    const config = readConfig();
+    if (config) {
+      // Set all surveys to inactive in config
+      Object.keys(config.surveys).forEach(key => {
+        config.surveys[key].status = 'inactive';
+      });
+      
+      // Find and activate the matching survey in config
+      const surveyTitle = await new Promise((resolve, reject) => {
+        db.get(
+          "SELECT title FROM Survey WHERE id = ?",
+          [primarySurvey.id],
+          (err, row) => {
+            if (err) reject(err);
+            else resolve(row?.title);
+          }
+        );
+      });
+      
+      if (surveyTitle) {
+        const surveyKey = Object.keys(config.surveys).find(
+          key => config.surveys[key].title === surveyTitle
+        );
+        if (surveyKey) {
+          config.surveys[surveyKey].status = 'active';
+          writeConfig(config);
+        }
+      }
+    }
+  }
+};
+
+// Function to check survey statuses periodically
+const startStatusChecker = () => {
+  updateSurveyStatuses().catch(err => {
+    console.error('Error updating survey statuses:', err);
+  });
+
+  //Run every hour to check for date changes
+  setInterval(() => {
+    updateSurveyStatuses().catch(err => {
+      console.error('Error updating survey statuses:', err);
+    });
+  }, 60 * 60 * 1000);
+};
+
+const readConfig = () => {
+  try {
+    const data = fs.readFileSync(configPath, 'utf8');
+    return JSON.parse(data);
+  } catch (err) {
+    console.error('Error reading config.json:', err);
+    return null;
+  }
+};
+const writeConfig = (data) => {
+  try {

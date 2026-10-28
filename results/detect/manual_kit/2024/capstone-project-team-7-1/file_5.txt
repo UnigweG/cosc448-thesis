@@ -1,0 +1,106 @@
+"use client";
+
+import React, { useEffect, useState, useCallback, MouseEvent } from "react";
+import { DashFramework } from '@/app/components/primary/dashboard/core/DashFramework';
+import { useRouter } from "next/navigation";
+import { useHeaderRefresh } from "@/app/contexts/HeaderRefreshContext";
+import { Button } from "@/app/components/shadcn/ui/button";
+import { MessageCircle, LayoutDashboard, Lock, Unlock, Paperclip, Mic, Search, Send, Plus, Trash2, X } from 'lucide-react';
+import { Input } from "@/app/components/shadcn/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/app/components/shadcn/ui/dialog";
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from "@/app/components/shadcn/ui/carousel";
+import { SearchDialog } from "@/app/components/primary/chat/core-functionality/search-dialog";
+import { VoiceDrawer } from "@/app/components/primary/chat/core/voice-drawer";
+import { WelcomeMessage } from "@/app/components/primary/chat/messages/welcome-message";
+import { BotMessage } from "@/app/components/primary/chat/messages/BotMessage";
+import { UserMessage } from "@/app/components/primary/chat/messages/UserMessage";
+import { GraphMessage } from "@/app/components/primary/chat/messages/GraphMessage";
+import { BotAvatar } from "@/app/components/primary/chat/support/BotAvatar";
+
+interface GraphData {
+  type: "pie" | "bar" | "line" | "area";
+  data: any[];
+  config?: any;
+  chartTitle: string;
+  dateSpan?: string;
+}
+
+interface Message {
+  content: string;
+  sender: "user" | "bot";
+  timestamp: string;
+  graphs?: GraphData[];
+}
+
+interface Thread {
+  id: string;
+  name: string;
+  messages: Message[];
+  locked: boolean;
+}
+
+interface DashboardComponentProps {
+  initialView?: "dashboard" | "chatbot";
+  onViewChange?: (view: "dashboard" | "chatbot") => void;
+}
+
+const PREDEFINED_PROMPTS = ["Tell me about your features", "How can you help me?", "What's new today?"];
+const MAX_THREADS = 20;
+
+function processStreamChunks(chunks: string): { [key: string]: any } {
+  const result: { [key: string]: any } = {};
+  const chunkArray = chunks.split('}{').map(chunk => chunk.replace(/^\{|\}$/g, ''));
+  for (const chunk of chunkArray) {
+    try {
+      const parsedChunk = JSON.parse(`{${chunk}}`);
+      const { type, content } = parsedChunk;
+      if (result[type]) {
+        result[type] += content;
+      } else {
+        result[type] = content;
+      }
+    } catch (error) {
+      console.error("Error parsing chunk:", chunk, error);
+    }
+  }
+  return result;
+}
+
+export const DashboardComponent = ({ initialView, onViewChange }: DashboardComponentProps) => {
+  const router = useRouter();
+  const { forceRefresh } = useHeaderRefresh();
+  const [view, setView] = useState<"dashboard" | "chatbot">(() => {
+    // Use provided initialView or retrieve from localStorage, defaulting to "dashboard"
+    if (initialView) return initialView;
+    
+    if (typeof window !== 'undefined') {
+      const savedView = localStorage.getItem("dashboardView");
+      return (savedView === "chatbot") ? "chatbot" : "dashboard";
+    }
+    return "dashboard";
+  });
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [threads, setThreads] = useState<Thread[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [api, setApi] = useState<CarouselApi>();
+  const [current, setCurrent] = useState(0);
+  const [count, setCount] = useState(0);
+  const [sidebarVisible, setSidebarVisible] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(280); // Increased default width
+  const [isResizing, setIsResizing] = useState(false);
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
+  const [threadNameInput, setThreadNameInput] = useState("");
+  const [isUnlockDialogOpen, setIsUnlockDialogOpen] = useState(false);
+  const [threadToUnlock, setThreadToUnlock] = useState<string | null>(null);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const sidebarRef = React.useRef<HTMLDivElement>(null);
+  let data = {};
+
+  useEffect(() => {
+    const token = sessionStorage.getItem("token");
+    if (token) {
+      window.dispatchEvent(new Event('login'));

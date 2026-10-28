@@ -1,0 +1,110 @@
+'use strict';
+
+const { App } = require('../src/app');
+const assert = require('node:assert/strict');
+const { By, Key, Builder, Capabilities, logging, until } = require('selenium-webdriver');
+const chromedriver = require('chromedriver');
+const { describe, it, before, after } = require('node:test');
+const fs = require('fs');
+const { Options } = require('selenium-webdriver/chrome.js');
+const os = require('os');
+const path = require('node:path');
+
+describe('Admin page test', async () => {
+    let tmpDir;
+    let app;
+    let driver;
+    let options;
+    let pref;
+
+    before(async () => {
+        /* Copy dataset to a temporary directory */
+        tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), '499wd-'));
+        fs.cpSync(path.join(__dirname, '..', 'dataset'),
+            path.join(tmpDir, 'dataset'), {recursive: true});
+        /* Update port */
+        fs.writeFileSync(path.join(tmpDir, 'config.json'),
+            '{"listen": "127.0.0.1:8081", "mediaConfigPath": "config/survey-1.json"}', 'utf8');
+        /* Run the app */
+        app = new App(tmpDir);
+        app.start();
+        /* Run the browser */
+        options = new Options();
+        if (process.env.GITHUB_ACTIONS) {
+            options.addArguments('--no-sandbox');
+            options.addArguments('--headless');
+        }
+
+        pref = new logging.Preferences();
+        pref.setLevel(logging.Type.BROWSER, logging.Level.ALL);
+        pref.setLevel(logging.Type.SERVER, logging.Level.ALL);
+
+        driver = await new Builder().forBrowser('chrome').setChromeOptions(options)
+            .withCapabilities(Capabilities.chrome())
+            .setLoggingPrefs(pref)
+            .build();
+    });
+
+    after(async () => {
+        app.stop();
+        await driver.quit();
+    });
+
+    it('Must handle login correctly', async () => {
+        /* Check unauthenticated behaviour */
+        await driver.get('http://localhost:8081/admin');
+        let title = await driver.getTitle();
+        assert.equal(title, 'Admin Login — Image Aesthetics',
+            'Unauthenticated users must be shown login page.');
+
+        let loginForm = await driver.findElement(By.css('#loginForm'));
+        let keyField = await driver.findElement(By.css('#key'));
+        let keyErr = await driver.findElement(By.css('#keyerr'));
+        let keySubmit = driver.findElement(By.css('#loginForm button'));
+
+        /* Ensure incorrect key is rejected */
+        await keyField.clear();
+        await keyField.sendKeys('bad-admin-key');
+        await keySubmit.click();
+        await new Promise((r) => setTimeout(r, 200)); /* loading delay */
+        let text = await keyErr.getAttribute('innerText');
+        assert.equal(text, 'The admin key is incorrect.',
+            'Page must require keys to be submitted.');
+
+        /* Ensure correct key is accepted */
+        await keyField.clear();
+        await keyField.sendKeys('default-admin-key');
+        await keySubmit.click();
+        await new Promise((r) => setTimeout(r, 200)); /* loading delay */
+        title = await driver.getTitle();
+        assert.equal(title, 'Admin Dashboard — Image Aesthetics',
+            'Authenticated users must be shown dashboard.');
+    });
+
+    it('Must display available surveys', async () => {
+        await driver.get('http://localhost:8081/admin');
+        await new Promise((r) => setTimeout(r, 200)); /* loading delay */
+
+        let surveyContainer = await driver.findElement(By.css('#survey-container'));
+        let surveys = await surveyContainer.findElements(By.css('button'));
+        assert.equal(surveys.length > 0, true, 'At least one survey must be displayed.');
+    });
+
+    it('Must allow media upload', async () => {
+        /* Prevent files from being uploaded */
+        const originalWriteFile = fs.writeFile;
+        fs.writeFile = (path, data, encoding, callback) => {
+            console.log(`File write prevented: ${path}`);
+        };
+        await driver.get('http://localhost:8081/admin');
+        await new Promise((r) => setTimeout(r, 200)); /* loading delay */
+
+        let fileInput = await driver.findElement(By.css('#imageUpload'));
+        let submitButton = await driver.findElement(By.css('#imageUploadForm'));
+
+        /* Simulate file selection */
+        let filePath = path.join(tmpDir, 'dataset/images/1.jpg');
+        await fileInput.sendKeys(filePath);
+        await submitButton.submit();
+
+        await new Promise((r) => setTimeout(r, 500)); /* waiting for upload process */

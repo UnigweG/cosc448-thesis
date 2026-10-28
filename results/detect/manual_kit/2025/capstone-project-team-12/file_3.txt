@@ -1,0 +1,96 @@
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from 'react-router-dom';
+import SectionCard from "../components/SectionCard";
+import type { Resume, Project, Language, EducationEntry, WorkEntry, AwardEntry } from "../types/resumeTypes";
+import ResumePreviewModal from "../components/resumePreviewModal";
+
+export const LIMITS = {
+  summary: { bullets: 3, chars:180 },
+  work: { entries: 3, bullets: 3, chars: 180 },
+  education: { entries: 3, chars: 180 },
+  awards: { entries: 2, bullets: 2, chars: 180 },
+  projects: { entries: 3, chars: 180},
+  skills: {entries: 15},
+} as const;
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+
+export const mockResume: Resume = {
+  analysis_id: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  full_name: "John Doe",
+  github_username: "yourusername",
+  user_email: "you@example.com",
+  phone: "123-456-7890",
+  linkedin: "linkedin.com/in/yourusername",
+  summary: [
+    "Full-stack developer with experience building collaborative web and mobile applications. Strong version control practices and a focus on clean, maintainable code.",
+    "Passionate about learning new technologies and applying them to solve real-world problems. Seeking opportunities to contribute to impactful projects and grow as a software engineer.",
+  ],
+  projects: [
+    {
+      name: "Capstone Analysis Tool", date_range: "Jan 2025 - Apr 2025",
+      collaboration: "Contributed a substantial amount of new code, indicating a strong role in implementing features and expanding the project's functionality.",
+      frameworks: ["Python", "FastAPI", "PostgreSQL", "Docker", "Flask"],
+    },
+    {
+      name: "COSC 360 – Android App", date_range: "Apr 2025 - Present",
+      collaboration: "Most contributions involved modifying existing files, suggesting a maintenance-focused role aimed at improving correctness and performance.",
+      frameworks: ["Java", "Android SDK", "XML", "SQLite"],
+    },
+    {
+      name: "Personal Portfolio", date_range: "Feb 2025 - Mar 2025",
+      collaboration: "Balanced contribution pattern across additions, modifications, and deletions throughout the codebase.",
+      frameworks: ["React", "TypeScript", "Tailwind CSS", "Vite"],
+    },
+  ],
+  // TODO (backend): aggregate skills across all analyses, tiering needs future work
+  skills: ["TypeScript", "React", "Python", "Git", "REST APIs", "Java", "Android SDK", "PostgreSQL", "Docker", "CI/CD"],
+  languages: [
+    { name: "TypeScript", file_count: 18 }, { name: "Java", file_count: 14 },
+    { name: "Python",     file_count: 11 }, { name: "XML",  file_count: 50 },
+    { name: "SQL",        file_count: 3  },
+  ],
+  education: [
+    { 
+      institution: "University of British Columbia Okanagan",
+      degree: "Bachelor of Science",
+      major: "Computer Science",
+      date_range: "Sep 2022 – Apr 2026",
+      notes: "Dean's List 2023, 2024 · Relevant coursework: Algorithms, Databases, Software Engineering",
+    },
+  ],
+  awards: [
+    {
+      title: "Test Scholars Award",
+      issuer: "University of British Columbia Okanagan",
+      date: "Apr 2024",
+      description: [
+        "Awarded to top 5% of students in each faculty based on academic performance and extracurricular involvement.",
+        "Recognizes consistent excellence across all courses and contributions to the university community.",
+      ],
+    },
+  ],
+  work_experience: [
+    {
+      company: "UBC Okanagan Computer Science Department",
+      role: "Undergraduate Teaching Assistant",
+      date_range: "Sep 2023 – Apr 2024",
+      location: "Kelowna, BC",
+      description: [
+        "Led weekly lab sessions for 30+ students in an introductory programming course, providing guidance on Java and Python assignments.",
+        "Held regular office hours to assist students with debugging and understanding core programming concepts.",
+      ],
+    },
+  ],
+};
+
+// ─── API ───────────────────────────────────────────────────────────────
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
+
+async function fetchResume(resumeId: string, githubUsername: string, userEmail: string): Promise<Resume> {
+  const res = await fetch(`${API_BASE}/resume/${resumeId}`);
+  if (!res.ok) throw new Error(`Failed to fetch resume: ${res.status} ${res.statusText}`);
+  const data = await res.json();
+  console.log("Raw API response", data)
+  const r = data.resume_data ?? data;
+  console.log("parsed resume data", r)

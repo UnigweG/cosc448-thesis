@@ -1,0 +1,131 @@
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { DonationService } from '@infrastructure/services/donation.service';
+import { AccountService } from '@infrastructure/services';
+import { EventsService, Event } from '@infrastructure/services/events.service';
+import { Observable, of } from 'rxjs';
+import { ProgressColor } from '@progress/kendo-angular-progressbar';
+import { NotificationService } from '@infrastructure/services/notification.service';
+import { SVGIcon, starIcon } from '@progress/kendo-svg-icons';
+import { NgForm } from '@angular/forms';
+
+@Component({
+  selector: 'app-donation',
+  templateUrl: './donation.component.html',
+  styleUrls: ['./donation.component.css']
+})
+export class DonationComponent implements OnInit {
+  // Flower-related properties and methods
+  @ViewChild('fieldSvg', { static: false }) fieldSvg!: ElementRef<SVGElement>;
+  private animationRunning = false;
+  private readonly MAX_FLOWERS = 1000;
+  private readonly FLOWER_SPRITES =
+    ['assets/flowers/flower_1.png',
+      'assets/flowers/flower_2.png',
+      'assets/flowers/flower_3.png',
+      'assets/flowers/flower_4.png',
+      'assets/flowers/flower_5.png',
+    ];
+
+  private readonly PETAL_SPRITE =
+    ['assets/flowers/petal_1.png',
+      'assets/flowers/petal_2.png',
+      'assets/flowers/petal_3.png',
+      'assets/flowers/petal_4.png',
+      'assets/flowers/petal_5.png',
+    ];
+
+  // Wind gust variables
+  private windGustState: 'idle' | 'gusting' | 'fading' = 'idle';
+  private windGustStartTime = 0;
+  private fadeStartTime = 0;
+  private gustProgress = 0;
+  private fadeProgress = 0;
+  private readonly windGustDuration = 4000; // 4 seconds of strong gust
+  private readonly windGustFadeDuration = 8000; // 8 seconds of fade out
+  private readonly windGustPower = 15;
+  private nextGustTime = 0;
+  private readonly gustIntervalRange = [15000, 45000]; // 15-45 seconds between gusts
+
+  // petal vars
+  private petalElements: SVGElement[] = [];
+  private readonly PETAL_COUNT = 10;
+  private readonly PETAL_SIZE_RANGE = [40, 40];
+  private readonly PETAL_SPAWN_RATE = 300; // milliseconds between new petals
+  private petalSpawnInterval: any = null;
+
+  private petalAnimationId: number | null = null;
+
+  // Component state
+  eventId: number | null = null;
+  event: Event | null = null;
+  newDonation = {
+    email: '',
+    donationInfo: {} as { [key: string]: string }
+  };
+  lastDonor: string | null = null;
+  showThankYouPopup = false;
+  donationAmount = 0;
+  remainingTime = 0;
+  progress = 100;
+  private timer: any;
+  isCounting = false;
+  currentUrl = '';
+
+  // UI properties
+  public icons = { star: starIcon };
+  public animation = true;
+  public colors: ProgressColor[] = [
+    { from: 0, to: 25, color: "#F42E17" },
+    { from: 25, to: 50, color: "#F8DE7E" },
+    { from: 50, to: 75, color: "#F2E349" },
+    { from: 75, to: 100, color: "#4A9E24" }
+  ];
+
+  constructor(
+    private route: ActivatedRoute,
+    private donationService: DonationService,
+    private eventsService: EventsService,
+    private accountService: AccountService,
+    private notificationService: NotificationService
+  ) { }
+
+  ngOnInit(): void {
+    this.currentUrl = window.location.href;
+    this.route.queryParams.subscribe((params) => {
+      this.eventId = params['id'] ? +params['id'] : null;
+      if (this.eventId !== null) {
+        this.loadEventById(this.eventId).subscribe();
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    setTimeout(() => this.recreateFlowers(), 0);
+    this.initPetals();
+  }
+
+  ngOnDestroy(): void {
+    clearInterval(this.timer);
+    this.animationRunning = false;
+    this.clearPetals();
+  }
+
+  /* ------------------------- */
+  /* FLOWER-RELATED METHODS */
+  /* ------------------------- */
+
+  private recreateFlowers(): void {
+    if (!this.fieldSvg?.nativeElement) {
+      setTimeout(() => this.recreateFlowers(), 100);
+      return;
+    }
+
+    const backgroundImg = document.createElementNS("http://www.w3.org/2000/svg", "image");
+    backgroundImg.setAttributeNS("http://www.w3.org/1999/xlink", "href", "assets/flowers/grass.png");
+    backgroundImg.setAttribute("x", "0");
+    backgroundImg.setAttribute("y", "0");
+    backgroundImg.setAttribute("width", "100%");
+    backgroundImg.setAttribute("height", "100%");
+    backgroundImg.setAttribute("preserveAspectRatio", "none");
+    this.fieldSvg.nativeElement.appendChild(backgroundImg);

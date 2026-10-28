@@ -1,0 +1,139 @@
+"""
+storage.py
+----------
+SQLite-backed persistence layer for storing grouped pipeline insights.
+The legacy encrypted blob tables remain for backward compatibility, but the
+active codepaths read/write grouped rows.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import shutil
+import sqlite3
+import threading
+import zlib
+import hmac
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+
+DEFAULT_DB_URL = "sqlite:///data/app.db"
+DEFAULT_DB_PATH = DEFAULT_DB_URL.replace("sqlite:///", "")
+# Fixed local encryption key (overridable via INSIGHTS_ENCRYPTION_KEY env var)
+DEFAULT_INSIGHTS_KEY = os.getenv("INSIGHTS_ENCRYPTION_KEY", "local-insights-key")
+SCHEMA_VERSION = 8
+
+# Legacy tables (no longer written)
+LEGACY_ZIP_TABLE = "zipfile"
+
+# Grouped tables
+DELETION_AUDIT_TABLE = "deletion_audit"
+INGEST_TABLE = "ingest"
+PROJECTS_TABLE = "projects"
+PROJECT_INFO_TABLE = "project_info"
+FILES_TABLE = "files"
+FILE_INFO_TABLE = "file_info"
+FILE_ANALYSIS_CACHE_TABLE = "file_analysis_cache"
+PORTFOLIO_INSIGHTS_TABLE = "portfolio_insights"
+RESUME_BULLETS_TABLE = "resume_bullets"
+TAGS_TABLE = "tags"
+SKILL_EVIDENCE_TABLE = "skill_evidence"
+RANKING_TABLE = "ranking"
+CHRONOLOGY_TABLE = "chronology"
+THUMBNAILS_TABLE = "thumbnails"
+PRESENTATION_TABLE = "presentation"
+PROFILE_TABLE = "profile"
+RUN_REPRESENTATION_TABLE = "run_representation"
+
+
+def _utcnow() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _ensure_parent(path: str) -> None:
+    directory = os.path.dirname(path)
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+
+
+def _canonical_dumps(data: Any) -> str:
+    return json.dumps(data, sort_keys=True, separators=(",", ":"))
+
+
+def _iso_to_datetime(raw: str) -> datetime:
+    return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+
+
+class SecureSerializer:
+    """Compresses and encrypts insights before storing them in SQLite."""
+
+    def __init__(self, key: Optional[bytes]) -> None:
+        if key is None:
+            env_key = DEFAULT_INSIGHTS_KEY
+            key = env_key.encode("utf-8") if isinstance(env_key, str) else env_key
+        if isinstance(key, str):  # pragma: no cover - defensive
+            key = key.encode("utf-8")
+        self._root_key = hashlib.sha256(key).digest()
+
+    def _derive_stream(self, iv: bytes, length: int) -> bytes:
+        """Derive a pseudo-random keystream using HMAC-SHA256."""
+        stream = bytearray()
+        counter = 0
+        while len(stream) < length:
+            counter_bytes = counter.to_bytes(4, "big")
+            block = hmac.new(self._root_key, iv + counter_bytes, hashlib.sha256).digest()
+            stream.extend(block)
+            counter += 1
+        return bytes(stream[:length])
+
+    def encrypt(self, payload: Dict[str, Any]) -> bytes:
+        serialized = _canonical_dumps(payload).encode("utf-8")
+        compressed = zlib.compress(serialized, level=9)
+        iv = os.urandom(16)
+        keystream = self._derive_stream(iv, len(compressed))
+        ciphertext = bytes(a ^ b for a, b in zip(compressed, keystream))
+        mac = hmac.new(self._root_key, iv + ciphertext, hashlib.sha256).digest()
+        return iv + ciphertext + mac
+
+    def decrypt(self, blob: bytes) -> Dict[str, Any]:
+        if len(blob) <= 48:
+            raise ValueError("Ciphertext is too short to decrypt.")
+        iv = blob[:16]
+        mac = blob[-32:]
+        ciphertext = blob[16:-32]
+        expected_mac = hmac.new(self._root_key, iv + ciphertext, hashlib.sha256).digest()
+        if not hmac.compare_digest(mac, expected_mac):
+            raise ValueError("Ciphertext failed integrity verification.")
+        keystream = self._derive_stream(iv, len(ciphertext))
+        compressed = bytes(a ^ b for a, b in zip(ciphertext, keystream))
+        decompressed = zlib.decompress(compressed)
+        return json.loads(decompressed.decode("utf-8"))
+
+
+class PayloadValidationError(ValueError):
+    """Raised when the pipeline output does not meet schema requirements."""
+
+
+@dataclass(frozen=True)
+class InsightStats:
+    inserted: int
+    updated: int
+    unchanged: int
+    deleted: int
+    project_count: int
+    metadata_updated: bool
+
+
+class ProjectInsightsStore:
+    """High-level API for persisting project insights in SQLite."""
+
+    def __init__(
+        self,
+        db_path: Optional[str] = None,
+        encryption_key: Optional[bytes] = None,
+    ) -> None:

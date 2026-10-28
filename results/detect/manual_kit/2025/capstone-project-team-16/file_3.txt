@@ -1,0 +1,107 @@
+import React, { useState, useEffect, useMemo } from "react";
+
+export default function PortfolioDashboard({ isActive, scans, selectedScanId, fetchJson, downloadArtifact, loadProjectsForScan, setActiveTab, formatTimestamp, isNoise }) {
+  const [portfolioTitle, setPortfolioTitle] = useState("Generated Portfolio");
+  const [portfolioScanId, setPortfolioScanId] = useState("");
+  const [portfolioProjects, setPortfolioProjects] = useState([]);
+  const [portfolioSelectedProjectIds, setPortfolioSelectedProjectIds] = useState([]);
+  const [portfolioLoadingProjects, setPortfolioLoadingProjects] = useState(false);
+  const [portfolioGenerating, setPortfolioGenerating] = useState(false);
+  const [portfolioArtifact, setPortfolioArtifact] = useState(null);
+  const [portfolioError, setPortfolioError] = useState("");
+  const [portfolioExporting, setPortfolioExporting] = useState(false);
+  const [portfolioViewMode, setPortfolioViewMode] = useState("edit");
+  const [contributors, setContributors] = useState([]);
+  const [contributorProfiles, setContributorProfiles] = useState({});
+  const [selectedContributor, setSelectedContributor] = useState("");
+  const [activeViewProjectId, setActiveViewProjectId] = useState(null);
+  const [contributorSelections, setContributorSelections] = useState({});
+  const [contributorProjectEdits, setContributorProjectEdits] = useState({});
+  const [artifactsByContributor, setArtifactsByContributor] = useState({});
+  const [uploadingThumbnails, setUploadingThumbnails] = useState({});
+  const [viewSearchQuery, setViewSearchQuery] = useState("");
+  const [viewActiveFilter, setViewActiveFilter] = useState("");
+  const [showSkillsProgression, setShowSkillsProgression] = useState(false);
+
+  useEffect(() => {
+    if (selectedScanId) {
+      setPortfolioScanId(selectedScanId);
+    }
+  }, [selectedScanId]);
+
+  useEffect(() => {
+    if (!isActive) {
+      setPortfolioArtifact(null);
+      setPortfolioError("");
+      setActiveViewProjectId(null);
+    } else {
+      setPortfolioViewMode("edit");
+    }
+  }, [isActive]);
+
+  useEffect(() => {
+    setContributorSelections({});
+    setArtifactsByContributor({});
+    setContributorProjectEdits({});
+    setPortfolioArtifact(null);
+    setPortfolioError("");
+    setActiveViewProjectId(null);
+    setPortfolioSelectedProjectIds([]);
+    setPortfolioProjects([]);
+    setPortfolioViewMode("edit");
+    setUploadingThumbnails({});
+    setViewSearchQuery("");
+    setViewActiveFilter("");
+    setShowSkillsProgression(false);
+  }, [portfolioScanId]);
+
+  useEffect(() => {
+    setPortfolioError("");
+    setActiveViewProjectId(null);
+    setPortfolioArtifact(artifactsByContributor[selectedContributor] || null);
+  }, [selectedContributor]); // Intentionally omitting artifactsByContributor so it only runs on switch
+
+  useEffect(() => {
+    setViewSearchQuery("");
+    setViewActiveFilter("");
+    setShowSkillsProgression(false);
+  }, [portfolioViewMode, selectedContributor]);
+
+  useEffect(() => {
+    if (!portfolioScanId || !isActive) return;
+    loadProjectsForScan(portfolioScanId, {
+      setProjects: setPortfolioProjects,
+      setSelected: () => {},
+      setLoading: setPortfolioLoadingProjects,
+      setError: setPortfolioError,
+      limit: 0,
+    });
+  }, [portfolioScanId, loadProjectsForScan, isActive]);
+  
+  useEffect(() => {
+    if (!portfolioScanId || !isActive) {
+      if (!portfolioScanId) {
+        setContributors([]);
+        setSelectedContributor("");
+      }
+      return;
+    }
+    let active = true;
+    fetchJson(`/scans/${portfolioScanId}`).then((data) => {
+      if (!active) return;
+      const profiles = data.scan?.scan_data?.contributor_profiles || {};
+      const valid = Object.keys(profiles).filter(c => {
+        if (typeof isNoise === "function") return !isNoise(c);
+        const lower = c.toLowerCase();
+        return !(lower.includes("[bot]") || lower.includes("dependabot") || lower.includes("github-actions") || lower.includes("github-classroom"));
+      });
+      setContributorProfiles(profiles);
+      setContributors(valid);
+      setSelectedContributor(prev => valid.includes(prev) ? prev : "");
+    }).catch(console.error);
+    return () => { active = false; };
+  }, [portfolioScanId, fetchJson, isNoise, isActive]);
+
+  const filteredProjects = useMemo(() => {
+    if (!selectedContributor || selectedContributor === "general") return portfolioProjects;
+    const userProjects = contributorProfiles[selectedContributor]?.projects || [];

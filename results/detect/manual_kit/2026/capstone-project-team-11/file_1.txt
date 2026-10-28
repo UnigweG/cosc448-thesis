@@ -1,0 +1,165 @@
+import {
+  act,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router-dom";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import ExamDetailsPage from "./ExamDetailsPage";
+import type { AuthUser } from "../types/auth";
+import type { Course } from "../types/course";
+import type {
+  Exam,
+  ExamPackage,
+  ExamPackageAnswerPatternComparison,
+  ExamQuestion,
+  ExamVariant,
+  ExamVariantDetail,
+} from "../types/exam";
+import { getCourse } from "../services/courseService";
+import {
+  addQuestionToExam,
+  compareExamPackageVariantAnswerPatterns,
+  createExamPackage,
+  deleteExamPackage,
+  evaluateExamPackageDiversity,
+  exportPrintableExamZip,
+  getExam,
+  getExamPackageMockResultsFile,
+  getExamVariant,
+  listExamQuestions,
+  listExamPackages,
+  listExamVariants,
+  removeQuestionFromExam,
+  setExamPackagePinned,
+  setExamVariantPinned,
+  generateExamVariants,
+  deleteExamVariant,
+  deleteExamVariants,
+  duplicateExamVariant,
+  getPrintableBaseAnswerKeyFile,
+  getPrintableBaseExamFile,
+  getPrintableVariantAnswerKeyFile,
+  getPrintableVariantFile,
+  updateExamVariantLayout,
+  updateExamPackage,
+  updateVariantQuestionMark,
+} from "../services/examService";
+import {
+  listQuestionTags,
+  listQuestions,
+} from "../services/questionService";
+import {
+  confirmExamResultsCsv,
+  getCourseResultsByExam,
+  getExamQuality,
+  getExamQuestionStats,
+  getExamResultSummary,
+  getExamScoreDistribution,
+  getExamVariantComparison,
+  previewExamResultsCsv,
+} from "../services/resultService";
+import type {
+  CourseExamBreakdown,
+  CsvPreviewReport,
+  ExamResultSummary,
+  ExamVariantComparison,
+  ScoreDistribution,
+} from "../types/result";
+import { AppNotificationProvider } from "../components/ui";
+import {
+  getAppNotificationByMessage,
+} from "../test/renderWithAppNotifications";
+import { useGuideSurface } from "../components/onboarding/GuideProvider";
+
+vi.mock("../components/onboarding/GuideProvider", () => ({
+  useGuideSurface: vi.fn(),
+}));
+
+vi.mock("../services/courseService", () => ({
+  getCourse: vi.fn(),
+}));
+
+vi.mock("../services/examService", () => ({
+  addQuestionToExam: vi.fn(),
+  compareExamPackageVariantAnswerPatterns: vi.fn(),
+  deleteExam: vi.fn(),
+  createExamPackage: vi.fn(),
+  deleteExamPackage: vi.fn(),
+  getExam: vi.fn(),
+  getExamPackageMockResultsFile: vi.fn(),
+  getExamVariant: vi.fn(),
+  listExamQuestions: vi.fn(),
+  listExamPackages: vi.fn(),
+  listExamVariants: vi.fn(),
+  removeQuestionFromExam: vi.fn(),
+  setExamPackagePinned: vi.fn(),
+  setExamVariantPinned: vi.fn(),
+  updateExam: vi.fn(),
+  updateExamMarkingScheme: vi.fn(),
+  updateExamQuestion: vi.fn(),
+  generateExamVariants: vi.fn(),
+  deleteExamVariant: vi.fn(),
+  deleteExamVariants: vi.fn(),
+  duplicateExamVariant: vi.fn(),
+  evaluateExamPackageDiversity: vi.fn(),
+  getPrintableBaseExamFile: vi.fn(),
+  getPrintableBaseAnswerKeyFile: vi.fn(),
+  getPrintableVariantFile: vi.fn(),
+  getPrintableVariantAnswerKeyFile: vi.fn(),
+  exportPrintableExamZip: vi.fn(),
+  updateExamVariantLayout: vi.fn(),
+  updateExamPackage: vi.fn(),
+  updateVariantQuestionMark: vi.fn(),
+}));
+
+vi.mock("../services/questionService", () => ({
+  listQuestionTags: vi.fn(),
+  listQuestions: vi.fn(),
+}));
+
+vi.mock("../services/resultService", async () => {
+  const actual = await vi.importActual<
+    typeof import("../services/resultService")
+  >("../services/resultService");
+
+  return {
+    ...actual,
+    confirmExamResultsCsv: vi.fn(),
+    getCourseResultsByExam: vi.fn(),
+    getExamQuality: vi.fn(),
+    getExamQuestionStats: vi.fn(),
+    getExamResultSummary: vi.fn(),
+    getExamScoreDistribution: vi.fn(),
+    getExamVariantComparison: vi.fn(),
+    previewExamResultsCsv: vi.fn(),
+  };
+});
+
+const mockedGetCourse = vi.mocked(getCourse);
+const mockedAddQuestionToExam = vi.mocked(addQuestionToExam);
+const mockedGetExam = vi.mocked(getExam);
+const mockedGetExamPackageMockResultsFile = vi.mocked(
+  getExamPackageMockResultsFile
+);
+const mockedGetExamVariant = vi.mocked(getExamVariant);
+const mockedListExamQuestions = vi.mocked(listExamQuestions);
+const mockedListExamPackages = vi.mocked(listExamPackages);
+const mockedListExamVariants = vi.mocked(listExamVariants);
+const mockedRemoveQuestionFromExam = vi.mocked(removeQuestionFromExam);

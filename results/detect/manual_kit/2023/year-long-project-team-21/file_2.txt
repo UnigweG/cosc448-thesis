@@ -1,0 +1,118 @@
+from datetime import datetime
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
+from rest_framework import status
+from django.db.models import Q
+from django.core.paginator import Paginator, EmptyPage
+from Advertisments.api.serializers import (
+    AdvertismentSerializer,
+    ImageSerializer,
+    ReturnAdvertismentSerializer,
+    LocationSerializer,
+)
+from Advertisments.models import Advertisment, AdvertismentImage
+from django.contrib.gis.measure import D
+from django.contrib.gis.db.models.functions import Distance
+from django.contrib.gis.geos import *
+
+
+class AdvertismentHandler(APIView):
+    """
+    API View for handling advertisment requests.
+
+    This view handles creating ads with POST requests as well as retrieving
+    ads from the database.
+    """
+
+    def post(self, request, *args, **kwargs):
+        """
+        Handle POST requests to create a new ad. Requires authentication so valid token must
+        be included in the request header.
+
+        Args:
+            request (HttpRequest): The request object containing the advertisment data.
+            Also has to contain an image to include with the ad
+
+        Returns:
+            Response: Response object with the ad data and a HTTP_201_CREATED response
+        """
+
+        if request.META["PATH_INFO"] == "/ads/location/":
+            return get_ads_location(request)
+
+        if request.META["PATH_INFO"] == "/ads/categories/location":
+            return get_ads_category_location(request)
+
+        # Manually authenticate user
+        permission = IsAuthenticated()
+        if not permission.has_permission(request, self):
+            return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        # call function to create the ad
+        return create_advertisment(request)
+
+    def get(self, request, *args, **kwargs):
+        """
+        Handle GET requests to retrieve ads and their corresponding images. Does not require authentication.
+        This method will redirect to another method to return ads based on passed parameters and
+        endpoint URL used.
+
+            URL: ads/<int>
+                will return single add where int is the primary key of the ad
+            URL: ads/user/<int>/
+                will return all ads created by a single user where <int> is the foreign key user_id
+            URL: ads/
+                will return all ads in the database
+
+        Args:
+            request (HttpRequest): The request object. (optional) ad_id or (optional) user_id
+
+        Returns:
+            Response: Response object with the ad data and image path as json
+                      If multiple ads are returned they will be returned as a list
+
+        """
+        if request.META["PATH_INFO"] == "/ads/categories/":
+            return get_ads_category(request)
+
+        # if request to create-ads endpoint was made via GET, return 405 response
+        if request.META["PATH_INFO"] == "/ads/create":
+            return Response(
+                {"detail": "Invalid request method."},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED,
+            )
+
+        # if ad_id provided get single ad
+        ad_id = kwargs.get("ad_id", None)
+        if ad_id is not None:
+            return retrieve_single_advertisment(ad_id)
+
+        # if user_id provided get all ads for user
+        user_id = kwargs.get("user_id", None)
+        if user_id is not None:
+            # Manually authenticate user
+            permission = IsAuthenticated()
+            if not permission.has_permission(request, self):
+                return Response(
+                    {"detail": "Authentication credentials were not provided."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            return retrieve_advertisments_for_user(request, user_id)
+
+        # ad_id and user_id not provided: get all ads in database
+        return retrieve_all_advertisments(request)
+
+    def put(self, request, *args, **kwargs):
+        """
+        Handle PUT requests to update an existing ad. Requires authentication so valid token must
+        be included in the request header.
+
+        Request should include these fields in the data body as JSON
+            - title
+            - description (optional)
+            - category
+            - expiry datetime (optional)

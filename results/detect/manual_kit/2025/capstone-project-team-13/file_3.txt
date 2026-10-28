@@ -1,0 +1,142 @@
+import { Joyride } from 'react-joyride';
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import confetti from "canvas-confetti";
+import { toast } from "../components/Toast";
+import "./Resumes.css";
+
+const API_BASE = "http://127.0.0.1:8000";
+
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+function authHeaders() {
+  const token = localStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+function formatDateDisplay(iso) {
+  if (!iso || iso === "Present") return "Present";
+  // Strip timezone/time info, keep only YYYY-MM or YYYY-MM-DD
+  const clean = iso.slice(0, 7); // "YYYY-MM"
+  const [year, month] = clean.split("-").map(Number);
+  if (!year || !month) return iso;
+  const d = new Date(year, month - 1, 1);
+  return d.toLocaleDateString("en-CA", { year: "numeric", month: "short" });
+}
+
+// Normalize a date value to "YYYY-MM" for storage (strips time/timezone)
+function normalizeDate(val) {
+  if (!val || val === "Present") return null;
+  return val.slice(0, 7); // keep only "YYYY-MM"
+}
+
+function blankEducation() {
+  return {
+    _id: crypto.randomUUID(),
+    _isNew: true,
+    _endPresent: true,
+    institution: "",
+    degree_type: "",
+    topic: "",
+    start_date: "",
+    end_date: null,
+    location: "",
+    gpa: "",
+    details: [],
+  };
+}
+
+function blankWorkHistory() {
+  return {
+    _id: crypto.randomUUID(),
+    _isNew: true,
+    _endPresent: true,
+    company: "",
+    role: "",
+    start_date: "",
+    end_date: null,
+    location: "",
+    bullets: [],
+  };
+}
+
+// ── MonthPicker — dropdown calendar for year + month ─────────────────────────
+
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function MonthPicker({ value, onChange, placeholder = "Select date" }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  const currentYear = new Date().getFullYear();
+  const years = Array.from({ length: 60 }, (_, i) => currentYear - i);
+
+  const parsed = value ? value.slice(0, 7).split("-") : [];
+  const selYear = parsed[0] ? parseInt(parsed[0]) : null;
+  const selMonth = parsed[1] ? parseInt(parsed[1]) : null;
+
+  const [viewYear, setViewYear] = useState(selYear || currentYear);
+
+  // Close on outside click
+  useEffect(() => {
+    function handle(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", handle);
+    return () => document.removeEventListener("mousedown", handle);
+  }, []);
+
+  function selectMonth(month) {
+    onChange(`${viewYear}-${String(month).padStart(2, "0")}`);
+    setOpen(false);
+  }
+
+  const displayVal = value
+    ? (() => {
+        const [y, m] = value.slice(0,7).split("-").map(Number);
+        return `${MONTHS[m-1] || ""} ${y}`;
+      })()
+    : placeholder;
+
+  return (
+    <span className="month-picker-wrap" ref={ref}>
+      <button
+        type="button"
+        className="month-picker-trigger r-inline-input"
+        onClick={() => { setViewYear(selYear || currentYear); setOpen(o => !o); }}
+      >
+        {displayVal}
+        <span className="month-picker-caret">▾</span>
+      </button>
+      {open && (
+        <div className="month-picker-popup">
+          <div className="month-picker-year-row">
+            <button type="button" className="month-picker-nav" onClick={() => setViewYear(y => y - 1)}>‹</button>
+            <select
+              className="month-picker-year-select"
+              value={viewYear}
+              onChange={e => setViewYear(parseInt(e.target.value))}
+            >
+              {years.map(y => <option key={y} value={y}>{y}</option>)}
+            </select>
+            <button type="button" className="month-picker-nav" onClick={() => setViewYear(y => y + 1)}>›</button>
+          </div>
+          <div className="month-picker-grid">
+            {MONTHS.map((m, i) => (
+              <button
+                key={m}
+                type="button"
+                className={`month-picker-month${selYear === viewYear && selMonth === i + 1 ? " selected" : ""}`}
+                onClick={() => selectMonth(i + 1)}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </span>
+  );
+}
+
+// ── SkillInput — local raw string, parsed to array only on blur ───────────────
+
+function SkillInput({ level, skills, onChange }) {
+  const [raw, setRaw] = useState(skills.join(", "));

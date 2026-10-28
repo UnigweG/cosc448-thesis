@@ -1,0 +1,91 @@
+using System.Collections.Generic;
+using Math = System.Math;
+using UnityEngine;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
+
+namespace Pathfinding {
+	using Pathfinding.Serialization;
+	using Pathfinding.Util;
+
+	/// <summary>
+	/// Generates a grid of nodes.
+	/// The GridGraph does exactly what the name implies, generates nodes in a grid pattern.\n
+	/// Grid graphs suit well to when you already have a grid based world.
+	/// Features:
+	/// - You can update the graph during runtime (good for e.g Tower Defence or RTS games)
+	/// - Throw any scene at it, with minimal configurations you can get a good graph from it.
+	/// - Supports raycast and the funnel algorithm
+	/// - Predictable pattern
+	/// - Can apply penalty and walkability values from a supplied image
+	/// - Perfect for terrain worlds since it can make areas unwalkable depending on the slope
+	///
+	/// [Open online documentation to see images]
+	/// [Open online documentation to see images]
+	///
+	/// The <b>The Snap Size</b> button snaps the internal size of the graph to exactly contain the current number of nodes, i.e not contain 100.3 nodes but exactly 100 nodes.\n
+	/// This will make the "center" coordinate more accurate.\n
+	///
+	/// <b>Updating the graph during runtime</b>\n
+	/// Any graph which implements the IUpdatableGraph interface can be updated during runtime.\n
+	/// For grid graphs this is a great feature since you can update only a small part of the grid without causing any lag like a complete rescan would.\n
+	/// If you for example just have instantiated a sphere obstacle in the scene and you want to update the grid where that sphere was instantiated, you can do this:\n
+	/// <code> AstarPath.active.UpdateGraphs (ob.collider.bounds); </code>
+	/// Where ob is the obstacle you just instantiated (a GameObject).\n
+	/// As you can see, the UpdateGraphs function takes a Bounds parameter and it will send an update call to all updateable graphs.\n
+	/// A grid graph will update that area and a small margin around it equal to \link Pathfinding.GraphCollision.diameter collision testing diameter/2 \endlink
+	/// See: graph-updates (view in online documentation for working links) for more info about updating graphs during runtime
+	///
+	/// <b>Hexagon graphs</b>\n
+	/// The graph can be configured to work like a hexagon graph with some simple settings. Since 4.1.x the grid graph has a 'Shape' dropdown.
+	/// If you set it to 'Hexagonal' the graph will behave as a hexagon graph.
+	/// Often you may want to rotate the graph +45 or -45 degrees.
+	/// [Open online documentation to see images]
+	///
+	/// Note however that the snapping to the closest node is not exactly as you would expect in a real hexagon graph,
+	/// but it is close enough that you will likely not notice.
+	///
+	/// <b>Configure using code</b>\n
+	/// <code>
+	/// // This holds all graph data
+	/// AstarData data = AstarPath.active.data;
+	///
+	/// // This creates a Grid Graph
+	/// GridGraph gg = data.AddGraph(typeof(GridGraph)) as GridGraph;
+	///
+	/// // Setup a grid graph with some values
+	/// int width = 50;
+	/// int depth = 50;
+	/// float nodeSize = 1;
+	///
+	/// gg.center = new Vector3(10, 0, 0);
+	///
+	/// // Updates internal size from the above values
+	/// gg.SetDimensions(width, depth, nodeSize);
+	///
+	/// // Scans all graphs
+	/// AstarPath.active.Scan();
+	/// </code>
+	///
+	/// \ingroup graphs
+	/// \nosubgrouping
+	///
+	/// <b>Tree colliders</b>\n
+	/// It seems that Unity will only generate tree colliders at runtime when the game is started.
+	/// For this reason, the grid graph will not pick up tree colliders when outside of play mode
+	/// but it will pick them up once the game starts. If it still does not pick them up
+	/// make sure that the trees actually have colliders attached to them and that the tree prefabs are
+	/// in the correct layer (the layer should be included in the 'Collision Testing' mask).
+	///
+	/// See: <see cref="Pathfinding.GraphCollision"/> for documentation on the 'Height Testing' and 'Collision Testing' sections
+	/// of the grid graph settings.
+	/// </summary>
+	[JsonOptIn]
+	[Pathfinding.Util.Preserve]
+	public class GridGraph : NavGraph, IUpdatableGraph, ITransformedGraph {
+		/// <summary>This function will be called when this graph is destroyed</summary>
+		protected override void OnDestroy () {
+			base.OnDestroy();
+
+			// Clean up a reference in a static variable which otherwise should point to this graph forever and stop the GC from collecting it

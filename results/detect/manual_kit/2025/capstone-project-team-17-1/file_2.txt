@@ -1,0 +1,131 @@
+import urllib
+import urllib.request
+import hashlib
+import json
+import os
+import re
+import sqlite3
+import sys
+import tempfile
+import pathlib
+import uuid
+from datetime import UTC, datetime, timedelta, timezone
+from typing import Iterable, List, Mapping
+import zipfile
+from collections import Counter
+
+ROOT = pathlib.Path(__file__).resolve().parent
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from capstone.consent import ensure_external_permission
+from capstone.llm_client import LLMClient, build_default_llm
+from capstone.code_bundle import bundle_code_from_zip
+from capstone.deep_review_prompt import build_deep_review_prompt
+from capstone.storage import fetch_latest_snapshots
+from capstone.cli import main
+from capstone.config import load_config
+from capstone.company_profile import build_company_resume_lines
+from capstone.company_qualities import extract_company_qualities
+from capstone.config import load_config, reset_config
+from capstone.consent import ensure_consent, grant_consent, revoke_consent, ensure_or_prompt_consent
+from capstone.github_contributors import get_contributor_rankings, parse_repo_url, sync_contributor_stats
+from capstone.metrics_extractor import chronological_proj
+from capstone.modes import resolve_mode
+from capstone.project_ranking import rank_projects_from_snapshots
+import capstone.consent as consent_mod
+import capstone.config as config_mod 
+from capstone.resume_retrieval import (
+    build_resume_project_summary,
+    build_resume_preview,
+    delete_resume_project_description,
+    generate_resume_project_descriptions,
+    get_resume_entry,
+    get_resume_project_description,
+    insert_resume_entry,
+    query_resume_entries,
+    update_resume_entry,
+    upsert_resume_project_description,
+)
+from capstone.storage import (
+    fetch_github_source,
+    fetch_latest_contributor_stats,
+    fetch_project_overrides,
+    fetch_project_thumbnail_meta,
+    fetch_latest_snapshot,
+    fetch_latest_snapshots,
+    fetch_project_contributor_activity_periods,
+    get_user,
+    open_db,
+    store_github_source,
+    upsert_default_resume_modules,
+    upsert_project_overrides,
+    upsert_project_thumbnail,
+    update_user_profile,
+)
+from capstone.services import ArchiveAnalysisError, ArchiveAnalyzerService, SnapshotStore
+from capstone.top_project_summaries import (
+    AutoWriter,
+    EvidenceItem,
+    create_summary_template,
+    export_markdown,
+    generate_top_project_summaries,
+)
+from capstone.ai_insights import ask_project_question
+from capstone.top_project_summaries import export_readme_snippet
+from capstone.zip_analyzer import ZipAnalyzer
+from capstone.cli import prompt_project_metadata
+from capstone.cli import pick_zip_file
+from capstone.storage import save_project_metadata
+from capstone.storage import load_project_metadata
+from capstone.storage import close_db
+from capstone.storage import store_analysis_snapshot
+from capstone.language_detection import detect_language, classify_activity
+from capstone import file_store
+
+
+def _parse_csv_tokens(raw: str) -> list[str]:
+    return [part.strip() for part in (raw or "").split(",") if part.strip()]
+
+
+def _ensure_project_representation_schema(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS project_representation_prefs (
+            project_id TEXT PRIMARY KEY,
+            chronology_notes TEXT,
+            comparison_attributes_json TEXT,
+            highlighted_skills_json TEXT,
+            showcase_selected INTEGER,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    # Backward-compatible schema extensions for contribution/role analysis metadata.
+    for col_def in [
+        "analyzed_username TEXT",
+        "user_is_primary INTEGER",
+        "inferred_role TEXT",
+        "contribution_summary_json TEXT",
+    ]:
+        try:
+            conn.execute(f"ALTER TABLE project_representation_prefs ADD COLUMN {col_def}")
+        except sqlite3.OperationalError:
+            pass
+    conn.commit()
+
+
+def _upsert_project_representation_prefs(
+    conn: sqlite3.Connection,
+    *,
+    project_id: str,
+    chronology_notes: str | None = None,
+    comparison_attributes: list[str] | None = None,
+    highlighted_skills: list[str] | None = None,
+    showcase_selected: bool | None = None,
+    analyzed_username: str | None = None,
+    user_is_primary: bool | None = None,
+    inferred_role: str | None = None,
+    contribution_summary: dict | None = None,
+) -> None:

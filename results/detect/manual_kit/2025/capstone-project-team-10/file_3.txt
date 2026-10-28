@@ -1,0 +1,150 @@
+import csv
+import os
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Any
+from unittest.mock import MagicMock, patch
+
+import pdfplumber
+import pytest
+from bs4 import BeautifulSoup
+
+import src.showcase.showcase as showcase
+from src.fas.fas import FileAnalysis
+from src.showcase.showcase import ShowcaseProject, ShowcaseProjectManager
+
+resume_file_path = os.path.join("tests", "testdata", "test_showcase", "test_resume.pdf")
+PDF_PATH = Path(resume_file_path)
+portfolio_file_path = os.path.join(
+    "tests", "testdata", "test_showcase", "test_portfolio.html"
+)
+PORTFOLIO_PATH = Path(portfolio_file_path)
+
+TEST_DIR = Path("test_output")
+keep_files = False
+
+
+def setup_test_dir():
+    if TEST_DIR.exists() and not keep_files:
+        shutil.rmtree(TEST_DIR)
+    TEST_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def cleanup_test_dir():
+    if TEST_DIR.exists() and not keep_files:
+        shutil.rmtree(TEST_DIR)
+    # Also clean up mock git directories
+    git_test_dirs = [
+        Path("tests/testdata/test_showcase/my_project"),
+        Path("tests/testdata/test_showcase/team_project"),
+    ]
+    for git_dir in git_test_dirs:
+        if git_dir.exists():
+            shutil.rmtree(git_dir)
+
+
+# Pass in a CSV Writer
+def make_test_file(writer: Any) -> None:
+    writer.writerow(
+        [
+            "File path analyzed",
+            "File name",
+            "File type",
+            "Last modified",
+            "Created time",
+            "Extra data",
+            "Importance",
+            "Customized",
+            "Project id",
+        ]
+    )
+    writer.writerow(
+        [
+            "tests/testdata/test_showcase/file1.txt",
+            "file1",
+            "txt",
+            "2023-01-02T00:00:00",
+            "2023-01-01T00:00:00",
+            "skills",
+            "1.0",
+            "False",
+            "",
+        ],
+    )
+    # file_path, file_name, file_type, last_modified, created_time, extra_data
+    writer.writerow(
+        [
+            "tests/testdata/test_showcase/bob.png",
+            "bob",
+            "jpg",
+            "2023-01-03T00:00:00",
+            "2023-01-01T00:00:00",
+            "artistic project",
+            "2.0",
+            "False",
+            "",
+        ],
+    )
+
+
+def make_test_file_with_git(writer: Any, create_git_dirs: bool = False) -> None:
+    """Creates a test CSV file including git collaborative project entries
+
+    Args:
+        writer: CSV writer object
+        create_git_dirs: If True, creates mock git project directories
+    """
+    make_test_file(writer)
+
+    git_project_path_1 = "tests/testdata/test_showcase/my_project"
+    git_project_path_2 = "tests/testdata/test_showcase/team_project"
+
+    # Create mock git directories if requested
+    if create_git_dirs:
+        Path(git_project_path_1).mkdir(parents=True, exist_ok=True)
+        Path(git_project_path_2).mkdir(parents=True, exist_ok=True)
+
+    # Single author git project
+    writer.writerow(
+        [
+            git_project_path_1,
+            "my_project",
+            "git",
+            "2023-06-15T00:00:00",
+            "2023-01-15T00:00:00",
+            str(
+                {
+                    "key_skills": ["Python", "Git", "Version Control"],
+                    "author": ["John Doe"],
+                    "commits": {
+                        "total_commits": 42,
+                        "total_insertions": 1250,
+                        "total_deletions": 380,
+                        "net_change": 870,
+                        "message_analysis": {
+                            "feature implementation",
+                            "bug fixes",
+                            "documentation",
+                        },
+                    },
+                    "extra data": [
+                        {
+                            "File name": "main.py",
+                            "Extra data": {
+                                "key_skills": ["Python", "API Development"],
+                                "language": "Python",
+                            },
+                        },
+                        {
+                            "File name": "utils.py",
+                            "Extra data": {
+                                "key_skills": ["Python", "Data Processing"],
+                                "language": "Python",
+                            },
+                        },
+                    ],
+                }
+            ),
+            "5.0",
+            "False",

@@ -1,0 +1,132 @@
+"""Unified CLI for artifact pipeline operations."""
+
+import sys
+import os
+import json
+import getpass
+import argparse
+import sqlite3
+import shutil
+from typing import Optional, List, Dict, Any
+
+BANNER = "Digital Work Artifact Miner — Interactive CLI\n" + "=" * 50
+MAIN_MENU = """
+  1. Analyze a new ZIP file
+  2. Incremental update (merge new ZIP into existing portfolio)
+  3. List all projects
+  4. View project details
+  5. View portfolio showcase
+  6. View resume item
+  7. Generate / regenerate portfolio & resume items
+  8. Customize portfolio showcase (edit & save)
+  9. Customize resume item (edit & save)
+ 10. Manage skills for a project
+ 11. Set your role in a project
+ 12. Add evidence of success for a project
+ 13. Associate a thumbnail image for a project
+ 14. Representation view (ranking / chronology / skills / showcase)
+ 15. View chronological skills timeline
+ 16. Delete data
+ 17. Start FastAPI server
+  0. Exit
+"""
+
+def _inp(msg: str, default: str = "") -> str:
+    suffix = f" [{default}]" if default else ""
+    try:
+        v = input(f"  {msg}{suffix}: ").strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return default
+    return v or default
+
+def _inp_int(msg: str) -> Optional[int]:
+    raw = _inp(msg)
+    try:
+        return int(raw) if raw else None
+    except ValueError:
+        print("  Invalid number.")
+        return None
+
+def _inp_yn(msg: str, default: bool = False) -> bool:
+    hint = "Y/n" if default else "y/N"
+    raw = _inp(f"{msg} ({hint})", "")
+    return (raw.lower() in ("y", "yes")) if raw else default
+
+_LIST_ARGS = argparse.Namespace(
+    db_path=None, encryption_key_env=None,
+    language=None, framework=None, zip_path=None, zip_hash=None,
+)
+
+def _get_store():
+    from src.insights.storage import ProjectInsightsStore
+    return ProjectInsightsStore()
+
+def _get_pipeline(store=None):
+    from src.pipeline.presentation_pipeline import PresentationPipeline
+    return PresentationPipeline(insights_store=store or _get_store())
+
+def _split_csv(raw: str) -> List[str]:
+    """Split a comma-separated string into a stripped, non-empty list."""
+    return [s.strip() for s in raw.split(",") if s.strip()]
+
+def _inp_zip_path(prompt: str) -> Optional[str]:
+    """Prompt for a ZIP path; print a message and return None if invalid."""
+    path = _inp(prompt)
+    if not path:
+        print("  Cancelled.")
+        return None
+    if not os.path.isfile(path):
+        print("  File not found.")
+        return None
+    return path
+
+def _load_project_payload(store=None):
+    """Pick a project interactively and return (pid, store, payload), or None on failure."""
+    store = store or _get_store()
+    pid = _pick_project(store)
+    if pid is None:
+        return None
+    payload = store.load_project_insight_by_id(pid)
+    if payload is None:
+        print(f"  Project {pid} not found.")
+        return None
+    return pid, store, payload
+
+def _pick_project(store=None) -> Optional[int]:
+    """Print project table and prompt for a project ID. Returns ID or None."""
+    handle_list(_LIST_ARGS)
+    return _inp_int("Enter project ID")
+
+def _iact_analyze():
+    zip_path = _inp_zip_path("Path to ZIP file")
+    if zip_path:
+        handle_analyze(argparse.Namespace(zip_path=zip_path, user_id=None))
+
+def _iact_incremental():
+    """Incrementally update an existing ZIP analysis with a new ZIP file."""
+    print("  Incremental update merges a new ZIP into an existing portfolio.")
+    print("  • Old-only projects are kept  • New-only are added  • Duplicates are replaced.\n")
+
+    store = _get_store()
+    runs = store.list_recent_zipfiles(limit=20)
+    if not runs:
+        print("  No existing analyses found. Run option 1 first.")
+        return
+
+    print(f"  {'#':<4}  {'ZIP Hash':<16}  {'Source':<40}  {'Projects'}")
+    print(f"  {'-'*4}  {'-'*16}  {'-'*40}  {'-'*8}")
+    for i, run in enumerate(runs, 1):
+        zh = (run.get("zip_hash") or "")[:16]
+        src = (run.get("zip_path") or run.get("source_name") or "N/A")[-40:]
+        n = len([p for p in store.list_projects_for_zip(run.get("zip_hash") or "") if p != "_misc_files"])
+        print(f"  {i:<4}  {zh:<16}  {src:<40}  {n}")
+
+    idx = _inp_int("Select existing analysis number to update")
+    if idx is None or not (1 <= idx <= len(runs)):
+        print("  Invalid selection. Cancelled.")
+        return
+
+    new_zip_path = _inp_zip_path("Path to new ZIP file")
+    if new_zip_path:
+        handle_incremental(argparse.Namespace(

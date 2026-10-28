@@ -1,0 +1,154 @@
+/*
+ * Copyright [2023] [Privacypal Authors]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+"use client";
+
+import { CSS } from "@lib/utils";
+import {
+  Bullseye,
+  Card,
+  CardBody,
+  CardHeader,
+  Icon,
+  Modal,
+  ModalVariant,
+  Split,
+  SplitItem,
+  Text,
+  TextVariants,
+  Wizard,
+  WizardHeader,
+  WizardStep,
+} from "@patternfly/react-core";
+import { UploadIcon } from "@patternfly/react-icons";
+import { redirect, useRouter } from "next/navigation";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { RegionInfo } from "react-region-select-2";
+import UploadVideoForm from "./UploadVideoForm";
+import { VideoBlurringPanel } from "./blurring/VideoBlurringPanel";
+import VideoReview from "@components/VideoReview";
+import { UploadStatus } from "./UploadStatus";
+import { PrivacyOptionReview } from "./PrivacyReview";
+
+const blurPreviewVideoStyle: CSS = {
+  pointerEvents: "none",
+  display: "block",
+};
+
+/* Support functions */
+
+interface APIBlurredRegion {
+  origin: [number, number];
+  width: number;
+  height: number;
+}
+
+function mapBlurRegionsToAPI(
+  regions: RegionInfo[],
+  width: number,
+  height: number,
+): APIBlurredRegion[] {
+  return regions.map((r: RegionInfo) => {
+    const relativeX = (r.pos.x / 100) * width;
+    const relativeY = (r.pos.y / 100) * height;
+    const relativeWidth = (r.dim.width / 100) * width;
+    const relativeHeight = (r.dim.height / 100) * height;
+    return {
+      origin: [Math.round(relativeX), Math.round(relativeY)],
+      width: Math.round(relativeWidth),
+      height: Math.round(relativeHeight),
+    };
+  });
+}
+
+/* Components */
+
+interface UploadWizardProps {
+  apptId: number;
+  onFinish?: () => void;
+}
+
+export const UploadWizard = ({ apptId, onFinish }: UploadWizardProps) => {
+  // refs
+  const blurredVideoRef = useRef<HTMLVideoElement>(null);
+  // wizard
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  // upload
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [uploadCancelled, setUploadCancelled] = useState(false);
+  const [processCancelled, setProcessCancelled] = useState(false);
+  // blurring
+  const [blurredRegions, setBlurredRegions] = useState<RegionInfo[]>([]);
+  const [videoWidth, setVideoWidth] = useState(0);
+  const [videoHeight, setVideoHeight] = useState(0);
+  const [facialBlurringEnabled, setFacialBlurringEnabled] = useState(true);
+  const [customBlurringEnabled, setCustomBlurringEnabled] = useState(false);
+
+  // status
+  const [reviewFilePath, setReviewFilePath] = useState("");
+
+  const videoUrl = useMemo(() => {
+    if (!videoFile) {
+      return null;
+    }
+    return URL.createObjectURL(videoFile);
+  }, [videoFile]);
+
+  const selectedVideo = useMemo(
+    () =>
+      videoUrl ? (
+        <video
+          ref={blurredVideoRef}
+          src={videoUrl}
+          controls={false}
+          style={blurPreviewVideoStyle}
+          onLoadedMetadata={(_) => {
+            if (!blurredVideoRef.current) {
+              return;
+            }
+            const video = blurredVideoRef.current;
+            setVideoWidth(video.videoWidth);
+            setVideoHeight(video.videoHeight);
+          }}
+        />
+      ) : null,
+    [videoUrl, blurredVideoRef],
+  );
+
+  const handleUpdateVideoFile = useCallback(
+    (file?: File | null) => {
+      setVideoFile(file ?? null);
+    },
+    [setVideoFile],
+  );
+
+  const handleUploadVideo = useCallback(async () => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", videoFile as Blob);
+      formData.set("apptId", apptId.toString());
+      formData.set("blurFaces", facialBlurringEnabled.toString());
+
+      if (customBlurringEnabled) {
+        const processed = mapBlurRegionsToAPI(
+          blurredRegions,
+          videoWidth,
+          videoHeight,
+        );
+        formData.set("regions", JSON.stringify(processed));
+      }

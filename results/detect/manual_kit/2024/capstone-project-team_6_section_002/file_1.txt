@@ -1,0 +1,109 @@
+"use client"
+
+import React, { useState, useRef } from "react"
+import { motion } from "framer-motion"
+import { useInView } from "react-intersection-observer"
+import confetti from "canvas-confetti"
+import { Link } from "react-router-dom"
+import { Github, Linkedin, Mail, Code, Database, Server, Globe, ArrowRight, Sparkles } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Badge } from "@/components/ui/badge"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import HeaderMain from '../components/headerMain';
+import lebronChampionship from "@/assets/lebronChampionship.jpg";
+import GavinProfile from "@/assets/GavinProfile.jpg";
+import AndreasProfile from "@/assets/andreas.jpg";
+import MoProfile from "@/assets/MoProfile.png";
+import JordanPicture from "@/assets/JordanPicture.jpg"
+import BassimProfile from "@/assets/BassimProfile.jpg";
+import { useTranslation } from 'react-i18next';
+
+export default function AboutPage() {
+    const [clickCount, setClickCount] = useState(0)
+    const [secretFound, setSecretFound] = useState(false)
+    const logoRef = useRef<HTMLDivElement>(null)
+    const { t } = useTranslation();
+    // Animation triggers for sections
+    const [projectRef, projectInView] = useInView({ triggerOnce: true, threshold: 0.1 })
+    const [teamRef, teamInView] = useInView({ triggerOnce: true, threshold: 0.1 })
+    const [techRef, techInView] = useInView({ triggerOnce: true, threshold: 0.1 })
+
+    // Handle logo click for secret confetti
+    const handleLogoClick = () => {
+        setClickCount((prev) => prev + 1)
+
+        if (clickCount === 4) {
+            setSecretFound(true)
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 },
+            })
+        }
+    }
+
+    // Team members data
+    const teamMembers = [
+        {
+            name: "Bassim Beshry",
+            role: t('about.team.role.developer'), // Correct translation key
+            image: BassimProfile,
+            bio: t('about.team.bio.Bassim'), // Correct translation key
+            links: {
+                github: "https://github.com/Lunilux24",
+                linkedin: "https://www.linkedin.com/in/bassim-beshry/",
+                mail: "bassimbeshry24@gmail.com",
+            },
+        },
+        {
+            name: "Imoudu Ibrahim",
+            role: t('about.team.role.developer'), // Correct translation key
+            image: MoProfile,
+            bio: t('about.team.bio.Imoudu'), // Correct translation key
+            links: {
+                github: "https://github.com/imoudu13",
+                linkedin: "https://www.linkedin.com/in/imoudu-ibrahim-9107981a3/",
+                mail: "imouduibrahim11@gmail.com",
+            },
+        },
+        {
+            name: "Andreas Hoffbauer",
+            role: t('about.team.role.developer'), // Correct translation key
+            image: AndreasProfile,
+            bio: t('about.team.bio.Andreas'), // Correct translation key
+            links: {
+                github: "https://github.com/ahoffbauer127",
+                linkedin: "https://www.linkedin.com/in/andreas-hoffbauer-4973052b2/",
+                mail: "a.hoffbauer@icloud.com",
+            },
+        },
+        {
+            name: "Jordan Pohr",
+            role: t('about.team.role.developer'), // Correct translation key
+            image: JordanPicture,
+            bio: t('about.team.bio.Jordan'), // Correct translation key
+            links: {
+                github: "https://github.com/jordanp2002",
+                linkedin: "https://www.linkedin.com/in/jordan-pohr/",
+                mail: "jordanpohr@gmail.com",
+            },
+        },
+        {
+            name: "Gavin Ashworth",
+            role: t('about.team.role.developer'), // Correct translation key
+            image: GavinProfile,
+            bio: t('about.team.bio.Gavin'), // Correct translation key
+            links: {
+                github: "https://github.com/GavinAshworth",
+                linkedin: "https://www.linkedin.com/in/gavin-ashworth-557666250/",
+                mail: "gavinashworth1@gmail.com",
+            },
+        },
+    ];
+
+    // Tech stack data
+    const techStack = {
+        frontend: [
+            { name: "React", description: t('about.techStack.frontendReact') },

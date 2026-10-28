@@ -1,0 +1,126 @@
+import express from "express";
+import multer from "multer";
+import fs from "fs";
+import path from "path";
+import archiver from "archiver";
+import { parse } from "json2csv"; // For converting JSON to CSV
+import db from "../db/connection.js"; // Import the database connection
+
+const router = express.Router();
+
+// Define the storage directory and multer configuration
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.resolve("./frontend/src/assets/images");
+
+    // Ensure the directory exists
+    if (!fs.existsSync(uploadPath)) {
+      console.log("Upload path does not exist. Creating it.");
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    cb(null, uploadPath); // Save to this directory
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname); // Save file with its original name initially
+  },
+});
+
+// Configure multer
+const upload = multer({ storage });
+
+// Basic route for uploading and renaming files
+router.post("/", upload.fields([{ name: "imageA" }, { name: "imageB" }]), (req, res) => {
+  try {
+    console.log("Uploaded files:", req.files);
+
+    // Ensure files were uploaded
+    if (!req.files || !req.files.imageA || !req.files.imageB) {
+      return res.status(400).json({ error: "Both images are required." });
+    }
+
+    const uploadPath = path.resolve("./frontend/src/assets/images");
+
+    // Get all existing image files in the directory
+    const existingFiles = fs
+      .readdirSync(uploadPath)
+      .filter((file) => file.match(/^image(\d+)[ab]\.(jpg|jpeg)$/i));
+
+    // Extract the numeric part of existing file names
+    const existingNumbers = existingFiles.map((file) => {
+      const match = file.match(/^image(\d+)[ab]\.(jpg|jpeg)$/i);
+      return match ? parseInt(match[1], 10) : 0;
+    });
+
+    // Find the highest number and calculate the next image index
+    const nextImageIndex = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+
+    // Determine extensions and rename paths for imageA and imageB
+    const imageAExtension = path.extname(req.files.imageA[0].originalname).toLowerCase();
+    const imageBExtension = path.extname(req.files.imageB[0].originalname).toLowerCase();
+
+    const imageAPath = path.join(uploadPath, `image${nextImageIndex}a${imageAExtension}`);
+    const imageBPath = path.join(uploadPath, `image${nextImageIndex}b${imageBExtension}`);
+
+    console.log("Renaming imageA to:", imageAPath);
+    console.log("Renaming imageB to:", imageBPath);
+
+    // Rename uploaded files
+    fs.renameSync(req.files.imageA[0].path, imageAPath);
+    fs.renameSync(req.files.imageB[0].path, imageBPath);
+
+    res.status(200).json({
+      message: "Files uploaded and renamed successfully!",
+      newImageA: `image${nextImageIndex}a${imageAExtension}`,
+      newImageB: `image${nextImageIndex}b${imageBExtension}`,
+    });
+  } catch (error) {
+    console.error("Error uploading files:", error);
+    res.status(500).json({ error: "Failed to upload files." });
+  }
+});
+
+// Route to export users and responses as a ZIP file
+router.get("/export-data", async (req, res) => {
+  try {
+    const usersData = await db.all("SELECT * FROM users");
+    const responsesData = await db.all("SELECT * FROM responses");
+
+    // Convert JSON data to CSV format
+    const usersCsv = parse(usersData);
+    const responsesCsv = parse(responsesData);
+
+    // Create temporary folder for CSV files
+    const exportDir = path.resolve("./exports");
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+
+    // File paths for the CSV files
+    const usersFilePath = path.join(exportDir, "users.csv");
+    const responsesFilePath = path.join(exportDir, "responses.csv");
+
+    // Write CSV files
+    fs.writeFileSync(usersFilePath, usersCsv);
+    fs.writeFileSync(responsesFilePath, responsesCsv);
+
+    // Create a ZIP archive
+    const zipFilePath = path.join(exportDir, "data_export.zip");
+    const output = fs.createWriteStream(zipFilePath);
+    const archive = archiver("zip", { zlib: { level: 9 } });
+
+    // Handle ZIP stream events
+    output.on("close", () => {
+      res.download(zipFilePath, "data_export.zip", (err) => {
+        if (err) {
+          console.error("Error sending ZIP file:", err);
+        }
+        // Clean up temporary files
+        fs.unlinkSync(usersFilePath);
+        fs.unlinkSync(responsesFilePath);
+        fs.unlinkSync(zipFilePath);
+      });
+    });
+
+    archive.on("error", (err) => {
+      throw err;

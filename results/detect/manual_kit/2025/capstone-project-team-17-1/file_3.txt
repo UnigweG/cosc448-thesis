@@ -1,0 +1,143 @@
+"""
+Lightweight storage utilities used to persist analysis data.
+
+This module centralizes:
+- DB open/close lifecycle
+- Schema initialization + simple migrations
+- Snapshot persistence/retrieval
+- GitHub source persistence (repo URL + encrypted token)
+- Contributor stats persistence/retrieval
+- Project evidence persistence/retrieval (metrics/feedback/evaluations)
+"""
+
+from __future__ import annotations
+
+import base64
+import contextvars
+import hashlib
+import json
+import sqlite3
+import uuid
+from pathlib import Path
+from typing import Iterable, Optional
+from datetime import datetime
+from .config import CONFIG_SECRET
+from .logging_utils import get_logger
+import os
+import sys
+
+logger = get_logger(__name__)
+
+def _user_dir(username: str) -> str:
+    """Return a filesystem-safe, case-sensitive directory name for a username.
+    Uses SHA256 so 'erensun408' and 'ErenSun408' always get different dirs,
+    even on case-insensitive filesystems (Windows/macOS).
+    """
+    return hashlib.sha256(username.encode()).hexdigest()[:24]
+
+
+def _load_dotenv():
+    """Load key=value pairs from a .env file in the project root (if present).
+    Only sets variables that are not already set in the environment.
+    No external dependencies required.
+    """
+    # Walk up from this file to find the project root (.env lives next to pyproject.toml)
+    here = Path(__file__).resolve()
+    for parent in [here.parent, here.parent.parent, here.parent.parent.parent]:
+        env_file = parent / ".env"
+        if env_file.exists():
+            with open(env_file, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+                    key, _, value = line.partition("=")
+                    key = key.strip()
+                    value = value.strip().strip('"').strip("'")
+                    if key and key not in os.environ:
+                        os.environ[key] = value
+            break
+
+_load_dotenv()
+
+
+def resolve_storage_user_key(user_id: str | None) -> str | None:
+    """Return user_id stripped if it represents a real user, else None."""
+    token = (user_id or "").strip()
+    return token or None
+
+def get_base_data_dir():
+
+    local_appdata = os.getenv("LOCALAPPDATA")
+    appdata = os.getenv("APPDATA")
+    home = os.path.expanduser("~")
+    root = local_appdata or appdata or home
+    base = Path(root) / "Loom"
+
+    base.mkdir(parents=True, exist_ok=True)
+    return base
+
+BASE_DIR = get_base_data_dir()
+_DB_HANDLE: Optional[sqlite3.Connection] = None
+_DB_PATH: Optional[Path] = None
+CURRENT_USER = None
+_REQUEST_STORAGE_USER: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "storage_current_user", default=None
+)
+_SCHEMA_READY: set[str] = set()
+
+def _is_noreply_email(email: str | None) -> bool:
+    if not email:
+        return False
+    lowered = email.strip().lower()
+    if not lowered:
+        return False
+    return (
+        lowered == "noreply@github.com"
+        or lowered.endswith("@users.noreply.github.com")
+        or lowered.endswith("@noreply.github.com")
+    )
+
+
+def _normalize_user_email(email: str | None) -> str | None:
+    if not email:
+        return None
+    value = email.strip()
+    if not value:
+        return None
+    if _is_noreply_email(value):
+        return None
+    return value
+
+
+def _default_github_url(username: str | None) -> str | None:
+    if username is None:
+        return None
+    token = str(username).strip()
+    if not token:
+        return None
+    return f"https://github.com/{token}"
+
+
+def _has_required_schema(conn: sqlite3.Connection) -> bool:
+    """
+    Return True when the core tables needed for read endpoints already exist.
+    This allows the app to keep serving reads if the database is temporarily
+    opened in a readonly state and schema bootstrapping cannot run.
+    """
+    required = {
+        "project_analysis",
+        "files",
+        "uploads",
+        "error_analysis_results",
+    }
+    rows = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type IN ('table', 'view')"
+    ).fetchall()
+    existing = {str(row[0]) for row in rows}
+    return required.issubset(existing)
+
+
+# Schema + migrations
+
+def _initialize_schema(conn: sqlite3.Connection) -> None:

@@ -1,0 +1,141 @@
+"""
+FastAPI application for Skill Scope milestone API endpoints.
+
+This module keeps the existing scan endpoints while adding project/resume/portfolio
+endpoints for milestone requirements.
+"""
+
+import base64
+import json
+import logging
+import mimetypes
+import os
+import tempfile
+from collections import Counter
+from typing import Any, Dict, List, Optional, Tuple
+
+from fastapi import FastAPI, HTTPException, Path, Query, Request, UploadFile, File
+from fastapi.concurrency import run_in_threadpool
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel, Field
+
+from api_store import (
+    create_portfolio_artifact,
+    create_resume_artifact,
+    get_portfolio_artifact,
+    get_privacy_settings,
+    get_project_customization,
+    get_resume_artifact,
+    set_privacy_settings,
+    update_portfolio_artifact,
+    update_resume_artifact,
+    upsert_project_customization,
+)
+from db import (
+    delete_full_scan_by_id,
+    get_full_scan_by_id,
+    list_full_scans,
+    save_full_scan,
+    scan_exists,
+    update_full_scan,
+)
+from resume_generator import render_resume_artifact, _build_personal_project_description, _fmt_date
+
+try:
+    from portfolio_generator import generate_portfolio_markdown
+except ImportError:
+    generate_portfolio_markdown = None
+
+logger = logging.getLogger(__name__)
+
+THUMBNAILS_DIR = os.path.join(os.path.dirname(__file__), "..", "output", "thumbnails")
+os.makedirs(THUMBNAILS_DIR, exist_ok=True)
+
+VALID_ANALYSIS_MODES = {"basic", "advanced"}
+VALID_ADVANCED_OPTION_KEYS = {
+    "programming_scan",
+    "framework_scan",
+    "skills_gen",
+    "resume_gen",
+}
+
+
+class PrivacyConsentPayload(BaseModel):
+    consent: bool
+    external_services_allowed: bool = False
+    notes: str = ""
+
+
+class ProjectEditPayload(BaseModel):
+    ranking: Optional[int] = None
+    chronology_correction: Optional[Dict[str, Any]] = None
+    comparison_attributes: Optional[Dict[str, Any]] = None
+    highlighted_skills: Optional[List[str]] = None
+    selected_for_showcase: Optional[bool] = None
+    role: Optional[str] = None
+    evidence_of_success: Optional[Any] = None
+    thumbnail: Optional[str] = None
+    portfolio_showcase_text: Optional[str] = None
+    resume_wording: Optional[str] = None
+    custom_portfolio_project_description: Optional[str] = None
+    custom_portfolio_description: Optional[str] = None
+    custom_portfolio_tech_stack: Optional[List[str]] = None
+
+
+class ContributorProjectEdit(BaseModel):
+    custom_description: Optional[str] = None
+    custom_skills: Optional[List[str]] = None
+    reset_custom_skills: bool = False
+    custom_portfolio_description: Optional[str] = None
+    custom_portfolio_tech_stack: Optional[List[str]] = None
+    reset_custom_portfolio_tech_stack: bool = False
+    custom_portfolio_project_description: Optional[str] = None
+
+
+class ContributorProfileEditPayload(BaseModel):
+    custom_name: Optional[str] = None
+    custom_title: Optional[str] = None
+    custom_summary: Optional[str] = None
+    project_updates: Optional[Dict[str, ContributorProjectEdit]] = None
+    reset_profile: bool = False
+
+
+class MergeContributorsPayload(BaseModel):
+    primary_contributor: str
+    contributors_to_merge: List[str]
+
+
+class ResumeGeneratePayload(BaseModel):
+    scan_id: Optional[int] = None
+    contributor_id: Optional[str] = None
+    project_ids: List[str] = Field(default_factory=list)
+    title: str = "Generated Resume"
+    selected_project_ids: List[str] = Field(default_factory=list)
+    project_order: List[str] = Field(default_factory=list)
+
+
+class ResumeEditPayload(BaseModel):
+    user_name: Optional[str] = None
+    user_title: Optional[str] = None
+    user_summary: Optional[str] = None
+    title: Optional[str] = None
+    project_order: Optional[List[str]] = None
+    selected_project_ids: Optional[List[str]] = None
+    items: Optional[List[Dict[str, Any]]] = None
+    project_wording_edits: Optional[Dict[str, str]] = None
+
+
+class PortfolioGeneratePayload(BaseModel):
+    scan_id: Optional[int] = None
+    contributor_id: Optional[str] = None
+    project_ids: List[str] = Field(default_factory=list)
+    title: str = "Generated Portfolio"
+    selected_project_ids: List[str] = Field(default_factory=list)
+    project_order: List[str] = Field(default_factory=list)
+
+
+class PortfolioEditPayload(BaseModel):
+    title: Optional[str] = None
+    project_order: Optional[List[str]] = None
+    selected_project_ids: Optional[List[str]] = None

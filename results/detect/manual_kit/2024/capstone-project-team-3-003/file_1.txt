@@ -1,0 +1,118 @@
+"use client";
+
+import type { Account, Conversations, Queries, User } from "@/app/types/types";
+import AccountSelector from "@/components/custom/AccountSelector";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import type { Message } from "@/types/types";
+import { Mic, Trash2, X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import React from "react";
+import ClipLoader from "react-spinners/ClipLoader";
+import { toast } from "react-toastify";
+import { GenerateChart } from "../chart/chart";
+import { formatResponses, getChartData } from "./FormatResponse";
+import { Copy, Check } from "lucide-react";
+
+interface IProps {
+  userData: User;
+}
+
+export default function ChatInterface({ userData }: IProps) {
+  const accounts = userData.accounts;
+  const [selectedAccounts, setSelectedAccounts] = useState(
+    accounts.map((account: Account) => {
+      return { id: account.id, selected: true, name: account.name };
+    })
+  );
+  const [tempSelectedAccounts, setTempSelectedAccounts] = useState<any>([]);
+
+  const [conversations, setConversations] = useState<Conversations[]>(
+    userData.conversations ?? []
+  );
+  const [conversationUuid, setConversationUuid] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [input, setInput] = useState("");
+  const recognitionRef: any = useRef(null);
+  const [AIResponseSpinner, setAIResponseSpinner] = useState<boolean>(false); // When true, will display spinner
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = React.useState(false);
+  const [toggleDialog, setToggleDialog] = useState<boolean>(false);
+  const [selectedConversationUuid, setSelectedConversationUuid] = useState("");
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  const handleOpenDialog = (uuid: string) => {
+    setSelectedConversationUuid(uuid);
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedConversationUuid("");
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies(scrollToBottom): Updates on every re-render
+  // biome-ignore lint/correctness/useExhaustiveDependencies(messages): Scroll to bottom on every messages update, no need to check it though.
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    try {
+      e.preventDefault();
+      input.trim();
+      const newMessage: Message = { role: "user", content: input, uuid: "" };
+      const updatedMessages = [...messages, newMessage];
+      setMessages(updatedMessages);
+      setAIResponseSpinner(true);
+      setInput("");
+      let newConversation: any; // Use temp variable since useState does not update the variable in time to use newly acquired conversationUuid
+      //find accurate typing for this
+
+      // Create a new query if does not exist
+      if (conversationUuid === null) {
+        const newConversationResponse = await fetch(
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/conversation/createconversation`,
+          {
+            method: "GET",
+            credentials: "include",
+          }
+        );
+        if (newConversationResponse.status !== 201) {
+          console.error("Error fetching new conversation");
+          return;
+        }
+        const data = await newConversationResponse.json();
+        setConversationUuid(data.conversation.uuid);
+        newConversation = data.conversation;
+      }
+
+      // Send question
+      const questionResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/conversation/userquestion`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            question: newMessage.content,
+            conversationUuid: conversationUuid ?? newConversation.uuid,
+            accounts: selectedAccounts
+              .filter((account: any) => account.selected === true)

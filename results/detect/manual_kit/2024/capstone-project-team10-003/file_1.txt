@@ -1,0 +1,218 @@
+/* dashboard.component.css */
+.dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background: #f9fafb;
+}
+
+
+
+/* Sidebar */
+.sidebar {
+    width: 300px; /* Increased from 260px to prevent horizontal overflow */
+    background: linear-gradient(180deg, #ffffff 0%, #f9fafb 100%);
+    padding: 24px;
+    margin: 20px;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.03), 0 1px 3px rgba(0, 0, 0, 0.02);
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.vendor-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.vendor-logo {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.vendor-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: #1f2a44;
+    letter-spacing: 0.5px;
+}
+
+.user-stats {
+    margin-top: 16px;
+}
+
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    transition: all 0.3s ease;
+}
+
+.stat-row:hover {
+    transform: scale(1.02);
+}
+
+.rank-row {
+    align-items: flex-start;
+}
+
+.level-row {
+    align-items: flex-start;
+}
+
+.fancy-label {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1f2a44;
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    position: relative;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.fancy-label::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 50%;
+    height: 2px;
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+    border-radius: 2px;
+}
+
+.stat-value-wrapper {
+    text-align: right;
+}
+
+.sidebar-stat-value.fancy-value {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 18px;
+    font-weight: 700;
+    color: #2563eb;
+    line-height: 1.2;
+    flex-wrap: wrap; /* Allow wrapping if needed */
+}
+
+.rank-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    color: white;
+    border-radius: 12px;
+    box-shadow: 0 2px 4px rgba(37, 99, 235, 0.3);
+    font-size: 16px;
+    font-weight: 700;
+    animation: pulse 2s infinite;
+}
+
+.rank-subtext {
+    font-size: 14px;
+    color: #4b5563;
+    font-weight: 500;
+}
+
+.stat-subtext {
+    font-size: 11px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+}
+
+.progress-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.level-progress-bar.fancy-progress-bar {
+    width: 140px; /* Slightly increased from 120px to fit better */
+    height: 10px;
+    background: #e5e7eb;
+    border-radius: 5px;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 0 8px rgba(37, 99, 235, 0.2);
+    position: relative;
+}
+
+.level-progress.fancy-progress {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
+    border-radius: 5px;
+    transition: width 0.4s ease-in-out;
+    box-shadow: 0 0 10px rgba(37, 99, 235, 0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.level-progress.fancy-progress::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(45deg, rgba(255, 255, 255, 0.2) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.2) 75%);
+    background-size: 20px 20px;
+    animation: shine 3s linear infinite;
+}
+
+.progress-percentage.fancy-percentage {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2563eb;
+    background: #dbeafe;
+    padding: 2px 6px;
+    border-radius: 4px;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, 0.2);
+}
+
+.sidebar-nav {
+    flex: 1;
+    margin-top: 20px;
+}
+
+.nav-section {
+    margin-bottom: 20px;
+}
+
+.nav-section-title {
+    display: block;
+    padding: 8px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    margin: 4px 0;
+    color: #4b5563;
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    position: relative; /* For tooltip positioning */
+}
+
+.nav-item.disabled {
+    opacity: 0.5; /* Visually indicates disabled state */

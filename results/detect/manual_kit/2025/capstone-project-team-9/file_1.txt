@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artifact - Dashboard</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/dashboard.css">
+    <link rel="stylesheet" href="css/responsive.css">
+    <style>
+        @keyframes upload-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+    </style>
+    <!-- Core JavaScript Modules -->
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/upload.js"></script>
+    <script src="js/portfolioSettings.js"></script>
+    <script src="js/portfolioCustomization.js"></script>
+    <!-- PDF export libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <button type="button" class="nav-mobile-toggle" id="navMobileToggle" aria-label="Open menu" aria-expanded="false">≡</button>
+            <h1>Artifact Dashboard <span id="username"></span></h1>
+            <nav class="header-nav" aria-label="Main navigation">
+                <button type="button" class="header-nav-btn" data-view="overview" onclick="showView('overview')">Overview</button>
+                <div class="header-nav-dropdown">
+                    <button type="button" class="header-nav-btn header-nav-btn-dropdown" id="projectsMenuToggle" onclick="toggleHeaderDropdown('projectsSubmenu', 'projectsMenuToggle')">
+                        Projects <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor"><path d="M3 4.5l3 3 3-3"/></svg>
+                    </button>
+                    <div class="header-nav-submenu" id="projectsSubmenu">
+                        <button type="button" class="header-nav-submenu-btn" data-view="upload" onclick="showView('upload')">Upload ZIP</button>
+                        <button type="button" class="header-nav-submenu-btn" data-view="list" onclick="showView('list')">List Projects</button>
+                        <button type="button" class="header-nav-submenu-btn" data-view="analyze" onclick="showView('analyze')">Analyze Project</button>
+                        <button type="button" class="header-nav-submenu-btn" data-view="thumbnail" onclick="showView('thumbnail')">Add Thumbnail</button>
+                        <button type="button" class="header-nav-submenu-btn" data-view="merge" onclick="showView('merge')">Merge ZIP</button>
+                        <button type="button" class="header-nav-submenu-btn" data-view="cleanup" onclick="showView('cleanup')">Delete Projects</button>
+                    </div>
+                </div>
+                <button type="button" class="header-nav-btn" data-view="resume-builder" onclick="showView('resume-builder')">Resume</button>
+                <button type="button" class="header-nav-btn" data-view="portfolio-dashboard" onclick="showView('portfolio-dashboard')">Portfolio</button>
+                <button type="button" class="header-nav-btn" onclick="window.location.href='public-dashboard.html'">Public Dashboard</button>
+            </nav>
+        </div>
+        <div class="header-actions">
+            <button class="header-action-btn" onclick="showView('preferences')" aria-label="Settings">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
+                    <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+                </svg>
+            </button>

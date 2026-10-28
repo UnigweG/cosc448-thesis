@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Complete Analysis Script - Detailed Metadata Extraction and Deep Code Analysis
+
+Usage:
+    python src/backend/analysis/analyze.py <zip_file_path>
+"""
+
+import io
+import json
+import sys
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+# Configure stdout/stderr to use UTF-8 encoding on Windows to handle Unicode characters.
+# Only when run as script - avoid breaking pytest capture when imported as module.
+if __name__ == "__main__" and sys.platform.startswith("win"):
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
+
+# Add paths for imports
+current_dir = Path(__file__).parent
+backend_dir = current_dir.parent
+src_dir = backend_dir.parent
+
+sys.path.insert(0, str(src_dir))
+sys.path.insert(0, str(backend_dir))
+
+from analysis.deep_code_analyzer import generate_comprehensive_report
+from analysis.resume_generator import (generate_formatted_resume_entry,
+                                       print_resume_items)
+
+from backend.analysis.portfolio_item_generator import generate_portfolio_item
+from backend.analysis_database import (count_analyses_by_zip_file,
+                                       delete_analyses_by_zip_file,
+                                       get_all_analyses,
+                                       get_all_analyses_by_zip_file,
+                                       get_analysis_by_zip_file,
+                                       get_analysis_report, get_connection,
+                                       get_resume_items_for_project_id,
+                                       init_db, record_analysis,
+                                       store_resume_item)
+
+
+def print_separator(title=""):
+    """Print a separator line."""
+    if title:
+        print(f"\n{'=' * 78}")
+        print(f"  {title}")
+        print(f"{'=' * 78}\n")
+    else:
+        print("=" * 78)
+
+
+def calculate_days_since(date_str: str) -> int:
+    """
+    Calculate number of days since a given date string.
+
+    Args:
+        date_str: Date string in ISO format (e.g., "2024-01-15")
+
+    Returns:
+        Number of days since the date, or 999999 if parsing fails
+    """
+    try:
+        date_obj = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        now = datetime.now()
+        delta = now - date_obj
+        return delta.days
+    except (ValueError, AttributeError):
+        return 999999  # Very old if we can't parse
+
+
+def calculate_duration_days(start_date_str: str, end_date_str: str) -> int:
+    """
+    Calculate duration in days between two dates.
+
+    Args:
+        start_date_str: Start date in ISO format
+        end_date_str: End date in ISO format
+
+    Returns:
+        Number of days between dates, or 0 if parsing fails
+    """
+    try:
+        start = datetime.fromisoformat(start_date_str.replace("Z", "+00:00"))
+        end = datetime.fromisoformat(end_date_str.replace("Z", "+00:00"))
+        delta = end - start
+        return max(delta.days, 0)
+    except (ValueError, AttributeError):
+        return 0
+
+
+def categorize_score(score: float) -> str:
+    """
+    Categorize a project based on its final score.
+
+    Args:
+        score: Final composite score (0-100)
+
+    Returns:
+        Category string
+    """
+    if score >= 80:
+        return "Flagship Project"
+    elif score >= 65:
+        return "Major Project"
+    elif score >= 50:
+        return "Significant Project"
+    elif score >= 35:
+        return "Supporting Project"
+    else:
+        return "Minor Contribution"
+
+
+def calculate_contribution_score(project: Dict[str, Any], user_email: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Calculate individual contribution score (0-30 points).
+
+    For solo projects, user gets full credit (30 points).
+    For collaborative projects, score is weighted by commit percentage:
+    - 70%+ commits: 30 pts (Dominant contributor)
+    - 50-70%: 25 pts (Major contributor)
+    - 30-50%: 20 pts (Moderate contributor)
+    - 15-30%: 10 pts (Supporting contributor)
+    - <15%: 5 pts (Minor contributor)
+
+    Args:
+        project: Project data dictionary
+        user_email: Optional user email to identify contribution percentage
+
+    Returns:
+        Dictionary with score and justification
+    """
+    git_analysis = project.get("git_analysis", {})
+    is_collaborative = git_analysis.get("is_collaborative", False)
+
+    if not is_collaborative:

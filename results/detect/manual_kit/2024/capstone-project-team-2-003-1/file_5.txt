@@ -1,0 +1,139 @@
+/**
+ * @jest-environment jsdom
+ */
+import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { AuthContext } from '../components/lib/AuthContext';
+
+// Mock the entire ChatPage component
+jest.mock('@/app/chat/page', () => {
+  // Create a simplified mock implementation of the ChatPage component
+  const ChatPageMock = () => {
+    const [messages, setMessages] = React.useState([{
+      senderRole: 'assistant',
+      content: "Hi! I'm your AI financial assistant powered by Google Gemini. I can help you with budgeting, investments, financial planning, and more. What would you like to know?",
+      timestamp: new Date(),
+    }]);
+    const [input, setInput] = React.useState('');
+    const [loading, setLoading] = React.useState(false);
+    const [isListening, setIsListening] = React.useState(false);
+    const [chatActive, setChatActive] = React.useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+
+    const handleSuggestionClick = (suggestion) => {
+      setInput(suggestion);
+    };
+
+    const handleSubmit = async (e) => {
+      e.preventDefault();
+      if (!input.trim() || loading) return;
+
+      if (isListening) {
+        setIsListening(false);
+      }
+
+      const userMessage = {
+        senderRole: 'user',
+        content: input.trim(),
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, userMessage]);
+      setInput('');
+      setLoading(true);
+
+      try {
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 100));
+        setMessages(prev => [...prev, {
+          senderRole: 'assistant',
+          content: 'Test response',
+          timestamp: new Date(),
+        }]);
+      } catch (error) {
+        setMessages(prev => [...prev, {
+          senderRole: 'assistant',
+          content: 'Sorry, I encountered an error. Please try again.',
+          timestamp: new Date(),
+        }]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const newChat = () => {
+      setChatActive(true);
+      setMessages([{
+        senderRole: 'assistant',
+        content: "Hi! I'm your AI financial assistant powered by Google Gemini. I can help you with budgeting, investments, financial planning, and more. What would you like to know?",
+        timestamp: new Date(),
+      }]);
+    };
+
+    const formatTime = (date) => {
+      return new Intl.DateTimeFormat('en-US', {
+        hour: 'numeric',
+        minute: 'numeric',
+        hour12: true,
+      }).format(date);
+    };
+
+    const toggleSidebar = () => {
+      setSidebarCollapsed(!sidebarCollapsed);
+    };
+
+    const loadChat = (chatId) => {
+      setChatActive(true);
+      setMessages([
+        {
+          senderRole: 'user',
+          content: 'How can I save for retirement?',
+          timestamp: new Date(),
+        },
+        {
+          senderRole: 'assistant',
+          content: 'There are several ways to save for retirement including 401(k)s, IRAs, and investment accounts.',
+          timestamp: new Date(),
+        }
+      ]);
+    };
+
+    const toggleListening = () => {
+      setIsListening(!isListening);
+      if (!isListening) {
+        try {
+          // Mock successful start
+          if (window.SpeechRecognition) {
+            const recognition = new window.SpeechRecognition();
+            recognition.start();
+          } else if (window.webkitSpeechRecognition) {
+            const recognition = new window.webkitSpeechRecognition();
+            recognition.start();
+          }
+        } catch (err) {
+          console.error('Speech recognition error:', err);
+          setIsListening(false);
+        }
+      } else {
+        // Mock successful stop
+        if (window.SpeechRecognition) {
+          const recognition = new window.SpeechRecognition();
+          recognition.stop();
+        } else if (window.webkitSpeechRecognition) {
+          const recognition = new window.webkitSpeechRecognition();
+          recognition.stop();
+        }
+      }
+    };
+
+    return (
+      <div className="h-screen w-screen flex overflow-hidden relative">
+        {/* Sidebar */}
+        <div className={`bg-white/90 backdrop-blur-xl border-r border-gray-200 ${
+          sidebarCollapsed ? 'w-0' : 'w-64'
+        }`}>
+          <div className="flex items-center gap-3 px-4 py-5">
+            <div>Chatbox            </div>
+          </div>
+          <div className="flex flex-col p-3">

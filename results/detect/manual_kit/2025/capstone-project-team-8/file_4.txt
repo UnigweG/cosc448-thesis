@@ -1,0 +1,139 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
+import Header from '@/components/Header';
+import config from '@/config';
+import { getGrade, getBarColor } from '@/utils/gradeUtils';
+
+export default function ProjectDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const { isAuthenticated, token, loading: authLoading } = useAuth();
+  const [project, setProject] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [evaluation, setEvaluation] = useState(null);
+  const [evalLoading, setEvalLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', description: '', classification_type: '', user_role: '' });
+  const [saving, setSaving] = useState(false);
+
+  const USER_ROLES = [
+    { value: 'solo_developer', label: 'Solo Developer' },
+    { value: 'lead_developer', label: 'Lead Developer' },
+    { value: 'contributor', label: 'Contributor' },
+    { value: 'frontend_developer', label: 'Frontend Developer' },
+    { value: 'backend_developer', label: 'Backend Developer' },
+    { value: 'full_stack_developer', label: 'Full Stack Developer' },
+    { value: 'designer', label: 'Designer' },
+    { value: 'writer', label: 'Writer' },
+    { value: 'architect', label: 'Architect' },
+    { value: 'other', label: 'Other' },
+  ];
+
+  const CLASSIFICATION_TYPES = [
+    { value: 'coding', label: 'Coding' },
+    { value: 'writing', label: 'Writing' },
+    { value: 'art', label: 'Art/Design' },
+    { value: 'mixed:coding+writing', label: 'Mixed: Coding + Writing' },
+    { value: 'mixed:coding+art', label: 'Mixed: Coding + Art' },
+    { value: 'mixed:writing+art', label: 'Mixed: Writing + Art' },
+    { value: 'unknown', label: 'Unknown' }
+  ];
+
+  const handleEditClick = () => {
+    setEditForm({
+      name: project.name || '',
+      description: project.description || '',
+      classification_type: project.classification_type || 'unknown',
+      user_role: project.user_role || 'other'
+    });
+    setIsEditing(true);
+  };
+
+  const handleSaveProject = async () => {
+    setSaving(true);
+    try {
+      const response = await fetch(`${config.API_URL}/api/projects/${params.id}/`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editForm.name,
+          description: editForm.description,
+          classification: editForm.classification_type,
+          user_role: editForm.user_role
+        })
+      });
+      if (!response.ok) throw new Error('Failed to update project');
+      
+      setProject({
+        ...project,
+        name: editForm.name,
+        description: editForm.description,
+        classification_type: editForm.classification_type,
+        user_role: editForm.user_role
+      });
+      setIsEditing(false);
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!isAuthenticated) {
+      router.push('/login');
+      return;
+    }
+
+    const fetchProject = async () => {
+      try {
+        const response = await fetch(
+          `${config.API_URL}/api/projects/${params.id}/`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch project');
+        }
+
+        const data = await response.json();
+        setProject(data);
+      } catch (err) {
+        console.error('Error fetching project:', err);
+        setError('Failed to load project details');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (params.id) {
+      fetchProject();
+      fetchEvaluation();
+    }
+  }, [authLoading, isAuthenticated, token, router, params.id]);
+
+  const fetchEvaluation = async () => {
+    setEvalLoading(true);
+    try {
+      const response = await fetch(
+        `${config.API_URL}/api/evaluations/project/${params.id}/`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.ok) {
+        const data = await response.json();

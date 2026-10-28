@@ -1,0 +1,117 @@
+import { Joyride } from 'react-joyride';
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams, Link } from "react-router-dom";
+import "./Settings.css";
+
+const API_BASE = "http://127.0.0.1:8000";
+
+export default function Settings({ onLogout }) {
+  // Only run walkthrough if not seen
+  const [runWalkthrough, setRunWalkthrough] = useState(() => {
+    return localStorage.getItem('settings_walkthrough_seen') !== '1';
+  });
+  // Set flag as soon as walkthrough starts
+  useEffect(() => {
+    if (runWalkthrough) {
+      localStorage.setItem('settings_walkthrough_seen', '1');
+    }
+  }, [runWalkthrough]);
+  const walkthroughSteps = [
+    {
+      target: 'body',
+      placement: 'center',
+      title: 'Settings',
+      content: 'This page lets you manage your account, privacy, dashboard, and more. Let’s take a quick tour!'
+    },
+    {
+      target: '.settings-nav-item:nth-child(1)',
+      placement: 'right',
+      title: 'Account Settings',
+      content: 'Manage your profile, avatar, and account details here.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(2)',
+      placement: 'right',
+      title: 'Consent',
+      content: 'Grant or revoke file and AI consent for your data.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(3)',
+      placement: 'right',
+      title: 'Privacy',
+      content: 'Configure excluded folders and file types for privacy.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(4)',
+      placement: 'right',
+      title: 'Dashboard Settings',
+      content: 'Customize dashboard display options like emojis, streak, and tips.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(5)',
+      placement: 'right',
+      title: 'Current Configuration',
+      content: 'View a live summary of your current system and privacy settings.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(6)',
+      placement: 'right',
+      title: 'Community Portfolios',
+      content: 'Explore and share public portfolios from the community.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(7)',
+      placement: 'right',
+      title: 'How to Use the App',
+      content: 'Find keyboard shortcuts and feature guides for the app.'
+    },
+    {
+      target: '.settings-nav-item:nth-child(8)',
+      placement: 'right',
+      title: 'About',
+      content: 'Learn more about this app, its creators, and version info.'
+    }
+  ];
+  const [searchParams] = useSearchParams();
+  const [signupForm, setSignupForm] = useState({ first_name: "", last_name: "", email: "", password: "" });
+  const [loginForm, setLoginForm] = useState({ email: "", password: "" });
+  const [authLoading, setAuthLoading] = useState(false);
+  const [currentUserLoading, setCurrentUserLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [accountMessage, setAccountMessage] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [activeSection, setActiveSection] = useState(() => searchParams.get("section") || "account");
+  // GitHub username state
+  const [githubUsername, setGithubUsername] = useState("");
+  const [githubUsernameLoading, setGithubUsernameLoading] = useState(false);
+  const [githubUsernameMessage, setGithubUsernameMessage] = useState("");
+  const [githubUsernameError, setGithubUsernameError] = useState("");
+    // Fetch GitHub username when user loads or logs in
+    useEffect(() => {
+      async function fetchGithubUsername() {
+        setGithubUsernameLoading(true);
+        setGithubUsernameError("");
+        setGithubUsernameMessage("");
+        const token = localStorage.getItem("token");
+        if (!token) { setGithubUsername(""); setGithubUsernameLoading(false); return; }
+        try {
+          const res = await fetch(`${API_BASE}/user/github-username`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          if (!res.ok) throw new Error("Could not fetch GitHub username");
+          const data = await res.json();
+          setGithubUsername(data.github_username || "");
+        } catch (err) {
+          setGithubUsernameError(err.message || "Could not fetch GitHub username");
+        } finally {
+          setGithubUsernameLoading(false);
+        }
+      }
+      if (currentUser) fetchGithubUsername();
+      else setGithubUsername("");
+    }, [currentUser]);
+
+    async function handleGithubUsernameSave(e) {
+      e.preventDefault();
+      setGithubUsernameMessage("");
+      setGithubUsernameError("");

@@ -1,0 +1,146 @@
+"use client";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { Requests, Submissions } from "stack/database/src/sql.generated";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import {
+  Archive,
+  Trash2,
+  ArrowLeft,
+  LucideUploadCloud,
+  PlaySquare,
+  XSquare,
+  Square,
+  Circle,
+  LucideLoader2,
+  ArrowBigDown,
+  FileText,
+  UploadIcon,
+  UploadCloud,
+  Download,
+  DownloadCloud,
+} from "lucide-react";
+import { format, set, sub } from "date-fns";
+import Webcam from "react-webcam";
+import VideoPlayer from "./video-player";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useToast } from "@/components/ui/use-toast";
+import { useDropzone } from "react-dropzone";
+import { useAtom } from "jotai";
+import { atomWithToggle } from "../../atoms/atomWithToggle";
+import { useSubmissions } from "@/app/hooks/use-submissions";
+import PanelLoader from "./panel-2-loader";
+import { useSubmission } from "@/app/hooks/use-submission";
+import { useUpload } from "@/app/hooks/use-upload";
+import { EnrichedSubmissions } from "@obscurus/database/src/types/enrichedSubmission";
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { useIsShowingVideo } from "@/app/hooks/use-is-showing-video";
+import { Badge } from "@/components/ui/badge";
+import { isSafari } from "react-device-detect";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import Loading from "@/components/authentication/loading";
+import { useProcessedVideo } from "@/app/hooks/use-processed-video";
+
+export default function SubmitDisplay({
+  getPresignedUrl,
+  getDownloadPresignedUrl,
+  sendToService,
+  updateSubmissionStatus,
+  setSubmittedDate,
+  getProfileImgPresignedUrl,
+  getPfp
+}: {
+  getPresignedUrl?: (submissionId: string) => Promise<string>;
+  getDownloadPresignedUrl?: (submissionId: string) => Promise<string>;
+  sendToService?: (
+    submissionId: string,
+    fileExt: string,
+    requesterEmail: string,
+    requesteeEmail: string,
+    blurred: boolean
+  ) => Promise<string>;
+  updateSubmissionStatus?: Function;
+  setSubmittedDate?: Function;
+  getProfileImgPresignedUrl?: (username: string) => Promise<string>;
+  getPfp: Function;
+}) {
+  const [submission, setSubmission] = useSubmission();
+  const [upload, setUpload] = useUpload();
+  const [iseShowingVideo, setShowingVideo] = useIsShowingVideo();
+  const { toast } = useToast();
+  const [processedVideo, setProcessedVideo] = useState<string | null>(null);
+
+
+
+  // if (!request) {
+  //   setRequest(requests && requests[0]);
+  // }
+
+
+
+  const [submissions] = useSubmissions();
+  const selected = submissions?.find(
+    (sub) => sub.submissionId === submission.submissionId
+  );
+
+  const submissionIdFromQuery = useSearchParams().get("submissionId");
+  useEffect(() => {
+
+    if (submissionIdFromQuery) {
+      setSubmission({ submissionId: submissionIdFromQuery });
+    }
+    const fetchProcessedVideo = async () => {
+      if (
+        selected?.status === "COMPLETED" &&
+        getDownloadPresignedUrl &&
+        selected.submissionId
+      ) {
+        try {
+          const videoUrl = await getDownloadPresignedUrl(selected.submissionId);
+          setProcessedVideo(videoUrl);
+        } catch (error) {
+          console.error("Error fetching processed video:", error);
+          toast({
+            title: "Error",
+            description: "Failed to load processed video.",
+          });
+        }
+      }
+    };
+
+    fetchProcessedVideo();
+    getRequesterProfileImage(selected?.requester, selected?.requestDetails);
+  }, [submissionIdFromQuery, selected]);
+
+  const canShowVideo =
+    selected && selected.status === "COMPLETED" && processedVideo;
+
+  const [file, setFile] = useState<File | undefined>(undefined);
+  const [objectURL, setObjectURL] = useState<string | null>(null);
+
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUploadClick = (e: React.FormEvent) => {
+    e.preventDefault();
+    fileInputRef.current?.click();
+  };
+
+  const handleProcessVideo = async () => {

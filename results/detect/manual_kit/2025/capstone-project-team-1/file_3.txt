@@ -1,0 +1,160 @@
+"""Minimal async local-generation service built on the shared local runtime."""
+
+from __future__ import annotations
+
+from collections import defaultdict
+from datetime import UTC, datetime
+import math
+import subprocess
+from pathlib import Path
+from typing import Callable
+
+from ...RepositoryIntelligence.repo_intelligence_main import getRepoStats
+from ...RepositoryIntelligence.repo_intelligence_user import (
+    collect_user_additions,
+    get_daily_commit_counts,
+    getUserRepoStats,
+)
+import json as json_lib
+
+from ..client import query_text
+from .markdown_parser import parse_resume_markdown
+from .prompts import (
+    FACTS_SYSTEM,
+    POLISH_SYSTEM,
+    PROJECT_CONTENT_SYSTEM,
+    PROFILE_SYSTEM,
+    SUMMARY_SYSTEM,
+    build_polish_prompt,
+    build_profile_prompt,
+    build_project_content_prompt,
+    build_project_facts_prompt,
+    build_summary_prompt,
+)
+from .schemas import (
+    GenerationFeedback,
+    ProjectFacts,
+    ResumeOutputModel,
+    ResumePortfolioDashboardModel,
+    ResumePortfolioModel,
+    ResumeProjectModel,
+    ResumeProjectPeriod,
+)
+
+
+ProgressCallback = Callable[[str], None]
+
+
+def _read_readme(repo_path: Path) -> str:
+    candidates = sorted(repo_path.glob("README*"))
+    for candidate in candidates:
+        if candidate.is_file():
+            try:
+                return candidate.read_text(encoding="utf-8", errors="ignore")[:4000]
+            except OSError:
+                continue
+    return ""
+
+
+def _recent_commit_messages(repo_path: Path, user_email: str, limit: int = 12) -> list[str]:
+    result = subprocess.run(
+        [
+            "git",
+            "log",
+            f"--author={user_email}",
+            "--format=%s",
+            "-n",
+            str(limit),
+        ],
+        cwd=str(repo_path),
+        capture_output=True,
+        text=True,
+        timeout=20,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _sample_files(repo_path: Path, limit: int = 20) -> list[str]:
+    sampled: list[str] = []
+    for path in sorted(repo_path.rglob("*")):
+        if len(sampled) >= limit:
+            break
+        if not path.is_file():
+            continue
+        try:
+            relative = path.relative_to(repo_path)
+        except ValueError:
+            continue
+        if ".git" in relative.parts:
+            continue
+        sampled.append(relative.as_posix())
+    return sampled
+
+
+def _parse_iso_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
+def _format_iso_datetime(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
+
+
+def _snapshot_by_project_name(
+    snapshots: list[dict[str, object]],
+) -> dict[str, dict[str, object]]:
+    by_project: dict[str, dict[str, object]] = {}
+    for snapshot in snapshots:
+        name = snapshot.get("project_name")
+        if isinstance(name, str) and name.strip():
+            by_project[name] = snapshot
+    return by_project
+
+
+def _commit_total_for_depth(
+    fact: ProjectFacts, snapshot: dict[str, object] | None
+) -> int:
+    if snapshot:
+        user_total = snapshot.get("user_total_commits")
+        if isinstance(user_total, bool):
+            return int(user_total)
+        if isinstance(user_total, (int, float)):
+            return max(0, int(user_total))
+    return max(0, sum(fact.commit_breakdown.values()))
+
+
+def _project_skills(fact: ProjectFacts) -> list[str]:
+    skills: list[str] = []
+    seen: set[str] = set()
+    for raw_skill in fact.technologies:
+        normalized = raw_skill.strip()
+        if not normalized:
+            continue
+        key = normalized.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        skills.append(normalized)
+    return skills
+
+
+def _build_skills_timeline(
+    facts: list[ProjectFacts],
+    snapshots: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    snapshots_by_project = _snapshot_by_project_name(snapshots)
+    timeline_map: dict[str, dict[str, object]] = {}
+
+    for fact in facts:
+        snapshot = snapshots_by_project.get(fact.project_name)
+        first_seen = _parse_iso_datetime(fact.first_commit)

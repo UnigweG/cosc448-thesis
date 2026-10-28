@@ -1,0 +1,125 @@
+from datetime import datetime, timedelta
+import json
+import pytest
+from flask_jwt_extended import create_access_token
+from werkzeug.security import generate_password_hash
+from app.models import Admin, DemographicData, UserResponse, Image, ImageQuestion, FeedbackData  # Import models
+from app import db
+
+# Fixture setup for creating a test admin user
+@pytest.fixture
+def setup_test_admin(init_database):
+    """Set up a test admin user with a known password."""
+    password_hash = generate_password_hash("testpassword")
+    test_admin = Admin(username="testuser", password=password_hash)
+    db.session.add(test_admin)
+    db.session.commit()
+    return test_admin
+
+@pytest.fixture
+def sample_data(init_database):
+    """Seeding data"""
+    
+    image1 = Image(id=1, url="images/test_image_1.jpg", question_id=101)
+    image2 = Image(id=2, url="images/test_image_2.jpg", question_id=102)
+    image3 = Image(id=3, url="images/test_image_3.jpg", question_id=103)
+    
+    db.session.add_all([image1, image2, image3])
+    db.session.commit()
+
+    user1 = DemographicData(id=1, fname="John", lname="Doe", age="18-27", country="USA", uniCourse="yes", gender="Male")
+    user2 = DemographicData(id=2, fname="Jane", lname="Doe", age="28-37", country="Canada", uniCourse="no", gender="Female")
+    
+    db.session.add_all([user1, user2])
+    db.session.commit()
+
+    test_start_date = datetime(2025, 3, 4)  
+    test_end_date = test_start_date + timedelta(days=1)
+
+    response1 = UserResponse(user_id=1, question_id=101, image_id=1, response_time=3.2, flagged=False, timestamp=test_start_date)
+    response2 = UserResponse(user_id=1, question_id=102, image_id=2, response_time=5.1, flagged=True, timestamp=test_end_date)
+    response3 = UserResponse(user_id=2, question_id=103, image_id=3, response_time=2.0, flagged=False, timestamp=test_start_date)
+    
+    db.session.add_all([response1, response2, response3])
+    db.session.commit()
+
+    return [response1, response2, response3]
+
+
+# Reporting feature tests
+@pytest.fixture
+def valid_headers(setup_test_admin):
+    """Generate valid authorization headers."""
+    token = create_access_token(identity="testuser")
+    return {'Authorization': f'Bearer {token}'}
+
+# Tests for the demographic route
+def test_demographic_route(client, init_database):
+    """Test the GET route for demographic data."""
+
+    # Delete already existing data
+    DemographicData.query.delete()
+    db.session.commit()
+
+    # Add mock data to the database
+    demographic = DemographicData(
+        fname="John", lname="Doe", age=30, country="US", gender="Male", uniCourse="Computer Science"
+    )
+    db.session.add(demographic)
+    db.session.commit()
+
+    # Make a GET request to fetch demographic data
+    response = client.get('/api/demographic')
+    assert response.status_code == 200
+
+    # Verify the response data
+    data = response.get_json()
+    assert isinstance(data, list)  # Ensure the response is a list
+    assert len(data) == 1  # Ensure one record is returned
+    assert data[0]["fname"] == "John"
+    assert data[0]["lname"] == "Doe"
+    assert data[0]["age"] == '30'
+    assert data[0]["country"] == "US"
+    assert data[0]["gender"] == "Male"
+    assert data[0]["uniCourse"] == "Computer Science"
+
+
+# Tests for the feedback route
+def test_feedback_route(client, init_database):
+    """Test the GET route for feedback data."""
+
+    # Delete already existing data
+    FeedbackData.query.delete()
+    db.session.commit()
+
+    # Add mock data to the database
+    feedback = FeedbackData(
+        rating=5, feedbackText="Fantastic work!"
+    )
+    db.session.add(feedback)
+    db.session.commit()
+
+    # Make a GET request to fetch feedback data
+    response = client.get('/api/feedback')
+    assert response.status_code == 200
+
+    # Verify the response data
+    data = response.get_json()
+    assert isinstance(data, list)  # Ensure the response is a list
+    assert len(data) == 1  # Ensure one record is returned
+    assert data[0]["rating"] == 5
+    assert data[0]["feedbackText"] == "Fantastic work!"
+
+
+# Test for the sample route
+def test_sample_route(client):
+    """Test the sample API route returns a 200 status code."""
+    response = client.get('/api/sample')
+    assert response.status_code == 200
+    assert b'This is sample data!' in response.data  # Check if message exists
+
+
+# Admin login tests
+def test_adminlogin_route_success(client, setup_test_admin):
+    """Test login route with valid credentials."""
+    valid_login_data = {

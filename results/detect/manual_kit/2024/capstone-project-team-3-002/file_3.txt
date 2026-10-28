@@ -1,0 +1,143 @@
+const { PrismaClient } = require('@prisma/client');
+const { Configuration, PlaidApi, PlaidEnvironments } = require('plaid');
+const pineconeClient = require('../services/pineconeClient'); // Pinecone client service
+const pineconeController = require('./pineconeController');
+const prisma = new PrismaClient();
+
+const configuration = new Configuration({
+  basePath: PlaidEnvironments.sandbox, // Change to PlaidEnvironments.production in production
+  baseOptions: {
+    headers: {
+      'PLAID-CLIENT-ID': process.env.PLAID_CLIENT_ID,
+      'PLAID-SECRET': process.env.PLAID_SECRET,
+    },
+  },
+});
+
+const plaidClient = new PlaidApi(configuration);
+
+// Function to create a link token
+const createLinkToken = async (req, res) => {
+  try {
+    const userId = String(req.body.userId);
+
+    if (!req.body.userId) {
+      return res.status(400).json({ message: 'User ID is required to create a link token.' });
+    }
+    
+
+    console.log("Creating link token for user:", userId);
+
+    const response = await plaidClient.linkTokenCreate({
+      user: {
+        client_user_id: userId,
+      },
+      client_name: 'Transaction Query App',
+      products: ['transactions'],
+      country_codes: ['US', 'CA'],
+      language: 'en',
+    });
+
+    console.log("Plaid link token created:", response.data.link_token);
+    res.status(200).json({ link_token: response.data.link_token });
+  } catch (error) {
+    console.error('Error creating link token:', error.response ? error.response.data : error.message);
+    res.status(500).json({
+      message: 'Failed to create link token',
+      error: error.response ? error.response.data : error.message,
+    });
+  }
+};
+
+// Function to exchange public token for access token and store it
+const exchangePublicToken = async (req, res) => {
+  const { public_token, userId } = req.body;
+
+  if (!public_token || !userId) {
+    return res.status(400).json({ message: 'Public token and userId are required.' });
+  }
+
+  try {
+    const response = await plaidClient.itemPublicTokenExchange({ public_token });
+    const accessToken = response.data.access_token;
+    const itemId = response.data.item_id;
+
+   
+    // Gather old transaction IDs to remove them from Pinecone
+    const oldTxns = await prisma.transaction.findMany({
+      where: { userId: Number(userId) },
+      select: { transactionId: true },
+    });
+    const oldTransactionIds = oldTxns.map(t => t.transactionId);
+
+    if (oldTransactionIds.length) {
+      await pineconeController.deleteTransactions(oldTransactionIds);
+      console.log(`Removed ${oldTransactionIds.length} old transactions from Pinecone.`);
+    }
+
+    await prisma.transactionCategory.deleteMany({
+      where: {
+        transaction: { userId: Number(userId) },
+      },
+    });
+
+    await prisma.transaction.deleteMany({
+      where: { userId: Number(userId) },
+    });
+    console.log(`Deleted all old transactions for user ${userId} from the DB.`);
+
+
+    await prisma.user.update({
+      where: { id: Number(userId) },
+      data: {
+        plaidAccessToken: accessToken,
+        plaidItemId: itemId,
+      },
+    });
+    
+    // Reactivate any existing recurring payments for this user
+    await prisma.recurringPayment.updateMany({
+      where: {
+        userId: Number(userId),
+      },
+      data: {
+        isActive: true,
+      },
+    });
+
+    await fetchAndStoreTransactions(accessToken, userId);
+
+    res.status(200).json({ access_token: accessToken });
+  } catch (error) {
+    console.error('Error exchanging public token:', error.response ? error.response.data : error.message);
+    res.status(500).json({
+      message: 'Failed to exchange public token',
+      error: error.response ? error.response.data : error.message,
+    });
+  }
+};
+
+const fetchAndStoreTransactions = async (accessToken, userId) => {
+  try {
+    let cursor = null;
+    let hasMore = true;
+
+    // Get the Pinecone index
+    const pineconeIndex = pineconeClient.index(process.env.PINECONE_INDEX_NAME);
+
+    while (hasMore) {
+      const response = await plaidClient.transactionsSync({
+        access_token: accessToken,
+        cursor: cursor,
+      });
+
+      const { added, removed, next_cursor, has_more } = response.data;
+
+      // Process added transactions
+      if (added.length > 0) {
+        const transactionsData = added.map((tx) => ({
+          userId: Number(userId),
+          transactionId: tx.transaction_id,
+          accountId: tx.account_id,
+          amount: Math.abs(tx.amount),
+          date: new Date(tx.date),

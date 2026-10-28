@@ -1,0 +1,75 @@
+/**
+ * @module QuickSettings
+ */
+(function () {
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // region PRIVATE GENERIC UTILS
+    ////////////////////////////////////////////////////////////////////////////////
+    var nextID = 0;
+
+    function getNextID() {
+        nextID++;
+        return "qs_" + nextID;
+    }
+
+    function createLabel(title, container) {
+        var label = createElement("div", null, "qs_label", container);
+        label.innerHTML = title;
+        return label;
+    }
+
+    function createInput(type, id, className, parent) {
+        var input = createElement("input", id, className, parent);
+        input.type = type;
+        return input;
+    }
+
+    function createElement(type, id, className, parent) {
+        var element = document.createElement(type);
+        if (!element) return;
+        element.id = id;
+        if (className) {
+            element.className = className;
+        }
+        if (parent) {
+            parent.appendChild(element);
+        }
+        return element;
+    }
+
+    function isIE() {
+        if (navigator.userAgent.indexOf("rv:11") != -1) {
+            return true;
+        }
+        if (navigator.userAgent.indexOf("MSIE") != -1) {
+            return true;
+        }
+        return false;
+    }
+
+    function isSafari() {
+        var userAgent = navigator.userAgent.toLowerCase();
+        if (userAgent.indexOf("chrome") > -1 ||
+            userAgent.indexOf("firefox") > -1 ||
+            userAgent.indexOf("epiphany") > -1) {
+            return false;
+        }
+        if (userAgent.indexOf('safari/') > -1) {
+            return true;
+        }
+        return false;
+    }
+
+    function isEdge() {
+        var userAgent = navigator.userAgent.toLowerCase();
+        return userAgent.indexOf("edge") > -1;
+    }
+
+    // endregion
+
+
+    ////////////////////////////////////////////////////////////////////////////////
+    // region PRIVATE/STATIC DATA AND FUNCTIONS
+    ////////////////////////////////////////////////////////////////////////////////
+    var cssInjected = false,

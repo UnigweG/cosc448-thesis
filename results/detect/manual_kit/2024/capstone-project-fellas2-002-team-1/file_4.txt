@@ -1,0 +1,171 @@
+global.ResizeObserver = class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+};
+jest.setTimeout(10000);
+
+import React from 'react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import InterfacePage from '../src/app/interface/page';
+import { SessionProvider } from 'next-auth/react';
+import { ThemeProvider } from 'next-themes';
+import '@testing-library/jest-dom';
+import { useRouter } from 'next/navigation';
+import { getSession } from 'next-auth/react';
+import { getAccounts } from '@/services/accountService';
+import { fetchUserTransactions } from '@/services/transactionService';
+
+jest.mock('@/components/ui/chart', () => ({
+  ChartContainer: ({ children, className }) => (
+    <div className={className} data-testid="chart-container">
+      {children}
+    </div>
+  ),
+  ChartTooltip: ({ children }) => (
+    <div data-testid="chart-tooltip">{children}</div>
+  ),
+  ChartTooltipContent: ({ content }) => (
+    <div data-testid="chart-tooltip-content">{content}</div>
+  ),
+}));
+
+jest.mock('@/services/openaiService', () => ({
+  generateChatResponse: jest.fn().mockResolvedValue("Test assistant response with spending details"),
+}));
+
+jest.mock('recharts', () => {
+  const OriginalModule = jest.requireActual('recharts');
+
+  const MockResponsiveContainer = ({ children, ...props }) => (
+    <div {...props} data-testid="responsive-container">
+      <svg data-testid="mock-svg"></svg>
+      {children}
+    </div>
+  );
+
+  const MockLineChart = ({ children }) => (
+    <div data-testid="line-chart">{children}</div>
+  );
+
+  const MockBarChart = ({ children }) => (
+    <div data-testid="bar-chart">{children}</div>
+  );
+
+  const MockPieChart = ({ children }) => (
+    <div data-testid="pie-chart">{children}</div>
+  );
+
+  return {
+    ...OriginalModule,
+    ResponsiveContainer: MockResponsiveContainer,
+    LineChart: MockLineChart,
+    BarChart: MockBarChart,
+    PieChart: MockPieChart,
+    Line: ({ children }) => <div>{children}</div>,
+    Bar: ({ children }) => <div>{children}</div>,
+    Pie: ({ children }) => <div>{children}</div>,
+    Cell: () => <div />,
+    XAxis: () => <div />,
+    YAxis: () => <div />,
+    CartesianGrid: () => <div />,
+    Tooltip: () => <div />,
+    Legend: () => <div />
+  };
+});
+
+beforeAll(() => {
+  Element.prototype.scrollIntoView = jest.fn();
+  global.window.matchMedia = jest.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(),
+    removeListener: jest.fn(),
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  }));
+});
+
+// Router mock
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(() => ({
+    push: jest.fn(),
+  })),
+  usePathname: jest.fn(() => '/interface'),
+}));
+
+// Mock Sidebar
+jest.mock('@/components/Sidebar', () => ({
+  AppSidebar: ({ onNewChat }) => (
+    <div data-testid="mock-sidebar">
+      <button onClick={onNewChat} aria-label="New Chat">
+        New Chat
+      </button>
+    </div>
+  ),
+}));
+
+jest.mock('@/services/transactionService', () => ({
+  fetchUserTransactions: jest.fn(),
+}));
+
+// Mock theme
+jest.mock('next-themes', () => ({
+  ThemeProvider: ({ children }) => <>{children}</>,
+  useTheme: () => ({
+    theme: 'light',
+    resolvedTheme: 'light',
+    setTheme: jest.fn(),
+  }),
+}));
+
+// Mock next-auth
+jest.mock('next-auth/react', () => ({
+  ...jest.requireActual('next-auth/react'),
+  getSession: jest.fn(),
+  useSession: jest.fn(() => ({
+    data: null,
+    status: 'unauthenticated',
+  })),
+}));
+
+// Mock account service
+jest.mock('@/services/accountService', () => ({
+  getAccounts: jest.fn(),
+}));
+
+// Mock matchMedia
+global.matchMedia = jest.fn().mockImplementation((query) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: jest.fn(),
+  removeListener: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  dispatchEvent: jest.fn(),
+}));
+
+// Mock fetch for the OpenAI endpoint (and others)
+global.fetch = jest.fn((url) => {
+  if (url === "https://localhost:3001/api/openai/generate") {
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          content: "Mock Assistant Response",
+        }),
+    });
+  }
+  return Promise.reject(new Error("HTTP error! status: 500"));
+});
+
+const AllTheProviders = ({ children }) => (
+  <SessionProvider session={null}>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem

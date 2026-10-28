@@ -1,0 +1,102 @@
+const multer = require("multer");
+const asyncWrapper = require("../utils/asyncWrapper");
+const {database} = require("../config/database");
+const {doesCustomerWithIdExist} = require("../database/customer");
+const axios = require("axios");
+const {eventEmitter} = require("../utils/eventBus");
+const {getCurrentSession} = require("../auth/session");
+const comparisonService = require("../services/comparisonService");
+const ParsedDocument = require("../model/parsed/ParsedDocument");
+const ParsedElement = require("../model/parsed/ParsedElement");
+const {validateTeamAccess} = require("../auth/teamValidation");
+const {hashObject} = require("../utils/hash");
+
+const document = multer({limits: {fileSize: 100 * 1024 * 1024}}); // 100MB
+
+module.exports = app => {
+    // upload document endpoint with added team validation
+    app.post("/document", document.single('file'), asyncWrapper(async (req, res) => {
+        const {user} = await getCurrentSession(req);
+        if (!user) return res.status(401).json({message: "not_authorized"});
+
+        if (!req.file) return res.status(400).json({message: "no_file"});
+        if (!req.query.customer_id) return res.status(400).json({message: "customer_id_not_specified"});
+
+        const fileName = req.file.originalname;
+        const fileData = req.file.buffer.toString("base64");
+        const customerId = parseInt(req.query.customer_id);
+
+        if (isNaN(customerId)) return res.status(400).json({message: "invalid_customer_id"});
+
+        try {
+            const broker = await database('user')
+                .select('team_id')
+                .where('id', user.id)
+                .first();
+
+            if (!broker || !broker.team_id) {
+                return res.status(403).json({
+                    message: "broker_team_not_assigned",
+                    details: "You must be assigned to a team to upload documents"
+                });
+            }
+
+            // check if customer exists and belongs to the broker's team
+            const customer = await database('customer')
+                .select('team_id')
+                .where('id', customerId)
+                .first();
+
+            if (!customer) {
+                return res.status(404).json({message: "customer_not_found"});
+            }
+
+            // for admin and manager, allow access
+            if (!user.admin && !user.manager && customer.team_id !== broker.team_id) {
+                return res.status(403).json({
+                    message: "customer_team_mismatch",
+                    details: "You don't have permission to upload documents for this customer"
+                });
+            }
+
+            // use broker's team_id for consistency, or the customer's team_id for admin/manager
+            const teamId = (!user.admin && !user.manager) ? broker.team_id : customer.team_id;
+
+            // insert document with the appropriate team_id
+            const [documentId] = await database("policy_document").insert({
+                name: fileName,
+                created_at: new Date(Date.now()),
+                data: fileData,
+                team_id: teamId
+            });
+
+            await database("customer_policy_document").insert({
+                customer_id: customerId,
+                policy_document_id: documentId
+            });
+
+            axios.post('http://document-parser:8070/parse', fileData, {
+                headers: {
+                    'Content-Type': 'text/plain'
+                }
+            }).then(async response => {
+                const json = response.data;
+
+                await database("policy_document").where("id", documentId).update({parsed: JSON.stringify(json)});
+
+                eventEmitter.emit('post', "document_parsed", {user_id: user.id, id: documentId, json});
+            }).catch((error) => {
+                console.error("Document parsing error:", error);
+                eventEmitter.emit('post', "document_parsed", {user_id: user.id, id: documentId, fail: true});
+            });
+
+            res.status(200).json({message: "parsing", id: documentId});
+        } catch (error) {
+            console.error("Document upload error:", error);
+            res.status(500).json({message: "server_error", details: error.message});
+        }
+    }));
+
+    app.delete("/document/:documentId", asyncWrapper(async (req, res) => {
+        const {user} = await getCurrentSession(req);
+        if (!user) return res.status(401).json({message: "not_authorized"});

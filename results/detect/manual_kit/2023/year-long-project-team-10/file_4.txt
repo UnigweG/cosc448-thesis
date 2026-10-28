@@ -1,0 +1,125 @@
+"use client";
+import OccupationTags from "../occupationTags/OccupationTags";
+import defaultProfilePicture from "@/public/profile-pictures/1.svg";
+import editIcon from "../../images/pencil-solid.svg";
+import { useState } from "react";
+import { createAProfile } from "../../(unauthenticated)/createProfile/api/createAProfile.js";
+import getRandomProfilePicture from "@/app/scripts/getRandomProfilePicture";
+import "remixicon/fonts/remixicon.css";
+
+import { useRouter } from "next/navigation";
+import React from "react";
+import Image from "next/image";
+import Input from "../formComponents/Input";
+import { useWebSocket } from "../../contexts/WebSocketContext";
+
+
+function CreateProfileForm() {
+	const { userStatus, sendMessage } = useWebSocket();
+	return (
+		<>	
+			<form method="POST" className="mx-6">
+				<CreateProfileHeader />
+				<div
+					id="labels-and-inputs-container"
+					className="flex w-full flex-row items-center"
+				>
+					<FormLabelsAndInputs />
+				</div>
+			</form>
+		</>
+	);
+}
+
+function CreateProfileHeader() {
+	return (
+		<section className="w-full flex flex-col items-start">
+			<h1 className="font-bold text-6xl pb-4 text-[#343a40]">
+				Tell Others About Yourself
+			</h1>
+			<p className="text-xl font-light pb-8 text-[#343a40]">
+				Complete your profile to let others know who you are.
+			</p>
+		</section>
+	);
+}
+
+function FormLabelsAndInputs() {
+	const router = useRouter();
+	const [imageFile, setImageFile] = useState(getRandomProfilePicture());
+	const [currentTags, setTags] = useState(
+		[]
+	); /* Send this as a reference to OccupationTags */
+	/* OccupationTags will be able to modify currentTags as needed, but CreateProfileForm has access to it */
+	/* Given that currentTags is an object, any change to it in OccupationTags will be reflected in memory */
+	const [fullName, setFullName] = useState("");
+	const [country, setCountry] = useState("");
+	const [address, setAddress] = useState("");
+	const [bio, setBio] = useState("");
+
+	const [fullNameLabelHTML, setFullNameLabelHTML] = useState({
+		__html: 'Full Name: <span class = "text-red-500"> * </span>',
+	});
+	const [countryLabelHTML, setCountryLabelHTML] = useState({
+		__html: 'Country Of Residence: <span class = "text-red-500"> * </span> ',
+	});
+	const [addressLabelHTML, setAddressLabelHTML] = useState({
+		__html: 'Address: <span class = "text-red-500"> * </span> ',
+	});
+
+	// Using dangerouslySetInnerHTML allows us to set the innerHTML of a label, which is useful for adding a red asterisk to required fields and for adding error messages
+	// dangerouslySetInnerHTML does not have a security risk here because we are not using user input to set the innerHTML, we are using a string that we have defined ourselves
+	// dangerouslySetInnerHTML does have a security risk if we were to use user input to set the innerHTML, because it would allow users to inject HTML into our page, but since we are using a label and it is not possible to save this HTML to the database or show it to other users, there is no security risk here.
+
+	function onFullNameChange(e) {
+		const value = e.target.value.trim();
+		setFullName(value);
+
+		if (value == "")
+			setFullNameLabelHTML({
+				__html: '<span class = "text-red-500"> You cannot leave this field empty! Please enter your full name:</span>',
+			});
+		else
+			setFullNameLabelHTML({
+				__html: 'Full Name: <span class = "text-red-500"> * </span> ',
+			});
+	}
+
+	function onCountryChange(e) {
+		const value = e.target.value.trim();
+		setCountry(value);
+		if (value == "")
+			setCountryLabelHTML({
+				__html: '<span class = "text-red-500"> You cannot leave this field empty! Please enter your country of residence:</span>',
+			});
+		else
+			setCountryLabelHTML({
+				__html: 'Country Of Residence: <span class = "text-red-500"> * </span> ',
+			});
+	}
+
+	function onAddressChange(e) {
+		const value = e.target.value.trim();
+		setAddress(value);
+		if (value == "")
+			setAddressLabelHTML({
+				__html: '<span class = "text-red-500"> You cannot leave this field empty! Please enter your address:</span>',
+			});
+		else
+			setAddressLabelHTML({
+				__html: 'Address: <span class = "text-red-500"> * </span>',
+			});
+	}
+
+	function onBioChange(e) {
+		const value = e.target.value.trim();
+		setBio(value);
+	}
+
+	function displayRequiredFields() {
+		if (fullName == "")
+			setFullNameLabelHTML({
+				__html: '<span class = "text-red-500"> You cannot leave this field empty! Please enter your full name:</span>',
+			});
+		if (country == "")
+			setCountryLabelHTML({

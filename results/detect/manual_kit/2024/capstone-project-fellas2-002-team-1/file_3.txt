@@ -1,0 +1,137 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Search, Upload, X, ImagePlus, Maximize2, Check, FileText, FileUp, Camera, Plus, Minus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { uploadManualReceipt } from "@/services/receiptService";
+
+// Define Transaction interface here
+interface Transaction {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+}
+
+// Updated interface for receipt items to include quantity
+interface ReceiptItem {
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+type ReceiptUploadDialogProps = {
+  transactions: Transaction[] | null;
+  onUpload: (file: File | null, transactionId: string, manualDetails?: string) => Promise<void>;
+  children?: React.ReactNode; // Add children prop
+};
+
+export default function ReceiptUploadDialog({ transactions, onUpload, children }: ReceiptUploadDialogProps) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showResults, setShowResults] = useState(false);
+  const [showZoomPreview, setShowZoomPreview] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<"image" | "manual">("image");
+  
+  // Updated state for itemized receipt entry with quantity
+  const [receiptItems, setReceiptItems] = useState<ReceiptItem[]>([]);
+  const [itemName, setItemName] = useState("");
+  const [itemPrice, setItemPrice] = useState("");
+  const [itemQuantity, setItemQuantity] = useState("1");
+  const itemNameRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+  
+  const handleUpload = async () => {
+    if (!selectedTransaction) return;
+    if (activeTab === "image" && !selectedFile) return;
+    if (activeTab === "manual" && receiptItems.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      if (activeTab === "image") {
+        await onUpload(selectedFile, selectedTransaction.id);
+      } else {
+        // Format receipt items for the API as JSON
+        const items = receiptItems.map(item => ({
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity
+        }));  
+        await uploadManualReceipt(
+          selectedTransaction.id,
+          selectedTransaction.amount,
+          items
+        );
+      }
+      
+      setUploadSuccess(true);
+      setShowSuccessOverlay(true);
+      
+      // Wait for success animation before closing
+      setTimeout(() => {
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setSelectedTransaction(null);
+        setSearchQuery('');
+        setReceiptItems([]);
+        setItemName("");
+        setItemPrice("");
+        setItemQuantity("1");
+        setUploadSuccess(false);
+        setShowSuccessOverlay(false);
+        setDialogOpen(false); // Auto-close the dialog
+      }, 3500);
+    } catch (error) {
+      console.error('Failed to upload receipt details:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const clearFileSelection = () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };

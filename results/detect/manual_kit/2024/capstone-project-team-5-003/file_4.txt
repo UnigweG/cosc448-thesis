@@ -1,0 +1,116 @@
+import React, { useEffect, useState } from 'react';
+import {
+  ComposedChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend,
+  ResponsiveContainer, ErrorBar, Scatter, Bar, BarChart
+} from 'recharts';
+import './surveyResultsAllData.css';
+
+import translations from '../../pages/Translation.js'; // Import translations
+import { useLanguage } from '../../pages/LanguageProvider.js';
+import { useParams } from 'react-router-dom';
+
+const SurveyResultsAllData = () => {
+  const { language } = useLanguage(); // Get current language
+
+  const [boxPlotData, setBoxPlotData] = useState([]);
+  const barWidth = 5; // Define the uniform width for all bars
+  const [topQuestion, setTopQuestion] = useState([]);
+  const [topQuestionLV, setTopQuestionLV] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const { surveyId } = useParams();
+  const [imagesData, setImagesData] = useState({});
+  const [results, setResults] = useState([]);
+  const [resultsHV, setResultsHV] = useState([]);
+  const [resultsLV, setResultsLV] = useState([]);
+
+  const [lowestVarianceQuestion, setLowestVarianceQuestion] = useState([]);
+  const [highestVarianceQuestion, setHighestVarianceQuestion] = useState([]);
+
+  // bar charts 
+  const [slowestQuestionsChartData, setSlowestQuestionsChartData] = useState([]);
+  const [fastestQuestionsChartData, setFastestQuestionsChartData] = useState([]);
+
+  // Fetch the data for graphs 
+  useEffect(() => {
+    const fetchHighestVarianceData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5040/top-questions/${surveyId}`);
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+        const data = await response.json();
+        setTopQuestion(data);  // Set the data to state
+        const firstQuestionId = data.length > 0 ? data[0].question_id : 0; // Default to 0 if no valid ID
+        setHighestVarianceQuestion(firstQuestionId); // Ensure it's always a number
+      } catch (error) {
+        setError(error.message); // Handle errors
+      } finally {
+        setLoading(false); // Stop loading after data is fetched
+      }
+    };
+    const fetchLowestVarianceData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5040/lowest-variance-questions`);
+        if (!response.ok) {
+          throw new Error('Network response was not good. ');
+        }
+        const data = await response.json();
+        setTopQuestionLV(data);
+        const firstQuestionId = data.length > 0 ? data[0].question_id : 0;
+        setLowestVarianceQuestion(firstQuestionId);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    const fetchFastestData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5040/fastestQuestion/${surveyId}`);
+        if (!response.ok) {
+          throw new Error('Network response was not good');
+        }
+        const data = await response.json();
+        const formattedData = data.map((item) => ({
+          question_id: `Q${item.question_id}`,
+          avg_response_time: item.avg_response_time / 1000, // Convert to milliseconds if needed
+        }));
+        setFastestQuestionsChartData(formattedData);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    const fetchSlowestData = async () => {
+      try {
+        const response = await fetch(`http://localhost:5040/slowestQuestion/${surveyId}`);
+        if (!response.ok) {
+          throw new Error('Network response was not good');
+        }
+        const data = await response.json();
+        const formattedData = data.map((item) => ({
+          question_id: `Q${item.question_id}`,
+          avg_response_time: item.avg_response_time / 1000, // Convert to milliseconds if needed
+        }));
+        setSlowestQuestionsChartData(formattedData);
+      } catch (error) {
+        setError(error.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSlowestData();
+    fetchFastestData();
+    fetchHighestVarianceData();
+    fetchLowestVarianceData();
+  }, [topQuestion, topQuestionLV]);
+
+
+  useEffect(() => {
+    if (topQuestion.length === 0) return;
+    const fetchQuestionIDHV = async () => {
+      try {
+        const response = await fetch(`http://localhost:5040/question/${surveyId}/${topQuestion[0].question_id}`);

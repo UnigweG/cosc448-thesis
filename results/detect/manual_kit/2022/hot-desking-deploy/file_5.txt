@@ -1,0 +1,168 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Bookings;
+use App\Models\Buildings;
+use App\Models\Campuses;
+use App\Models\Desks;
+use App\Models\Floors;
+use App\Models\Resources;
+use App\Models\Roles;
+use App\Models\Rooms;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Tests\TestCase;
+
+class RoutesTest extends TestCase
+{
+    use RefreshDatabase, WithFaker;
+    public function test_example()
+    {
+        $response = $this->get('/');
+
+        $response->assertStatus(200);
+    }
+
+    // test dashboard redirects user not logged in
+    public function test_dashboard_not_logged_in()
+    {
+        $response = $this->get('/home');
+
+        $response->assertStatus(302);
+    }
+
+    // Bookings Manager Controller
+    public function test_non_admin_can_not_access_Bookings_Manager()
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('bookingsManager'));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Bookings_Manager()
+    {
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('bookingsManager'));
+
+        $response->assertStatus(200);
+    }
+
+    // Bookings Manager Controller
+    public function test_non_admin_can_not_access_Bookings_Manager_View()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('viewBooking', $booking->id));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Bookings_Manager_View()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('viewBooking', $booking->id));
+
+        $response->assertStatus(200);
+    }
+
+    // Bookings Manager Controller
+    public function test_non_admin_can_not_access_Bookings_Manager_Edit()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('editBooking', $booking->id));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Bookings_Manager_Edit()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('editBooking', $booking->id));
+
+        $response->assertStatus(200);
+    }
+    // Bookings Manager Controller
+    public function test_non_admin_can_not_access_Bookings_Manager_Create()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('createBooking', $booking->id));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Bookings_Manager_Create()
+    {
+        $booking = Bookings::factory()->create();
+
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('createBooking', $booking->id));
+
+        $response->assertStatus(200);
+    }
+
+    // Workspace Manager Controller
+    public function test_non_admin_can_not_access_Workspace_Manager_Index()
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('campusManager'));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Workspace_Manager_Index()
+    {
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('campusManager'));
+
+        $response->assertStatus(200);
+    }
+
+    public function test_non_admin_can_not_access_Workspace_Manager_Add_Campus()
+    {
+        $user = User::factory()->create();
+
+        $response = $this->actingAs($user)->get(route('addCampus'));
+
+        $response->assertStatus(302);
+    }
+
+    public function test_admin_can_access_Workspace_Manager_Add_Campus()
+    {
+        $user = User::factory()->create();
+        $user->is_admin = TRUE;
+        $user->save();
+
+        $response = $this->actingAs($user)->get(route('addCampus'));

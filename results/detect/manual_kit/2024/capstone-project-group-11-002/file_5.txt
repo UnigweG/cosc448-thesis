@@ -1,0 +1,137 @@
+import React, { useState, useEffect } from 'react';
+import AdminNav from '../AdminNav/AdminNav';
+import superAdminService from '../../services/superAdminService';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { faUserTie, faUserPlus, faUser, faIdBadge, faEdit, faEnvelope, faPhone, faCheckCircle, faTimesCircle, faTrashAlt, faTimes, faSave, faExclamationTriangle, faUsers } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { useTranslation } from 'react-i18next';
+
+const SuperAdminBrokers = () => {
+  const { t } = useTranslation();
+  const [showModal, setShowModal] = useState(false);
+  const [brokers, setBrokers] = useState([]);
+  const [managers, setManagers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({
+    username: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phoneNumber: '',
+    managerId: '',
+  });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedBroker, setSelectedBroker] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingBroker, setEditingBroker] = useState(null);
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const handleDelete = async () => {
+    try {
+      await superAdminService.deleteUser(selectedBroker.id);
+      toast.success(t('superAdmin.brokers.messages.deleteSuccess'));
+      setShowDeleteModal(false);
+      setSelectedBroker(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('superAdmin.brokers.messages.deleteFailed'));
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      const [brokersData, managersData] = await Promise.all([superAdminService.getBrokers(), superAdminService.getManagers()]);
+      setBrokers(brokersData);
+      setManagers(managersData);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('superAdmin.brokers.messages.updateFailed'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleInputChange = e => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'managerId' ? parseInt(value, 10) : value,
+    }));
+  };
+
+  const handleEditSubmit = async e => {
+    e.preventDefault();
+    try {
+      const updateData = {
+        username: formData.username,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phoneNumber: formData.phoneNumber,
+        managerId: parseInt(formData.managerId, 10),
+      };
+
+      await superAdminService.updateUser(editingBroker.id, updateData);
+      toast.success(t('superAdmin.brokers.messages.updateSuccess'));
+      setShowEditModal(false);
+      setEditingBroker(null);
+      setFormData({
+        username: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        managerId: '',
+      });
+      fetchData();
+    } catch (error) {
+      console.error('Update error:', error);
+      toast.error(error.response?.data?.detail || t('superAdmin.brokers.messages.updateFailed'));
+    }
+  };
+
+  const handleSubmit = async e => {
+    e.preventDefault();
+    try {
+      await superAdminService.createBroker(formData);
+      toast.success(t('superAdmin.brokers.messages.createSuccess'));
+      setShowModal(false);
+      setFormData({
+        username: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        phoneNumber: '',
+        managerId: '',
+      });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('superAdmin.brokers.messages.createFailed'));
+    }
+  };
+
+  const handleToggleActive = async brokerId => {
+    try {
+      await superAdminService.toggleUserStatus(brokerId);
+      fetchData();
+      toast.success(t('superAdmin.brokers.messages.statusSuccess'));
+    } catch (error) {
+      toast.error(error.response?.data?.detail || t('superAdmin.brokers.messages.statusFailed'));
+    }
+  };
+
+  const getManagerName = managerId => {
+    const manager = managers.find(m => m.id === managerId);
+    return manager ? `${manager.firstName} ${manager.lastName}` : 'Unknown';
+  };
+
+  if (loading) {
+    return <div className='text-center mt-5'>{t('superAdmin.dashboard.loading')}</div>;
+  }
+
+  return (
+    <div className='min-vh-100 bg-light py-4'>
+      <ToastContainer />

@@ -1,0 +1,137 @@
+class Prompts:
+    PRESENTATION = """
+    You will be given a json object that represents a slide in a slideshow.
+    Do not change the structure of the json object.
+    You must fill in the blanks in the json object with the appropriate content.
+    Only update the fields that have '<>' around them.
+    You will generate slide titles, content, and image search queries.
+    Only output the json object with the filled in content.
+    Do not output anything other than the json object.
+    Take note of the current slide number when generating the content.
+    For example, slide number 3 should cover content that comes after slide number 2.
+    Make the content coherent and relevant to the input text.
+    The slides should progress through the material in a logical way.
+    You must ALWAYS follow these rules:
+    - The title should be a maximum of 8 words.
+    - The sub-title should be a maximum of 8 words.
+    - The slide content should be less than 5 sentences.
+    - The image search query should be less than 5 words.
+    - Do not use markdown syntax in output.
+    - Do not include slide number in output.
+
+    Example input 1:
+    {{
+        "SLIDE_NUM": "1",
+        "SLIDE_LAYOUT": "title and subtitle",
+        "SLIDE_TYPE": "TITLE",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "<PRESENTATION TITLE HERE>"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "<PRESENTATION SUBTITLE HERE>"
+            }}
+        ]
+    }},
+
+    Example ouptut 1:
+    {{
+        "SLIDE_NUM": "1",
+        "SLIDE_LAYOUT": "title and subtitle",
+        "SLIDE_TYPE": "TITLE",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "Reasons to eat more fruits and vegetables"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "Fruits and vegetables are an important part of a healthy diet."
+            }}
+        ]
+    }},
+
+
+    Example input 2:
+    {{
+        "SLIDE_NUM": "2",
+        "SLIDE_LAYOUT": "single text box",
+        "SLIDE_TYPE": "CONTENT",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "<SLIDE TITLE HERE>"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "<SLIDE TEXT HERE>"
+            }}
+        ]
+    }},
+
+    Example output 2:
+    {{
+        "SLIDE_NUM": "2",
+        "SLIDE_LAYOUT": "single text box",
+        "SLIDE_TYPE": "CONTENT",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "Bananas"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "Bananas are rich in potassium, aiding heart health and blood pressure control. They contain vitamins C and B6, supporting immune function and skin health. The fiber in bananas promotes digestive health. Bananas can provide energy due to their natural sugars. Eating bananas might improve mood, thanks to tryptophan converting to serotonin."
+            }}
+        ]
+    }},
+
+
+    Example input 3:
+    {{
+        "SLIDE_NUM": "3",
+        "SLIDE_LAYOUT": "two text boxes",
+        "SLIDE_TYPE": "CONTENT",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "<SLIDE TITLE HERE>"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "<SLIDE TEXT HERE>"
+            }},
+            {{
+                "FIELD_INDEX": "2",
+                "FIELD_TYPE": "TEXT",
+                "FIELD_VALUE": "<SLIDE TEXT HERE>"
+            }}
+        ]
+    }},
+
+    Example output 3:
+    {{
+        "SLIDE_NUM": "3",
+        "SLIDE_LAYOUT": "two text boxes",
+        "SLIDE_TYPE": "CONTENT",
+        "FIELDS":[
+            {{
+                "FIELD_INDEX": "0",
+                "FIELD_TYPE": "TITLE",
+                "FIELD_VALUE": "Mangoes"
+            }},
+            {{
+                "FIELD_INDEX": "1",
+                "FIELD_TYPE": "TEXT",

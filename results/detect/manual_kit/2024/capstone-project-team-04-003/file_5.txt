@@ -1,0 +1,127 @@
+import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
+import { PageTitleService } from '@infrastructure/services';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  AbstractControl,
+  ValidationErrors,
+} from '@angular/forms';
+import { eventName, eventDescription } from './attendee-signup-mock-data';
+import { take } from 'rxjs/operators';
+import { AttendeeRegisterService } from '@infrastructure/services/attendee-register.service';
+import { AttendeeRegisterCommand } from '@application/attendee-register';
+import { NotificationService } from '@infrastructure/services/notification.service';
+import { ActivatedRoute } from '@angular/router';
+import { EventService } from '@infrastructure/services/event.service';
+import { CharityEvent } from '@application/event/event.result';
+import { CharacterSelectionWidgetComponent } from '@presentation/shared/boss-battle-progress-bar/character-selection-widget/character-selection-widget.component';
+import { create } from 'canvas-confetti';
+import { ProfileService } from '@infrastructure/services/profile.service';
+import { Attendee } from '@application/attendee/attendee.result';
+import { forkJoin } from 'rxjs';
+import {
+  BossGameComponent,
+  Attack,
+} from '@presentation/shared/boss-battle-progress-bar/boss-game/boss-game.component';
+import naughtyWords from 'naughty-words';
+
+interface VendorCustomColors {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+}
+
+// Default color for vendor page
+const vendorDefaultPrimaryColor: string = '#f2f2f4';
+const vendorDefaultSecondaryColor: string = '#000000';
+const vendorDefaultTertiaryColor: string = '#1567bf';
+
+// Add this function before the component class
+function containsNaughtyWords(
+  control: AbstractControl
+): ValidationErrors | null {
+  if (!control.value) return null;
+
+  const name: string = control.value.toLowerCase();
+  // Check both English and French naughty words
+  const hasNaughtyWord: boolean =
+    naughtyWords.en.some((word: string) => name.includes(word.toLowerCase())) ||
+    naughtyWords.fr.some((word: string) => name.includes(word.toLowerCase()));
+
+  return hasNaughtyWord ? { naughtyWord: true } : null;
+}
+
+@Component({
+  selector: 'app-attendee-signup',
+  templateUrl: './attendee-signup.component.html',
+  styleUrls: ['./attendee-signup.component.scss'],
+})
+export class AttendeeSignupComponent implements OnInit, AfterViewInit {
+  @ViewChild(CharacterSelectionWidgetComponent)
+  characterSelectionWidget!: CharacterSelectionWidgetComponent;
+  @ViewChild('bossGame') bossGameComponent!: BossGameComponent;
+
+  public signupForm!: FormGroup;
+  public submitted = false;
+  eventId: string = '';
+  public error: string = '';
+  public mask: string = '';
+  eventInfo: CharityEvent | null = null;
+  private characterId: number = 0;
+
+  logo: string | null = null;
+
+  vendorCustomColors: VendorCustomColors = {
+    primary: vendorDefaultPrimaryColor, // foreground color
+    secondary: vendorDefaultSecondaryColor, // background color
+    tertiary: vendorDefaultTertiaryColor, // theme color for the event
+  };
+
+  public showBossGameModal: boolean = false;
+  public healthPercentage: number = 100;
+  public pendingDamagePercentage: number = 100;
+  public attendees: Attendee[] = [];
+
+  get f() {
+    return this.signupForm.controls;
+  }
+
+  onCharacterSelect(characterId: number) {
+    this.characterId = characterId;
+  }
+
+  constructor(
+    private pageTitleService: PageTitleService,
+    private formBuilder: FormBuilder,
+    private attendeeRegisterService: AttendeeRegisterService,
+    private notificationService: NotificationService,
+    private route: ActivatedRoute,
+    private eventService: EventService,
+    private profileService: ProfileService
+  ) {
+    this.pageTitleService.setPageTitle('Attendee Signup');
+  }
+
+  phoneMaskOnfous() {
+    this.mask = '000-000-0000';
+  }
+
+  ngAfterViewInit() {
+    // set placeholder for phone number
+    const phoneNumberKendoInput = document.getElementById('phoneNumber');
+    if (phoneNumberKendoInput)
+      phoneNumberKendoInput
+        .getElementsByClassName('k-input-inner')[0]
+        .setAttribute('placeholder', 'Enter your phone number');
+  }
+
+  ngOnInit(): void {
+    // Get event id from route information
+    this.route.paramMap.subscribe((params) => {
+      const id: string | null = params.get('eventId');
+      this.eventId = id ? id : 'could not fetch';
+    });
+
+    // Const nameRegex = '^[a-zA-Z]+$';
+    this.signupForm = this.formBuilder.group({

@@ -1,0 +1,156 @@
+import { Component, OnInit } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import Chart from 'chart.js/auto';
+import { AccountService } from '@infrastructure/services/account.service';
+
+interface SubVendor {
+  id: string;
+  name: string;
+  email: string;
+  dateCreated: string; 
+  companyLogoUrl: string; 
+  eventsHosted: number;
+  totalSignups: number;
+  performance: string;
+  hasFullPermissions: boolean;
+}
+
+interface Attendee {
+  name: string;
+  email: string;
+  company?: string;
+  eventId: string;
+}
+
+interface EventReport {
+  title: string;
+  totalAttendees: number;
+  totalDonations: number;
+  eventPerformance?: { title: string; signUpCount: number }[]; 
+  vendorPerformance?: { vendor: string; totalSignUps: number }[];
+  signupsOverTime?: { date: string; signUpCount: number }[]; 
+}
+
+interface UserProfile {
+  companyLogoUrl: string;
+  parentVendorName: string;
+}
+
+@Component({
+  selector: 'app-parent-dashboard',
+  templateUrl: './parent-dashboard.component.html',
+  styleUrls: ['./parent-dashboard.component.css']
+})
+export class ParentVendorDashboardComponent implements OnInit {
+  loggedInUserEmail: string = '';
+  parentVendorName: string = ''; 
+  showCreateSubVendor: boolean = false;
+  companyLogoUrl: string = ''; 
+  companyLogoPreview: string | ArrayBuffer | null = null;
+  newSubVendor = {
+    name: '',
+    email: '',
+    dateCreated: '', 
+    password: '',
+    parentVendorId: '', 
+    hasFullPermissions: false
+  };
+
+  subVendors: SubVendor[] = [];
+  attendeeList: Attendee[] = [];
+  eventReports: EventReport = {
+    title: '',
+    totalAttendees: 0,
+    totalDonations: 0,
+    eventPerformance: [],
+    vendorPerformance: [],
+    signupsOverTime: []
+  };
+
+  totalEvents: number = 0;
+  totalVendors: number = 0;
+  totalSignups: number = 0; 
+
+  accountCreationDate: string = '';
+
+  constructor(private http: HttpClient, private accountService: AccountService) {}
+
+  ngOnInit(): void {
+ 
+    this.accountService.userSignedIn.subscribe((email) => {
+      if(email) {
+        this.loggedInUserEmail = email;
+        this.fetchParentVendor();
+        this.newSubVendor.parentVendorId = email; 
+        this.loadSubVendors();
+      }
+    });
+
+    this.loggedInUserEmail = this.accountService.email || ''; 
+
+    if (this.loggedInUserEmail) {
+      this.fetchParentVendor();
+      this.newSubVendor.parentVendorId = this.loggedInUserEmail;
+      this.loadSubVendors();
+    }
+
+    this.loadAttendees();
+    this.loadEventReports();
+  }
+
+
+  fetchParentVendor(): void {
+    if (!this.loggedInUserEmail) return;
+  
+    this.http.get<SubVendor[]>(`http://localhost:8080/api/vendor/vendors/${this.loggedInUserEmail}`)
+      .subscribe(
+        (vendors) => {
+          console.log("Fetched Vendors Data: ", vendors);
+          if (vendors.length > 0) {
+            const parentVendor = vendors.find(v => v.email === this.loggedInUserEmail);
+            if (parentVendor) {
+              this.parentVendorName = parentVendor.name;
+              this.companyLogoUrl = parentVendor.companyLogoUrl || '';
+              this.accountCreationDate = parentVendor.dateCreated;
+  
+              console.log("✅ Logo URL BEFORE rendering: ", this.companyLogoUrl);
+  
+              
+              if (this.companyLogoUrl && !this.companyLogoUrl.startsWith('data:image')) {
+                this.convertImageToBase64(this.companyLogoUrl);
+              } else {
+                this.companyLogoPreview = this.companyLogoUrl; // Already Base64
+              }
+            }
+          }
+        },
+        (error) => console.error('❌ Error loading vendor data:', error)
+      );
+  }
+
+  convertImageToBase64(imageUrl: string): void {
+    fetch(imageUrl, { mode: "no-cors" })
+  .then(response => response.blob())
+  .then(blob => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      this.companyLogoPreview = reader.result as string;
+      console.log("✅ Successfully Converted Image: ", this.companyLogoPreview);
+    };
+    reader.readAsDataURL(blob);
+  })
+  .catch(error => {
+    console.error("❌ Fetch Error:", error);
+    this.companyLogoPreview = "assets/default-logo.png"; // Fallback
+  });
+  }
+
+
+  loadSubVendors(): void {
+    if (!this.loggedInUserEmail) return;
+  
+    this.http.get<SubVendor[]>(`http://localhost:8080/api/vendor/subvendors/${this.loggedInUserEmail}`)
+      .subscribe(
+        (data) => {
+          this.subVendors = data;
+          this.totalVendors = data.length;

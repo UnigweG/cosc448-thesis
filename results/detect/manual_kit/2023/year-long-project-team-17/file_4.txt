@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+
+{% if user.is_authenticated %}
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" href="{% static 'favicon.png' %}">
+
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Text Animation Example</title>
+    <style>
+
+    body{
+        font-family: 'Montserrat', sans-serif;
+        background-color: #1e1e2f;
+        color: white;
+    }
+    .container {
+        margin-top: 15px;
+    }
+    h1 {
+        color: #fff;
+        text-align: center;
+        margin-bottom: 50px;
+        font-weight: 700;
+    }
+    form {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+    }
+    .info-box {
+    background-color: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
+    border: 1px solid rgba(255, 255, 255, 0.2); /* Slight white border for depth */
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 8px; /* Rounded corners */
+    color: white; /* Text color */
+}
+.form-control.md-textarea{
+  background-color: #F0F5FA;
+}
+.readable-header {
+    color: #ffffff; /*You can use white or any light shade that is readable on a dark background*/
+    font-weight: bold; /*Makes the font bolder, clearer and more readable*/
+}
+
+/* Alternatively, if you want to use a specific color for contrast */
+.light-blue-header {
+    color: #add8e6; /* Light blue color for contrast */
+    font-weight: bold;
+}
+
+.yellow-header {
+    color: #ffd700; /* Yellow color for contrast */
+    font-weight: bold;
+}
+
+.founders-container {
+    display: flex; /* Use flexbox for alignment */
+}
+
+.founders-container img {
+    margin-right: 10px; /* Add spacing between images */
+}
+
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .animated-text {
+            animation: fadeIn 2s ease-in-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+            }
+            to {
+                transform: translateX(0);
+            }
+        }
+
+        .quote1 {
+            animation: slideIn 1.4s ease-out;
+        }
+        .quote2 {
+            animation: slideIn 1.8s ease-out;
+        }
+        .quote3 {
+            animation: slideIn 2.1s ease-out;
+        }
+
+        .custom-button {
+        color: #fff;
+        background: linear-gradient(to right, #3498db 0%, #800080 100%);
+        background-size: 200% 100%;
+        transition: background-position 0.3s ease;
+    }
+
+    .custom-button:hover,
+    .custom-button:focus {
+        background-position: -100% 0;
+    }
+    .tech-guy{
+        float:right;
+        right:0;
+        top:250px;
+    }
+    @keyframes sdb03 {
+    0% {
+      opacity: 0;
+    }
+    30% {
+      opacity: 1;
+    }
+    60% {
+      box-shadow: 0 0 0 60px rgba(255,255,255,.1);
+      opacity: 0;
+    }
+    100% {
+      opacity: 0;
+    }
+  }
+
+
+#sectiondiv {
+  padding-top: 60px;
+}
+#sectiondiv span {
+  position: absolute;
+  top: 20%;
+  left: -90%;
+  width: 80px;
+  height: 80px;
+  margin-left: -23px;
+  border: 1px solid #ffffff;
+  border-radius: 100%;
+  box-sizing: border-box;
+}
+
+ #sectiondiv span::after {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  content: '';
+  width: 16px;
+  height: 16px;
+  margin: -12px 0 0 -8px;
+  border-left: 1px solid #ffffff;
+  border-bottom: 1px solid #ffffff;
+  -webkit-transform: rotate(-45deg);
+  transform: rotate(-45deg);
+  box-sizing: border-box;
+}
+.demo{
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  display: inline-block;
+  -webkit-transform: translate(0, -50%);
+  transform: translate(0, -50%);
+  color: #fff;
+  font : normal 400 20px/1 'Josefin Sans', sans-serif;
+  letter-spacing: .1em;
+  text-decoration: none;
+  transition: opacity .3s;
+}
+.smoothscroll {
+  scroll-behavior: smooth;
+ }
+ 
+.demo:hover {
+  opacity: .5;
+}
+.one-line p {
+    display: inline;
+    padding: 39px;
+}
+
+
+/* Slideshow container */
+.slideshow-container {
+  position: absolute;
+  mask-image: linear-gradient(to top, rgba(255, 255, 255, 0), rgba(0, 0, 0, 1));
+}
+.mySlides{
+  mask-image: linear-gradient(to bottom, rgba(255, 255, 255, 0), rgba(0, 0, 0, 1));
+}
+
+.text {
+  color: #f2f2f2;
+  font-size: 15px;
+  padding: 8px 12px;
+  position: absolute;
+  bottom: 8px;
+  width: 100%;
