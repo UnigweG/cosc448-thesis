@@ -6,3 +6,4 @@ __pycache__/
 results/repo_inventory_all.csv
 .DS_Store
 .pytest_cache/
+results/detect/chunks/
