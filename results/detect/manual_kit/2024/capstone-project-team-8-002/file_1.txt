@@ -1,0 +1,131 @@
+'use strict';
+
+const { Event } = require('../event');
+const fs = require('fs');
+const path = require('path');
+
+class EditSurveyEvent extends Event {
+    register(socket) {
+        socket.on('addImageSet', (data) => {
+            this.addImageSet(socket, data);
+        });
+        socket.on('updateSurveyName', (data) => {
+            this.updateName(socket, data);
+        });
+        socket.on('updateNumQuestions', (data) => {
+            this.updateNumQuestions(socket, data);
+        });
+        socket.on('getSurveyNumQuestions', (data) => {
+            this.getNumQuestions(socket, data);
+        });
+        socket.on('getImageset', (data) => {
+            this.getImageset(socket, data);
+        });
+        socket.on('deleteImageSet', (data) => {
+            this.deleteImageSet(socket, data);
+        });
+    }
+
+    /**
+    * Get the imageset for display
+    * @param {Socket.IO.Socket} A socket instance.
+    * @param {Object} Submitted data.
+    */
+    getImageset(socket, data) {
+        if (!socket.data.admin) {
+            socket.emit('unauthorized', { endpoint: 'getImageset' });
+            return;
+        }
+        const { id } = data;
+        const config = this.events.config;
+        const filePath = path.join(config.get('datasetPath'), 'config', id + ".json");
+
+        fs.readFile(filePath, 'utf-8', (err, fileData) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                socket.emit('error', { message: 'Error reading file' });
+                return;
+            }
+
+            try {
+                const jsonData = JSON.parse(fileData);
+                socket.emit("imagesetReturn", { bank: jsonData.bank });
+            } catch (parseError) {
+                console.error(parseError);
+                socket.emit('error', { message: 'Parse Error: ' + parseError });
+            }
+        });
+    }
+
+    /**
+    * Adds an question to the question bank
+    * @param {Socket.IO.Socket} A socket instance.
+    * @param {Object} Submitted data.
+    */
+    addImageSet(socket, data) {
+        if (!socket.data.admin) {
+            socket.emit('unauthorized', { endpoint: 'addImageSet'} );
+            return;
+        }
+
+        const { fileName, selected } = data;
+        const imageArray = selected.map((num) => `${num}.jpg`);
+        const config = this.events.config;
+
+        const filePath = path.join(config.get('datasetPath'), 'config', fileName);
+        // read current survey config
+        fs.readFile(filePath, 'utf8', (err, fileData) => {
+            if (err) {
+                console.error('Error reading file:', err);
+                socket.emit('error', { message: 'Error reading file:'});
+                return;
+            }
+
+            try {
+                const jsonData = JSON.parse(fileData);
+
+                // add images to question bank
+                if (!jsonData.bank) {
+                    jsonData.bank = [];
+                }
+                jsonData.bank.push(imageArray);
+
+                // save adjusted survey config
+                fs.writeFile(filePath, JSON.stringify(jsonData, null, 2), 'utf8', (err) => {
+                    if (err) {
+                        console.error('Error writing file:', err);
+                        socket.emit('error', { message: 'Error writing file:'});
+                    } else {
+                        socket.emit("imageSetAdded");
+                    }
+                });
+            } catch(parseError) {
+                console.error(parseError);
+                socket.emit('error', { message: ('Parse Error: ' + parseError)});
+            }
+        });
+    }
+
+    /**
+     * Updates the id of a survey
+     * @param {Socket.IO.Socket} A socket instance.
+     * @param {Object} Submitted data.
+     */
+    updateName(socket, data) {
+        if (!socket.data.admin) {
+            socket.emit('unauthorized', { endpoint: 'updateSurveyName'} );
+            return;
+        }
+
+        const { fileName, id } = data;
+        const config = this.events.config;
+
+        // Get original survey config
+        const filePath = path.join(config.get('datasetPath'), 'config', fileName);
+        const newFilePath = path.join(config.get('datasetPath'), 'config', `${id}.json`);
+
+        try {
+            // change the id of the survey
+            const fileData = fs.readFileSync(filePath, 'utf8');
+            const jsonData = JSON.parse(fileData);
+            jsonData.id = id;

@@ -1,0 +1,120 @@
+"use client"
+import React from 'react';
+import { useState } from 'react'
+import { ColumnDef } from "@tanstack/react-table"
+import { ArrowUpDown, MoreHorizontal } from "lucide-react"
+import { Checkbox } from "@/components/ui/checkbox"
+import { EditUserModal } from '@/components/editUserModal'
+import { Button } from "@/components/ui/button"
+import { useTranslation } from "react-i18next";
+import { API_URLS } from "@/lib/constants"
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useToast } from "@/hooks/use-toast"
+import axios from 'axios'
+import {Team} from '@/types/dbTypes'
+import {User} from '@/types/dbTypes'
+import { EditTeamModal } from "@/components/editTeamModal"
+
+
+export const sampleUserColumn: ColumnDef<User>[] = [
+    {
+        accessorKey: "id",
+        header: 'ID'
+    },
+    {
+        accessorKey: "name",
+        header: ({ column }) => {
+            const { t } = useTranslation(); // Initialize translation hook
+            return (
+                <Button
+                    variant="ghost"
+                    onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+                >
+                    {t('name' as any)}
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                </Button>
+            );
+        },
+    },
+    {
+        id: "actions",
+        header: 'Actions',
+        cell: ({ row }) => {
+            const { t } = useTranslation(); // Initialize translation hook
+            const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+            const oldUser = row.original
+            const { toast } = useToast()
+
+            const handleEditUser = () => {
+                setIsEditModalOpen(true)
+            }
+
+            const handleCloseModal = () => {
+                setIsEditModalOpen(false)
+            }
+
+            async function handleDelete(userId: number) {
+                const confirmDelete = () => {
+                    return new Promise((resolve) => {
+                        const { dismiss } = toast({
+                            title: t('confirmDeletion' as any),
+                            description: t('deleteConfirmationDescription' as any),
+                            action: (
+                                <div className="flex space-x-2">
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => {
+                                            resolve(true)
+                                            dismiss()
+                                        }}
+                                    >
+                                        {t('confirm' as any)}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            resolve(false)
+                                            dismiss()
+                                        }}
+                                    >
+                                        {t('cancel' as any)}
+                                    </Button>
+                                </div>
+                            ),
+                        })
+                    })
+                }
+
+                const confirmed = await confirmDelete()
+
+                if (!confirmed) {
+                    return // Exit the function if the user cancels
+                }
+
+                try {
+                    const formData = new FormData()
+                    formData.append('userId', userId.toString())
+
+                    const response = await axios.post('http://localhost:8000/remove-user/', formData, {
+                        headers: {
+                            'Content-Type': 'multipart/form-data',
+                        },
+                    })
+
+                    if (response.data.status === 'success') {
+                        toast({
+                            title: t('success' as any),
+                            description: response.data.message,
+                        })
+                        window.location.reload();
+                    } else {
+                        toast({

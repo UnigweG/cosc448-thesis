@@ -1,0 +1,132 @@
+/// <reference types="tree-sitter-cli/dsl" />
+
+// Using the informal draft spec to support the newest features of dart
+// https://spec.dart.dev/DartLangSpecDraft.pdf
+
+const DIGITS = token(sep1(/[0-9]+/, /_+/))
+const HEX_DIGITS = token(sep1(/[A-Fa-f0-9]+/, '_'))
+
+//Everything above RelationalTypeCast was incremented from its original value
+//This was to get type casting issues finally fixed.
+
+const DART_PREC = {
+    IMPORT_EXPORT: 19,
+    TYPE_IDENTIFIER: 18, //was: 17
+    DOT_IDENTIFIER: 19, //was: 18
+    UNARY_POSTFIX: 17,
+    UNARY_PREFIX: 16,
+    Multiplicative: 15, // *, /, ˜/, % Left
+    Additive: 14, // +, - Left
+    Shift: 13, // <<, >>, >>> Left
+    TYPE_ARGUMENTS: 13,
+    Bitwise_AND: 12, // & Left
+    Bitwise_XOR: 11, // ˆ Left
+    Bitwise_Or: 10, // | Left
+    RelationalTypeCast: 9, // <, >, <=, >=, as, is, is! None 8
+    RelationalTypeTest: 9,
+    Relational: 8, // <, >, <=, >=, as, is, is! None 8
+    Equality: 7, // ==, != None 7
+    Logical_AND: 6, // AND && Left
+    Logical_OR: 5, // Or || Left
+    If: 4, //-null ?? Left
+    Conditional: 3, // e1?e2:e3 Right 3
+    Cascade: 2, // .. Left
+    Assignment: 1, // =, *=, /=, +=, -=, &=, ˆ=, etc. Right
+    BUILTIN: 0,
+    TRY: 0,
+    // Added by Ben for experimentation.
+    SELECTOR_IN_PRIMARY: 1,
+    SELECTOR_IN_ASSIGNMENT: 0,
+    TYPE_ARGS: 1
+};
+
+// TODO: general things to add
+// both string types
+//get protocols in classes?
+// todo: type test operators: as, is, and is!
+//todo: assignment operators: ??=, and ~/=
+//todo: ?? operator
+// todo: cascade notation: dot dot accesses each object
+//todo: conditional member access: blah?.foo
+//todo: rethrow keyword
+//todo: override operator notations
+//todo: correct import statements to be strings
+//todo: sync* and async* functions, plus yields
+
+//DONE: override shorter constructor notations?
+
+
+module.exports = grammar({
+    name: 'dart',
+
+    externals: $ => [
+        $._template_chars_double,
+        $._template_chars_single,
+        $._template_chars_double_single,
+        $._template_chars_single_single,
+        $._template_chars_raw_slash,
+        $._block_comment,
+        $._documentation_block_comment,
+    ],
+
+    extras: $ => [
+        $.comment,
+        $.documentation_comment,
+        /\s/
+    ],
+
+    supertypes: $ => [
+        // $._expression,
+        $._declaration,
+        $._statement,
+        $._literal,
+        // $._element
+        // $._primary_pattern
+        // $._primary,
+        // $._type,
+    ],
+
+    inline: $ => [
+        $._ambiguous_name,
+        $._class_member_definition,
+        $._if_null_expression,
+    ],
+
+    conflicts: $ => [
+        [$._record_literal_no_const, $.record_field],
+        [$.block, $.set_or_map_literal],
+        [$._type_name, $._primary, $.function_signature],
+        [$._primary, $.function_signature],
+        [$._primary, $._type_name],
+        [$._primary, $._simple_formal_parameter],
+        [$._primary, $._type_name, $._function_formal_parameter],
+        [$._primary, $.constructor_param],
+        [$._normal_formal_parameters],
+        [$._declared_identifier],
+        [$.equality_expression],
+        [$.record_type_field, $._function_formal_parameter, $._var_or_type],
+        [$.typed_identifier, $._var_or_type, $._function_formal_parameter],
+        [$._type_name, $._simple_formal_parameter],
+        [$._type_not_function, $._type_not_void],
+        [$.switch_statement_case],
+        // [$._argument_list],
+        [$.declaration, $._external_and_static],
+        [$.constructor_signature, $._formal_parameter_part],
+        // [$._type_not_function, $._type_not_void],
+        [$._cascade_subsection],
+        [$._expression],
+        // [$._real_expression, $._below_relational_expression],
+        [$._postfix_expression],
+        [$.pattern_variable_declaration, $._var_or_type],
+        [$._final_const_var_or_type, $.pattern_variable_declaration],
+        [$.type_arguments, $.relational_operator],
+        [$.prefix_operator, $.constant_pattern],
+        [$._primary, $.constant_pattern, $._type_name],
+        [$._literal, $.constant_pattern],
+        [$._primary, $.constant_pattern],
+        [$._final_var_or_type],
+        [$._primary, $.constant_pattern, $._type_name, $._simple_formal_parameter],
+        [$._parenthesized_pattern, $._pattern_field],
+        [$.record_type_field, $._var_or_type, $._final_var_or_type, $._function_formal_parameter],
+        [$._var_or_type, $._final_var_or_type],
+        [$._final_const_var_or_type, $._final_var_or_type],

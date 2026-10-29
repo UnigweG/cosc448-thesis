@@ -1,0 +1,161 @@
+// components/Profile.tsx
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import PlaidLinkComponent from '@/components/PlaidLink';
+import {
+  User,
+  Mail,
+  Lock,
+  Key,
+  Cake,
+  Building2,
+  Shield,
+  AlertCircle,
+  CheckCircle2,
+  Wallet,
+  FileDown,
+  CircleDollarSign,
+  KeySquare
+} from 'lucide-react';
+import bcrypt from 'bcryptjs';
+import { useAuth } from './lib/AuthContext';
+import toast from 'react-hot-toast';
+
+interface User {
+  id: number;
+  fullname: string;
+  password: string;
+  email: string;
+  age: number;
+  currency: string;
+}
+
+interface FormData {
+  fullname: string;
+  email: string;
+  oldPassword: string;
+  newPassword: string;
+  age: string;
+  currency: string;
+}
+
+interface BankConnection {
+  name: string;
+  type: string;
+  lastSync: string;
+  status: "Connected";
+}
+
+interface NotificationSettings {
+  [key: string]: boolean;
+}
+
+export default function Profile() {
+  // State Management
+  const [isEditing, setIsEditing] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [oldCurrency, setOldCurrency] = useState('');
+  const [exchangerate, setExchangeRate] = useState(0);
+  const [oldPassword, setPassword] = useState('');
+  const [userChanged, setUserChange] = useState(false);
+  const [tfa, set2fa] = useState(false);
+  const { user } = useAuth();
+  const [users, setUsers] = useState<User | null>(null);
+  const [connectedBanks, setConnectedBanks] = useState<BankConnection[]>([]);
+  const [notifications, setNotifications] = useState<NotificationSettings>({
+    emailNotifications: true,
+    appNotifications: true,
+    weeklyReports: false,
+    importantAlerts: true
+  });
+  
+  const [formData, setFormData] = useState<FormData>({
+    fullname: '',
+    email: '',
+    oldPassword: '',
+    newPassword: '',
+    age: '',
+    currency: '',
+  });
+
+  // Fetch bank accounts
+  const fetchBankAccounts = useCallback(async () => {
+    if (!user) return;
+    
+    try {
+      const response = await fetch('/api/getAccounts', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ userId: user.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch accounts');
+      }
+
+      const fetchedAccounts = await response.json();
+      setConnectedBanks(fetchedAccounts.response);
+      
+      // Show toast if accounts were fetched successfully
+      if (fetchedAccounts.response && fetchedAccounts.response.length > 0) {
+        toast.success(`${fetchedAccounts.response.length} bank account(s) connected`);
+      }
+    } catch (error) {
+      console.error('Error fetching accounts:', error);
+      toast.error('Unable to load your connected bank accounts');
+    }
+  }, [user]);
+
+  // Callback for when a new bank account is connected
+  const handleAccountConnected = useCallback(() => {
+    toast.success('Bank account connected successfully!');
+    fetchBankAccounts();
+  }, [fetchBankAccounts]);
+  
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const response = await fetch('/api/getUserProfile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ id: user?.id, email: user?.email })
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user profile');
+        }
+
+        const fetchedUsers = await response.json();
+        setUsers(fetchedUsers.response);
+        setPassword(fetchedUsers.response.password);
+        set2fa(fetchedUsers.response.twofactorenabled);
+        console.log(tfa);
+        setFormData({
+          fullname: fetchedUsers.response.fullname || '',
+          email: fetchedUsers.response.email || '',
+          oldPassword: '',
+          newPassword: '',
+          age: fetchedUsers.response.age?.toString() || '',
+          currency: fetchedUsers.response.currency?.toString() || '',
+        });
+      } catch (error) {

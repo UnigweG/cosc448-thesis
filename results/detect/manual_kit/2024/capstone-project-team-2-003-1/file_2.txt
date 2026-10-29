@@ -1,0 +1,132 @@
+'use client';
+import React, { useState, useRef, useEffect } from 'react';
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Send,
+  Bot,
+  User,
+  Loader2,
+  Sparkles,
+  Clock,
+  RefreshCw,
+  Trash2,
+  BrainCircuit,
+  Settings,
+  CommandIcon,
+  PlusCircle,
+  MessageSquare,
+  ChevronRight,
+  PanelRightOpen,
+  PanelRightClose,
+  HelpCircle,
+  Moon,
+  Sun,
+  Mic
+} from 'lucide-react';
+import { useAuth } from '@/components/lib/AuthContext';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { ThemeProvider, useTheme } from '@/components/lib/ThemeContext';
+import ThemeToggle from '@/components/lib/ThemeToggle';
+import { ChartConfiguration, ChartTypeRegistry } from 'chart.js';
+import TransactionVisualization from '@/components/TransactionVisualization';
+
+// Add type definitions for Web Speech API
+interface SpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+  resultIndex: number;
+  interpretation: any;
+}
+
+interface SpeechRecognitionResultList {
+  length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+  length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+  isFinal?: boolean;
+}
+
+interface SpeechRecognitionAlternative {
+  transcript: string;
+  confidence: number;
+}
+
+interface SpeechRecognition extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onaudioend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onaudiostart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onerror: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onnomatch: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => any) | null;
+  onsoundend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onsoundstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionConstructor {
+  new(): SpeechRecognition;
+  prototype: SpeechRecognition;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition: SpeechRecognitionConstructor;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
+  }
+}
+
+interface Chat {
+  Id: string;
+  userId: number;
+  title: string;
+  date: Date;
+}
+
+interface Message {
+  senderRole: 'user' | 'assistant';
+  content: string;
+  timestamp: Date;
+  format?: string; // For markdown or text
+  visualizations?: Record<string, ChartConfiguration<keyof ChartTypeRegistry>>; // For display
+  originalQuery?: string; // Store original query for visualization regeneration
+  needsVisualizationRegeneration?: boolean; // Flag to indicate if visualization should be regenerated
+}
+
+
+// Properly typed interfaces for component props
+interface QuickSuggestionsProps {
+  onClick: (suggestion: string) => void;
+}
+
+// Decorative background component
+const BackgroundDecoration = () => (
+  <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+    <div className="absolute top-0 right-0 w-96 h-96 bg-blue-300 dark:bg-blue-900 rounded-full filter blur-3xl opacity-10 -translate-y-1/2 translate-x-1/3"></div>
+    <div className="absolute bottom-0 left-0 w-96 h-96 bg-indigo-300 dark:bg-indigo-900 rounded-full filter blur-3xl opacity-10 translate-y-1/3 -translate-x-1/4"></div>
+    <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-purple-300 dark:bg-purple-900 rounded-full filter blur-3xl opacity-10"></div>
+  </div>
+);
+
+const TypingIndicator = () => {
+  return (
+    <div className="flex gap-3 max-w-[85%] flex-row animate-fade-in-up" data-testid="typing-indicator">
+      <div className="flex-shrink-0 h-8 w-8 rounded-xl flex items-center justify-center bg-white dark:bg-gray-800 shadow-sm">
+        <Bot className="h-4 w-4 text-gray-700 dark:text-gray-300" />
+      </div>
+      <div className="flex flex-col gap-1">

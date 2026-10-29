@@ -9,30 +9,15 @@ pytest==9.1.1
 radon==6.0.1
 requests==2.34.2
 
-# pinned because they affect the metrics (astroid is Pylint's parser) or to keep
-# the install reproducible
-astroid==4.0.4
-certifi==2026.7.22
-charset-normalizer==3.5.1
-colorama==0.4.6
-dill==0.4.1
-idna==3.20
-iniconfig==2.3.0
-isort==9.0.1
-mando==0.7.1
-markdown-it-py==4.2.0
-mccabe==0.7.0
-mdurl==0.1.2
-mypy_extensions==1.1.0
-numpy==2.5.3
-packaging==26.3
-platformdirs==4.11.12
-pluggy==1.6.0
-Pygments==2.21.0
-python-dateutil==2.9.0.post0
-PyYAML==6.0.3
-rich==15.0.0
-six==1.17.0
-stevedore==5.9.1
-tomlkit==0.15.1
-urllib3==2.8.0
+# detectors (scripts/20_file_detect.py, scripts/ai_detect/). Versions of the .venv that produced results/detect.
+# Models are downloaded once from Hugging Face, then the run is offline (HF_HUB_OFFLINE=1). The revisions
+# (commit hashes) used for the scores:
+#   Qwen/Qwen2.5-Coder-1.5B                  df3ce67c0e24480f20468b6ef2894622d69eb73b
+#   Qwen/Qwen2.5-Coder-1.5B-Instruct         2e1fd397ee46e1388853d2af2c993145b0f1098a
+#   project-droid/DroidDetect-Large-Binary   44c45cbfb2dbf307e66acc691440f0cab3a0ddf5
+#   answerdotai/ModernBERT-large (config)    45bb4654a4d5aaff24dd11d4781fa46d39bf8c13
+torch==2.14.1
+transformers==5.20.0
+huggingface_hub==2.2.0
+tokenizers==0.23.3
+safetensors==0.8.0

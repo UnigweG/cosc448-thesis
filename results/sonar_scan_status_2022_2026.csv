@@ -1,0 +1,6 @@
+cohort_year,org,repo,project_key,status,notes,head_sha
+2022,UBCO-COSC-499-Summer-2022,api-development-and-testing-project1-helpya-services-inc,cosc448_2022_api-development-and-testing-project1-helpya-services-inc,ok,1 SQL (not analysed by CLI scanner) file(s) not analysed by SonarQube,4ffe9ac3353ef4143adfbee1f9024157d00313c4
+2022,UBCO-COSC-499-Summer-2022,database,cosc448_2022_database,ok,,837ffea765a952e914715b7cbd7a67d562c4cda9
+2022,UBCO-COSC-499-Summer-2022,hot-desking-deploy,cosc448_2022_hot-desking-deploy,ok,vendored packages excluded (**/public/packages/**),ba823caf5ac32dc71bd8a63d49a43428e7adad44
+2022,UBCO-COSC-499-Summer-2022,matlab-to-python-application-translation-project2-nrc,cosc448_2022_matlab-to-python-application-translation-project2-nrc,ok,,2a88a54dc8c1faf3aa098f68e63ce13d21e94cc7
+2026,UBCOCOSC499-S2026,capstone-project-team-11,cosc448_2026_capstone-project-team-11,ok,,d04513376a8bb046584604177a802a4409ae85b4

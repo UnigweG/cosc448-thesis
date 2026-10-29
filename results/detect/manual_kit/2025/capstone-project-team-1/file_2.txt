@@ -1,0 +1,128 @@
+/**
+ * Unified Snake game + progress screen for both Cloud and Local LLM flows.
+ *
+ * Snake on the left, humanized activity sidebar on the right.
+ *
+ * - Cloud mode: uploads zip, extracts, runs generateResume() streaming events
+ * - Local mode: starts the local pipeline, polls for status, translates messages
+ */
+import { mkdir, readFile, rm, symlink } from "node:fs/promises";
+import { basename, join } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useKeyboard, useTerminalDimensions } from "@opentui/react";
+import { generateResume, type ResumeEvent } from "../../agent";
+import { api } from "../../api/endpoints";
+import type {
+	DeveloperProfile,
+	LocalLlmSetupResponse,
+	PipelineStage,
+	PipelineStatusResponse,
+	ResumeV3Output,
+} from "../../api/types";
+import { useAppState } from "../../context/AppContext";
+import { theme } from "../../types";
+import { toErrorMessage } from "../../utils";
+import { useToast } from "../Toast";
+import { TopBar } from "../TopBar";
+import { SnakeGame } from "./SnakeGame";
+import {
+	humanizeToolCall,
+	inferPhase,
+	PHASE_LABELS,
+	type Phase as HumanPhase,
+} from "./humanize";
+
+// ── Shared Types ─────────────────────────────────────────────────────────────
+
+interface GitIdentity {
+	login: string;
+	name: string | null;
+	email: string;
+}
+
+interface ActivityEntry {
+	tool: string;
+	detail: string;
+	status: "done" | "active";
+}
+
+type FlowPhase = "extracting" | "generating" | "done" | "error";
+
+// Limit activity entries to prevent TUI rendering issues with large lists
+const MAX_ACTIVITY = 25;
+
+const glowColors = [
+	"#8B7500",
+	"#B8960B",
+	"#DAB520",
+	"#FFD700",
+	"#FFED66",
+	"#FFD700",
+	"#DAB520",
+	"#B8960B",
+];
+
+// ── Local Pipeline Humanization ──────────────────────────────────────────────
+
+const STEP_MAP: Array<[string, string]> = [
+	["Extracting README", "Reading project documentation"],
+	["Classifying commits", "Analyzing commit history"],
+	["Extracting structure", "Mapping project structure"],
+	["Extracting code constructs", "Scanning code constructs"],
+	["Inferring project type", "Detecting project type"],
+	["Extracting git stats", "Gathering git statistics"],
+	["Computing test ratio", "Measuring test coverage"],
+	["Scoring commit quality", "Scoring commit quality"],
+	["Measuring module breadth", "Measuring module breadth"],
+	["Computing style metrics", "Analyzing code style"],
+	["Computing complexity metrics", "Measuring code complexity"],
+	["Computing skill timeline", "Building skill timeline"],
+	["Extracting enriched constructs", "Deep code analysis"],
+	["Analyzing import graph", "Mapping dependencies"],
+	["Extracting config fingerprint", "Reading project configuration"],
+	["Inferring project purpose", "AI: Inferring project purpose"],
+	["Running project query for", "AI: Writing project description"],
+	["Running project query", "AI: Writing project bullets"],
+	["Running portfolio query for summary", "AI: Writing professional summary"],
+	["Running portfolio query for developer", "AI: Writing developer profile"],
+	["Running portfolio query", "AI: Composing portfolio summary"],
+	["Retrying facts for", "Retrying analysis (LLM hiccup)"],
+	["Facts extraction failed", "Analysis failed — retries exhausted"],
+	["Writing grounded draft", "AI: Drafting your resume"],
+	["Assembling resume", "Assembling resume document"],
+];
+
+const NOISE_PREFIXES = [
+	"Pipeline request",
+	"Phase 1 worker",
+	"Pipeline started",
+	"Phase 3 worker",
+	"Phase 3 started",
+	"Checking model",
+	"Found ",
+	"Analyzing [",
+];
+
+function friendlyError(raw: string): string {
+	if (raw.includes("JSONDecodeError") || raw.includes("json")) {
+		return "The local AI produced invalid output. Try running again — small models can be inconsistent.";
+	}
+	if (raw.includes("InferenceRequestError") || raw.includes("inference")) {
+		return "The local AI server crashed or timed out. Restart the backend and try again.";
+	}
+	if (raw.includes("SchemaValidation")) {
+		return "The local AI output didn't match the expected format. Try running again.";
+	}
+	if (raw.includes("ModelNotFound")) {
+		return "Model not found. Check that the GGUF file is in ~/.artifactminer/models/";
+	}
+	// Truncate long error messages
+	return raw.length > 120 ? `${raw.slice(0, 120)}…` : raw;
+}
+
+function toFriendlyStep(msg: string): string | null {
+	for (const [prefix, friendly] of STEP_MAP) {
+		if (msg.startsWith(prefix)) return friendly;
+	}

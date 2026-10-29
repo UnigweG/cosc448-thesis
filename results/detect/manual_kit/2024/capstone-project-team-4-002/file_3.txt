@@ -1,0 +1,126 @@
+import numpy as np
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from PIL import Image, ImageTk, ImageDraw
+import random, math, time, psutil, GPUtil
+
+# -------------------------------
+# Global Universal Parameter
+# -------------------------------
+global_params = {
+    "symmetry": 50  # 0 to 100; 100 means fully grid-based.
+}
+
+# -------------------------------
+# Shape Class with Individual Attributes
+# -------------------------------
+class Shape:
+    def __init__(self, shape_type, size=50, uniformity=20, contrast=50, complexity=0, num_sides=5):
+        self.shape_type = shape_type.lower()
+        self.size = size
+        self.uniformity = uniformity    # 0 to 100; 100 means no jitter.
+        self.contrast = contrast        # 0 to 100.
+        self.complexity = complexity    # 0 to 100.
+        self.num_sides = num_sides      # Only used if shape is polygon or star.
+
+# -------------------------------
+# Global Variables
+# -------------------------------
+shape_selections = []  # List of Shape objects.
+bg_choice = "white"
+bg_noise = 0
+
+# -------------------------------
+# Helper Functions
+# -------------------------------
+def get_centered_grid_positions(num_shapes, canvas_size):
+    rows = math.ceil(math.sqrt(num_shapes))
+    spacing_y = canvas_size / (rows + 1)
+    positions = []
+    remaining = num_shapes
+    for i in range(rows):
+        per_row = math.ceil(num_shapes / rows)
+        shapes_in_row = per_row if remaining >= per_row else remaining
+        spacing_x = canvas_size / (shapes_in_row + 1)
+        for j in range(shapes_in_row):
+            x = int((j + 1) * spacing_x)
+            y = int((i + 1) * spacing_y)
+            positions.append((x, y))
+        remaining -= shapes_in_row
+    return positions
+
+def add_complexity(points, comp_factor):
+    if comp_factor <= 0:
+        return points
+    new_points = []
+    n = len(points)
+    for i in range(n):
+        p1 = points[i]
+        p2 = points[(i+1) % n]
+        new_points.append(p1)
+        mid_x = (p1[0] + p2[0]) / 2
+        mid_y = (p1[1] + p2[1]) / 2
+        edge_length = math.hypot(p2[0]-p1[0], p2[1]-p1[1])
+        max_disp = edge_length * 0.3 * comp_factor
+        disp_x = random.uniform(-max_disp, max_disp)
+        disp_y = random.uniform(-max_disp, max_disp)
+        new_points.append((mid_x + disp_x, mid_y + disp_y))
+    return new_points
+
+def inset_polygon(points, center, scale):
+    cx, cy = center
+    return [(cx + (x - cx) * scale, cy + (y - cy) * scale) for (x, y) in points]
+
+def inset_bbox(bbox, center, scale):
+    cx, cy = center
+    x0, y0, x1, y1 = bbox
+    return (cx - (cx - x0) * scale,
+            cy - (cy - y0) * scale,
+            cx + (x1 - cx) * scale,
+            cy + (y1 - cy) * scale)
+
+def draw_single_shape(draw, center, shape_obj):
+    s = shape_obj.size
+    jitter = 1 - (shape_obj.uniformity / 100.0)
+    contrast = shape_obj.contrast
+    comp_factor = shape_obj.complexity / 100.0
+    cx, cy = center
+    jitter_range = max(1, s // 10)
+    vertex_shapes = ["square", "triangle", "polygon", "star", "diamond", "heart"]
+
+    if shape_obj.shape_type in vertex_shapes:
+        if shape_obj.shape_type == "square":
+            perfect = [
+                (cx - s//2, cy - s//2),
+                (cx + s//2, cy - s//2),
+                (cx + s//2, cy + s//2),
+                (cx - s//2, cy + s//2)
+            ]
+        elif shape_obj.shape_type == "triangle":
+            perfect = [
+                (cx, cy - s//2),
+                (cx - s//2, cy + s//2),
+                (cx + s//2, cy + s//2)
+            ]
+        elif shape_obj.shape_type == "polygon":
+            n = shape_obj.num_sides
+            r = s / 2
+            perfect = []
+            for i in range(n):
+                angle = math.radians(90) + 2 * math.pi * i / n
+                perfect.append((cx + r * math.cos(angle), cy - r * math.sin(angle)))
+        elif shape_obj.shape_type == "star":
+            n = shape_obj.num_sides
+            outer_r = s / 2
+            inner_r = outer_r * 0.5
+            perfect = []
+            for i in range(2 * n):
+                angle = math.radians(90) + math.pi * i / n
+                r_current = outer_r if i % 2 == 0 else inner_r
+                perfect.append((cx + r_current * math.cos(angle), cy - r_current * math.sin(angle)))
+        elif shape_obj.shape_type == "diamond":
+            r = s / math.sqrt(2)
+            perfect = [
+                (cx, cy - r),
+                (cx + r, cy),
+                (cx, cy + r),

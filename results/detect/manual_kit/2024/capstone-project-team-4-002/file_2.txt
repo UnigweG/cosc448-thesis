@@ -1,0 +1,138 @@
+import https from 'https';
+import express from 'express';
+import path from 'path'; // Needed for static files
+import session from 'express-session';
+import multer from 'multer';
+import fs, { truncate } from 'fs';
+import i18n from 'i18n'; // Needed for language support
+import cookieParser from 'cookie-parser'; // Include cookie-parser
+import axios from 'axios'
+import { processConfigData } from './appFunctions/processConfigData.js';
+import { buildSetsData } from './appFunctions/buildSetsData.js';
+import db from './Database/DBConnection.js'; // 
+import { fileURLToPath } from 'url';
+import { parse } from 'json2csv';
+import { generateExperimentConfig, writeConfigToFile}  from '../generateConfig.js';
+import bcrypt from 'bcrypt';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const imagesDir = path.join(__dirname, 'Database', 'images');
+const configPath = path.join(__dirname, '..', 'experiment_config.json');
+let configData = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Configure i18n for language support
+i18n.configure({
+    locales: ['en', 'fr'],  // Define the supported languages
+    directory: path.join(__dirname, 'language_files'), // Path to the language files
+    defaultLocale: 'en', // Default language if none is selected
+    autoReload: true, // Automatically reload language files when changed
+    syncFiles: true, // Synchronize language files
+    queryParameter: 'lang', // Query parameter to switch language
+    cookie: 'lang', // Use cookies to remember the language choice (can change this if needed)
+});
+
+db.connectToDB()
+    .then(() => {
+        console.log("Database connection established successfully.");
+    })
+    .catch((err) => {
+        console.error("Failed to connect to the database:", err.message);
+    });
+
+// Create an instance of an Express application
+const app = express();
+
+app.use(express.json());
+
+// Set EJS as the templating engine
+app.set('view engine', 'ejs');
+
+// Middleware to parse URL-encoded data from forms
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Setup express-session middleware, need to get rid of temp when actually using
+app.use(session({
+    secret: process.env.SESSION_SECRET || "fallback_secret_key",
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: true, httpOnly: true, sameSite: 'strict' }
+}));
+const sslOptions = {
+    key: fs.readFileSync('./certs/server.key'),
+    cert: fs.readFileSync('./certs/server.cert')
+};
+
+
+app.use(cookieParser()); // Use cookie-parser middleware
+
+// Initialize i18n middleware (for French language support)
+app.use(i18n.init);
+
+// Middleware to pass `i18n` to all views
+app.use((req, res, next) => {
+    res.locals.i18n = res;
+    next();
+});
+
+app.use((req, res, next) => {
+    if (!req.secure) {
+        return res.redirect(`https://${req.headers.host}${req.url}`);
+    }
+    next();
+});
+
+
+// Define the location for the views folder (default is views/)
+app.set('views', path.join(__dirname, 'views'));
+
+// Serve static files (CSS) from the assets directory
+app.use(express.static(path.join(__dirname, 'assets')));
+
+//Serve static image files from Database directory
+app.use(express.static(path.join(__dirname, 'Database')));
+app.use('/appFunctions', express.static(path.join(__dirname, 'appFunctions')));
+
+
+// Define the port the app will listen on
+const PORT = 3004;
+
+// Define a route for the root URL
+app.get('/', (req, res) => {
+    res.render('HomePage', {
+        title: 'Welcome to the Image Aesthetics Comparison'
+    });
+});
+
+// Route for displaying admin page
+app.get('/admin', (req, res) => {
+    res.render('adminLogin');
+});
+
+// Route for handling admin login
+app.post('/admin-login', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+      const admin = await db.getAdmin(username);
+
+      if (!admin) {
+          return res.render('adminLogin', {
+              errorMessage: 'Invalid credentials. Please try again.'
+          });
+      }
+
+      const passwordMatches = await bcrypt.compare(password, admin.password);
+
+      if (passwordMatches) {
+          req.session.isAdmin = true;
+          res.redirect('/admin-dashboard');
+      } else {
+          res.render('adminLogin', {
+              errorMessage: 'Invalid credentials. Please try again.'
+          });
+      }
+  } catch (err) {
+      console.error('Error checking admin credentials:', err.message);
+      res.status(500).render('adminLogin', {

@@ -1,0 +1,114 @@
+"use client";
+
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import { addMonths, eachDayOfInterval, endOfMonth, format, isAfter, isBefore, isSameDay, parseISO, startOfMonth } from 'date-fns';
+import { motion } from "framer-motion";
+import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { FiCheck, FiEye, FiEyeOff, FiX } from 'react-icons/fi';
+import TipJarIcon from '../../../../../public/assets/tipJar.svg';
+import { useHeaderRefresh } from "../../../../contexts/HeaderRefreshContext";
+import "../../../../styles/custom.css";
+import { cn } from '../../../shadcn/lib/utils';
+import Button from "../../../support/custom/button";
+import PlaidLinkGen from "../../plaid/PlaidLink";
+
+
+
+export interface SignupComponentProps {
+  onSignupSuccess?: () => void;
+  redirectUrl?: string;
+}
+
+export function SignupComponent({ onSignupSuccess, redirectUrl }: SignupComponentProps) {
+  const router = useRouter();
+  const { forceRefresh } = useHeaderRefresh();
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [dob, setDob] = useState("");
+  const [message, setMessage] = useState("");
+  const [isUnderage, setIsUnderage] = useState(false);
+  const [primaryUserInfo, setPrimaryUserInfo] = useState("");
+  const [isDependentInfoComplete, setIsDependentInfoComplete] = useState(false);
+  const [primaryUserId, setPrimaryUserId] = useState("");
+  const [userId, setUserId] = useState("");
+  const [showPlaid, setShowPlaid] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const calendarRef = useRef<HTMLDivElement | null>(null);
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [dobInput, setDobInput] = useState("");
+  const [signupCompleted, setSignupCompleted] = useState(false);
+  const [showingAnimation, setShowingAnimation] = useState(false);
+
+  // Check if user is already logged in and redirect if they are
+  useEffect(() => {
+    const token = sessionStorage.getItem("token");
+    if (token) {
+      // User is already logged in, redirect to dashboard
+      router.push(
+        process.env.NEXT_PUBLIC_ENV === "production" 
+          ? "/transactions/group7/app/dashboard"
+          : redirectUrl || "/dashboard"
+      );
+    }
+  }, [router, redirectUrl]);
+
+  // for dob
+  const today = new Date();
+  const minDate = new Date();
+  minDate.setFullYear(today.getFullYear() - 120);
+
+  const calendarDays = eachDayOfInterval({
+    start: startOfMonth(currentMonth),
+    end: endOfMonth(currentMonth)
+  });
+
+  const toggleCalendar = () => {
+    if (showCalendar) {
+      setCalendarVisible(false);
+      setTimeout(() => setShowCalendar(false), 200);
+    } else {
+      setShowCalendar(true);
+      setTimeout(() => setCalendarVisible(true), 10);
+    }
+  };
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent): void {
+      if (calendarRef.current && !calendarRef.current.contains(event.target as Node)) {
+        setShowCalendar(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const checkAge = (birthDate: string): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize time to start of day
+    // Parse birth date components from ISO string (YYYY-MM-DD)
+    const [birthYear, birthMonth, birthDay] = birthDate.split('-').map(Number);
+
+    // Create birth date object manually to avoid timezone issues
+    const birth = new Date(birthYear, birthMonth - 1, birthDay);
+    birth.setHours(0, 0, 0, 0); // Normalize time to start of day
+
+    // Calculate age
+    let age = today.getFullYear() - birth.getFullYear();
+
+    // Adjust age if birthday hasn't occurred yet this year
+    const currentMonth = today.getMonth();
+    const birthMonthZeroBased = birthMonth - 1;
+
+    if (
+      currentMonth < birthMonthZeroBased ||

@@ -1,0 +1,277 @@
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;400;500&display=swap");
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  text-decoration: none;
+  border: none;
+  outline: none;
+  scroll-behavior: smooth;
+  font-family: "Poppins", sans-serif;
+}
+
+:root {
+  --bg-color: #808080;
+  --text-color: white;
+}
+
+html {
+  font-size: 62.5%;
+  overflow-x: hidden;
+  height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--bg-color);
+  color: var(--text-color);
+  height: 100%;
+  width: 100%;
+}
+
+section {
+  padding: 10rem 9%;
+}
+
+header {
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 2rem 9%;
+  background: var(--bg-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 100;
+}
+
+.navbar a {
+  font-size: 1.7rem;
+  color: var(--text-color);
+  margin-left: 4rem;
+}
+.navbar {
+  display: block;
+}
+
+.home {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* Bacck-button is a button that is used to go back to the previous page */
+.back-button {
+  background-color: #555;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  text-align: center;
+  display: inline-block;
+  margin-right: 20px;
+  font-size: 1.5rem;
+}
+.left h1 {
+  font-size: 5.6rem;
+  font-weight: 500;
+  line-height: 2;
+  align-items: center;
+  display: block;
+}
+.left h2 {
+  font-size: 1.75rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  text-align: center;
+  justify-content: center;
+  display: block;
+}
+.navbar a:hover {
+  color: black;
+}
+.link_container img {
+  width: 5rem;
+}
+#title-box {
+  text-align: center;
+  background-color: #fff;
+  padding: 30px;
+  border-radius: 10px;
+  color: #333;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  margin: 30px auto;
+  max-width: 800px;
+}
+.content-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.form-container {
+  background-color: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  text-align: left;
+  margin-top: 20px;
+  width: 100%;
+  color: #000000;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-weight: bold;
+}
+
+.form-group input[type="number"],
+.form-group input[type="text"],
+.form-group input[type="file"] {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  font-size: 16px;
+}
+
+.form-group input[type="file"] {
+  cursor: pointer;
+}
+
+button[type="submit"] {
+  background-color: #555;
+  color: #fff;
+  padding: 15px 30px;
+  border: none;
+  border-radius: 5px;
+  font-weight: bold;
+  font-size: 18px;
+  transition: background-color 0.3s;
+  text-align: center;
+  cursor: pointer;
+}
+
+button[type="submit"]:hover {
+  background-color: #444;
+}
+
+#footer {
+  position: relative;
+  text-align: center;
+  bottom: 0;
+  background-color: var(--bg-color);
+  color: #fff;
+  padding: 20px;
+  width: 100%;
+}
+.right h1 {
+  align-items: center;
+  position: sticky;
+}
+.bx-menu {
+  display: none;
+}
+
+@media (max-width: 1200px) {
+  html {
+    font-size: 55%;
+  }
+}
+@media (max-width: 991px) {
+  .header {
+    padding: 2rem 3%;
+  }
+
+  section {
+    padding: 10rem 3% 2rem;
+  }
+
+  .footer {
+    padding: 2rem 3%;
+  }
+}
+
+@media (max-width: 768px) {
+  .bx-menu {
+    display: block;
+    font-size: 3.5rem;
+    cursor: pointer;
+  }
+
+  .navbar {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    padding: 1rem 3%;
+    background: var(--bg-color);
+    border-top: 0.1rem solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.2);
+    display: none;
+  }
+
+  .navbar.active {
+    display: block;
+  }
+
+  .navbar a {
+    display: block;
+    font-size: 2rem;
+    margin: 3rem 0;
+  }
+  .home {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+.ai-chatbot-container {
+  max-width: 600px;
+  margin: 2rem auto;
+  border: 1px solid #ccc;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+}
+
+.ai-chatbot-header {
+  background: #555;
+  color: white;
+  padding: 1rem;
+  text-align: center;
+}
+
+.ai-chatbot-body {
+  height: 400px;
+  overflow-y: auto;
+  padding: 1rem;
+  background: #f9f9f9;
+}
+
+.ai-chatbot-footer {
+  display: flex;
+  padding: 1rem;
+}
+
+.ai-chatbot-footer input {
+  flex-grow: 1;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+  border: 1px solid #ccc;
+}
+
+.ai-chatbot-footer button {
+  padding: 0.5rem 1rem;
+  background: #555;
+  color: white;
+  cursor: pointer;
+}
+
+.ai-chatbot-footer button:hover {

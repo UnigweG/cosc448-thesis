@@ -1,0 +1,127 @@
+import { DebugElement } from '@angular/core';
+import {
+  ComponentFixture,
+  TestBed,
+  fakeAsync,
+  tick,
+  discardPeriodicTasks,
+  flush,
+} from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
+import { ActivatedRoute } from '@angular/router';
+import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { of } from 'rxjs';
+
+import { AttendeeSignupComponent } from './attendee-signup.component';
+import {
+  NotificationService,
+  PageTitleService,
+} from '@infrastructure/services';
+import { AttendeeRegisterService } from '@infrastructure/services/attendee-register.service';
+import { EventService } from '@infrastructure/services/event.service';
+import { AttendeeRegisterResult } from '@application/attendee-register';
+import { CharacterSelectionWidgetComponent } from '@presentation/shared/boss-battle-progress-bar/character-selection-widget/character-selection-widget.component';
+import { BossGameComponent } from '@presentation/shared/boss-battle-progress-bar/boss-game/boss-game.component';
+import { TextBoxModule } from '@progress/kendo-angular-inputs';
+import { MaskedTextBoxModule } from '@progress/kendo-angular-inputs';
+import { ButtonsModule } from '@progress/kendo-angular-buttons';
+import { TranslateModule, TranslateService } from '@ngx-translate/core';
+import { EventActiveState } from '@application/event/patch-event/patch-event.command';
+import { GetProfileResult } from '@application/account/get-profile/get-profile.result';
+import { ProfileService } from '@infrastructure/services/profile.service';
+
+class MockProfileService {
+  getUserProfileByEventId() {
+    return of({
+      data: {
+        name: 'Test User',
+        description: 'Test Description',
+        primaryColour: '#FFFFFF',
+        secondaryColour: '#000000',
+        tertiaryColour: '#FF5733',
+        logo: 'logo_base64_string',
+      },
+    });
+  }
+}
+
+// Mock a module-level create that's used in the component
+const createSpy = jasmine.createSpy('create').and.returnValue({
+  // Return a no-op function that can be called with any parameters
+  fire: jasmine.createSpy('fire'),
+  reset: jasmine.createSpy('reset'),
+});
+
+describe('AttendeeSignupComponent', () => {
+  let component: AttendeeSignupComponent;
+  let fixture: ComponentFixture<AttendeeSignupComponent>;
+  let attendeeRegisterServiceSpy: jasmine.SpyObj<AttendeeRegisterService>;
+  let notificationServiceSpy: jasmine.SpyObj<NotificationService>;
+  let pageTitleServiceSpy: jasmine.SpyObj<PageTitleService>;
+  let eventServiceSpy: jasmine.SpyObj<EventService>;
+  let translateService: TranslateService;
+
+  beforeEach(async () => {
+    pageTitleServiceSpy = jasmine.createSpyObj('PageTitleService', [
+      'setPageTitle',
+    ]);
+    notificationServiceSpy = jasmine.createSpyObj('NotificationService', [
+      'showSuccess',
+      'showError',
+    ]);
+    attendeeRegisterServiceSpy = jasmine.createSpyObj(
+      'AttendeeRegisterService',
+      ['attendeeRegister', 'getAttendeesForEvent']
+    );
+    eventServiceSpy = jasmine.createSpyObj('EventService', [
+      'getEventAnonymous',
+    ]);
+
+    // Mock event data with donation goal and pledge amount
+    const mockEvent = {
+      id: '123',
+      name: 'Mock Event',
+      userId: 'uid',
+      start: new Date(),
+      end: new Date(),
+      pledgeAmount: 100,
+      donationGoal: 1000,
+      postalAddress: {
+        region: '',
+        country: '',
+        streetAddress: '',
+        streetAddress2: '',
+        locality: '',
+        postalCode: '',
+      },
+      description: '',
+      charityId: '',
+      active: EventActiveState.Ongoing,
+      requireEmailVerification: true,
+      isDonationComplete: false,
+    };
+
+    const mockActivateRoute = {
+      paramMap: of({ get: () => '123' }), // Mock eventId
+    };
+
+    eventServiceSpy.getEventAnonymous.and.returnValue(of(mockEvent));
+    attendeeRegisterServiceSpy.getAttendeesForEvent.and.returnValue(of([]));
+
+    await TestBed.configureTestingModule({
+      declarations: [
+        AttendeeSignupComponent,
+        CharacterSelectionWidgetComponent,
+        BossGameComponent,
+      ],
+      imports: [
+        ReactiveFormsModule,
+        HttpClientTestingModule,
+        TextBoxModule,
+        MaskedTextBoxModule,
+        ButtonsModule,
+        TranslateModule.forRoot(),
+      ],
+      providers: [
+        { provide: ActivatedRoute, useValue: mockActivateRoute },

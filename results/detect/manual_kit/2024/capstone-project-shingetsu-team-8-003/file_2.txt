@@ -1,0 +1,106 @@
+import pytest
+import torch
+import os
+import numpy as np
+from PIL import Image, ImageDraw, ImageFilter, ImageEnhance
+import torchvision.transforms as transforms
+import time
+from fine_tune_NIMA.model import FineTunedNIMA
+from siamese_training.siamese_model import SiameseNetwork
+
+device = torch.device('cpu')  # Force CPU usage regardless of CUDA availability
+
+class TestScoringAlgorithm:
+    @pytest.fixture
+    def transform(self):
+        return transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    
+    @pytest.fixture
+    def nima_model(self):
+        model = FineTunedNIMA(backbone="resnet50")
+        # Load weights from correct path and force CPU
+        if os.path.exists("fine_tune_NIMA/models/fine_tuned_nima.pth"):
+            model.load_state_dict(torch.load("fine_tune_NIMA/models/fine_tuned_nima.pth", 
+                                           map_location='cpu'))  # Force CPU
+        model.to(device)
+        model.eval()
+        return model
+    
+    @pytest.fixture
+    def siamese_model(self):
+        model = SiameseNetwork()
+        # Load weights if available and force CPU
+        if os.path.exists("models/siamese_network_best.pth"):
+            model.load_state_dict(torch.load("models/siamese_network_best.pth", 
+                                           map_location='cpu'))  # Force CPU
+        model.to(device)
+        model.eval()
+        return model
+    
+    @pytest.fixture
+    def sample_images(self):
+        """Create varied synthetic test images with different aesthetic qualities"""
+        # Create a test directory if it doesn't exist
+        os.makedirs("test/test_data", exist_ok=True)
+        
+        # Simple solid color
+        simple = Image.new('RGB', (224, 224), color=(200, 200, 200))
+        simple.save("test/test_data/simple_gray.jpg")
+        
+        # Complex pattern with gradient
+        complex_img = Image.new('RGB', (224, 224), color=(0, 0, 0))
+        for x in range(224):
+            for y in range(224):
+                r = int(255 * x / 224)
+                g = int(255 * y / 224)
+                b = int(255 * (x + y) / (2 * 224))
+                complex_img.putpixel((x, y), (r, g, b))
+        complex_img.save("test/test_data/complex_gradient.jpg")
+        
+        # Image with composition (rule of thirds)
+        composition = Image.new('RGB', (224, 224), color=(135, 206, 235))  # Sky blue background
+        draw = ImageDraw.Draw(composition)
+        # Horizon at bottom third
+        draw.rectangle([(0, 148), (224, 224)], fill=(34, 139, 34))  # Forest green ground
+        # Sun at intersection of thirds
+        draw.ellipse([(149, 74), (179, 104)], fill=(255, 215, 0))  # Gold sun
+        composition.save("test/test_data/composition_thirds.jpg")
+        
+        # Noisy, low quality image
+        noisy = Image.new('RGB', (224, 224), color=(100, 100, 100))
+        for i in range(10000):  # Add random noise
+            x = np.random.randint(0, 224)
+            y = np.random.randint(0, 224)
+            r, g, b = np.random.randint(0, 255, 3)
+            noisy.putpixel((x, y), (r, g, b))
+        noisy = noisy.filter(ImageFilter.GaussianBlur(1))
+        noisy.save("test/test_data/noisy_low_quality.jpg")
+        
+        # High contrast, vibrant image
+        vibrant = Image.new('RGB', (224, 224), color=(0, 0, 100))
+        draw = ImageDraw.Draw(vibrant)
+        for i in range(0, 224, 20):
+            draw.rectangle([(i, 0), (i+10, 224)], fill=(255, 165, 0))  # Orange stripes
+        vibrant_enhancer = ImageEnhance.Contrast(vibrant)
+        vibrant = vibrant_enhancer.enhance(1.5)
+        vibrant.save("test/test_data/vibrant_high_contrast.jpg")
+        
+        return [simple, complex_img, composition, noisy, vibrant]
+    
+    @pytest.fixture
+    def real_images(self):
+        """Check for and use real test images if available."""
+        test_images = []
+        test_dir = "test/test_data/real_images"
+        
+        # Create message if no real images found
+        if not os.path.exists(test_dir) or not os.listdir(test_dir):
+            print("\nNo real test images found. Create a directory 'test/test_data/real_images' with some JPG/PNG images to test with real photos.")
+            return []
+        
+        # Load all available real images
+        for file in os.listdir(test_dir):

@@ -1,0 +1,111 @@
+// Manage Review Page
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import { PDFViewer } from '../components/PDFViewer';
+import { PDFViewerProvider } from '../context/PDFViewerContext';
+import  PDFViewerToolbar  from '../components/PDFViewerToolbar';
+import { uploadPDF, downloadPDF } from '../libraries/pdf-handler';
+import { useNavigate, useParams } from 'react-router-dom';
+import { newURL } from '../libraries/file-path-provider';
+import { useTranslation } from "react-i18next";
+import DownloadButton from '../components/DownloadButton';
+
+
+
+export const PDFViewerContext = createContext();
+const hostURL = process.env.REACT_APP_HOST_URL || 'http://localhost:3001';
+
+
+const ManagerReview = () => {
+  const params = useParams();
+  const { t } = useTranslation();
+  const [files, setFiles] = useState({ old: null, new: null });
+  const [error, setError] = useState('');
+  const [fileFullscreen, setFileFullscreen] = useState(false); // Ensure to update the logic for setting fileFetch based on if fetching an existing file for the dynamic route is successful
+  const [isLoading, setIsLoading] = useState(false);
+  const [brokerComment, setBrokerComment] = useState('');
+  const [managerComment, setManagerComment] = useState('');
+  const [fileLoad, setFileLoad] = useState(false);
+
+  const caseID = params.caseID; 
+  const policyType = "comment"; // Something to fetch the comment JSON from PDF Store
+  const caseNumber = params.caseID;
+  //console.log(`Case ID:  ${caseNumber}`)
+  const oldFileName = `oldFile-${caseNumber}`;
+  const newFileName = `newFile-${caseNumber}`;
+
+
+  const [fileFetch, setFileFetch] = useState(false); // TODO: Ensure to update the logic for setting fileFetch based on if fetching an existing file for the dynamic route is successful
+  const navigate = useNavigate();
+
+  //Temporary Values until PDF-Store is Implemented with PDF-Analysis/Parse
+  const comparisonIdNew = "Zurich_New";
+  const comparisonIdOld = "Zurich_Old";
+
+
+  const handleFullscreen = async (e) => {
+    if (!fileFullscreen)
+      setFileFullscreen(true);
+    if (fileFullscreen)
+      setFileFullscreen(false);
+  };
+  const compareDocuments = async (comparisonIdNew, comparisonIdOld) => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${hostURL}/api/compare-docs?old_doc_path=${comparisonIdOld}&new_doc_path=${comparisonIdNew}`);
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      console.log('Received comparison data - checking value of sections_compared to confirm: ', data["sections_compared"]);
+      
+      /*
+        Temporary section to confirm that the .json file in express container is accessible from frontend. It should be the same as the returned data.   
+      */
+
+      const staticFilePath = `${hostURL}/api/public/pdf/${comparisonIdOld}+${comparisonIdNew}.json`;
+      const staticFileResponse = await fetch(staticFilePath);
+
+      if (!staticFileResponse.ok) {
+        throw new Error(`Failed to fetch static file at ${staticFilePath}. HTTP status: ${staticFileResponse.status}`);
+      }
+      const staticData = await staticFileResponse.json();
+      const areEqual = JSON.stringify(data) === JSON.stringify(staticData);
+
+      if (!areEqual) {
+        console.error('Data does not match static file content:', {
+          dynamicData: data,
+          staticFileData: staticData,
+        });
+      } else {
+        console.log('Data matches the static file content.');
+      }
+
+      /*
+        This section can be removed once frontend devs are familiar with accessing .json from the express server 
+      */
+
+      setFileLoad(true);
+      localStorage.setItem('annotation', data);
+      localStorage.setItem('test', 'HELLO WORLD');
+      
+      return data;
+    } catch (error) {
+      console.error('Error comparing documents:', error);
+      setError(t('chooseTwoFiles'));
+      return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    async function handleSetBrokerComment() {
+        const policyType = "comment";
+        try {
+            const file = await downloadPDF(policyType, caseNumber);
+            
+            // Convert File (JSON file) to text
+            const fileText = await file.text(); // Read file content
+            console.log(fileText);
+            const commentJSON = JSON.parse(fileText); // Parse JSON string

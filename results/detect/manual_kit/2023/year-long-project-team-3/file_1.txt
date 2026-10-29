@@ -1,0 +1,134 @@
+'use client'
+
+import { useSession } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
+import React, { useEffect, useState } from 'react'
+import { SubmissionBox, Video } from '@prisma/client'
+import logger from '@/utils/logger'
+import { toast } from 'react-toastify'
+import { Alert, Box, Button, Chip, Modal, TextField, Typography } from '@mui/material'
+
+import ScalingReactPlayer from '@/components/ScalingReactPlayer'
+import PageLoadProgress from '@/components/PageLoadProgress'
+import BackButton from '@/components/BackButton'
+import EditIcon from '@mui/icons-material/Edit'
+import { theme } from '@/components/ThemeRegistry/theme'
+import dayjs from 'dayjs'
+
+export type VideoDetailedPageProps = {
+    params: {
+        videoId: string
+    }
+}
+
+export default function VideoDetailedPage({ params }: VideoDetailedPageProps) {
+    const session = useSession()
+    const router = useRouter()
+
+    const { videoId } = params
+
+    const [video, setVideo] = useState<Video>()
+    const [isFetchingVideo, setIsFetchingVideo] = useState(false)
+    const [isOwner, setIsOwner] = useState(false)
+
+    const [submissionBoxes, setSubmissionBoxes] = useState<SubmissionBox[]>([])
+    const [isFetchingSubmissionBoxes, setIsFetchingSubmissionBoxes] = useState(false)
+
+    const [userId, setUserId] = useState<string>()
+
+    // Edit states
+    const [isEditing, setIsEditing] = useState(false)
+    const [titleEdit, setTitleEdit] = useState('')
+    const [descriptionEdit, setDescriptionEdit] = useState('')
+
+    // Delete confirm modal
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+
+
+    const modalStyle = {
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '25rem',
+        minWidth: '20rem',
+        backgroundColor: 'background.default',
+        borderRadius: '1rem',
+        boxShadow: 24,
+        p: '1rem 2rem',
+    }
+
+    useEffect(() => {
+        if (!session || !session?.data?.user?.email) {
+            return
+        }
+        getUserIdByEmail(session.data.user.email)
+            .then((userId) => setUserId(userId))
+            .catch((err) => {
+                logger.error(err)
+                toast.error('Unexpected error occurred')
+            })
+    }, [session])
+
+    useEffect(() => {
+        if (!video) {
+            return
+        }
+
+        setTitleEdit(video.title)
+        setDescriptionEdit(video?.description ?? '')
+        setIsOwner(video?.ownerId === userId)
+    }, [video, userId])
+
+    useEffect(() => {
+        setIsFetchingVideo(true)
+        setIsFetchingSubmissionBoxes(true)
+
+        if (!videoId) {
+            router.push('/')
+        }
+        const interval = setInterval(async () => {
+            Promise.all([
+                fetch(`/api/video/${ videoId }`),
+                fetch(`/api/submission-box/video/${ videoId }`),
+            ])
+                .then(async ([videoRes, submissionBoxesRes]) => [await videoRes.json(), await submissionBoxesRes.json()])
+                .then(([videoData, submissionBoxesData]) => {
+                    if (!videoData.video || !submissionBoxesData.submissionBoxes) {
+                        throw new Error('Could not fetch video or submission boxes')
+                    }
+                    setVideo(videoData.video)
+                    setSubmissionBoxes(submissionBoxesData.submissionBoxes)
+                    if (videoData.video.isCloudProcessed) {
+                        clearInterval(interval)
+                    }
+                })
+                .catch((err) => {
+                    logger.error(err.message)
+                    toast.error('An unexpected error occurred while trying to load your video!')
+                    router.push('/dashboard')
+                })
+                .finally(() => {
+                    setIsFetchingVideo(false)
+                    setIsFetchingSubmissionBoxes(false)
+                })
+        }, 2000)
+        return () => clearInterval(interval)
+    }, [router, videoId])
+
+    return (
+        <>
+            <Box
+                sx={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'stretch',
+                    m: 0,
+                    p: 0,
+                    width: '100%',
+                    height: '100%',
+                }}
+            >
+                {isFetchingVideo || isFetchingSubmissionBoxes ? (
+                    <PageLoadProgress />
+                ) : (

@@ -1,0 +1,226 @@
+/* ======================== */
+/*         GLOBAL STYLES    */
+/* ======================== */
+:root {
+  --primary-color: #4a90e2;
+  --secondary-color: #ff5722;
+  --background-color: #f5f7fa;
+  --card-background: #ffffff;
+  --text-color: #333;
+  --shadow-light: rgba(0, 0, 0, 0.1);
+  --shadow-medium: rgba(0, 0, 0, 0.2);
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: 'Poppins', sans-serif;
+  margin: 0;
+  padding: 0;
+}
+
+/* ======================== */
+/*      CONTAINER STYLES    */
+/* ======================== */
+.scale-wrapper {
+  transform: scale(0.95);
+  transform-origin: top center;
+  margin-top: -20px;
+  padding: 20px;
+}
+
+/* ======================== */
+/*      HEADER STYLES       */
+/* ======================== */
+.dashboard-header {
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.dashboard-header h1 {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--primary-color);
+}
+
+.dashboard-header p {
+  font-size: 1.2rem;
+  color: #666;
+}
+
+/* ======================== */
+/*      CARD STYLES         */
+/* ======================== */
+.highlight-card {
+  background: linear-gradient(135deg, #ffffff, #f9f9f9);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 4px 12px var(--shadow-light);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.highlight-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 24px var(--shadow-medium);
+}
+
+/* Icon Styling */
+.icon-container {
+  font-size: 2.8rem;
+  color: var(--primary-color);
+  transition: transform 0.3s ease, color 0.3s ease;
+}
+
+.icon-container:hover {
+  color: var(--secondary-color);
+  transform: scale(1.1);
+}
+
+/* Number Styling */
+.highlight-number {
+  font-size: 2.8rem;
+  font-weight: bold;
+  margin-top: 10px;
+  animation: fadeIn 0.8s ease-in-out;
+}
+
+/* ======================== */
+/*      FIRE STREAK UI      */
+/* ======================== */
+.fire-streak-container {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255, 87, 34, 0.9);
+  color: white;
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 1.2rem;
+  box-shadow: 0 4px 12px var(--shadow-medium);
+  z-index: 1000;
+  text-align: center;
+  font-weight: bold;
+  animation: streak-glow 1s infinite alternate;
+}
+
+@keyframes streak-glow {
+  0% {
+    text-shadow: 0 0 10px rgba(255, 87, 34, 0.5);
+  }
+  100% {
+    text-shadow: 0 0 20px rgba(255, 87, 34, 1);
+  }
+}
+
+/* ======================== */
+/*      CHART STYLES        */
+/* ======================== */
+.canvas-container {
+  position: relative;
+  height: 400px;
+  width: 100%;
+}
+
+canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background-color: #f9f9f9;
+  border-radius: 12px;
+}
+
+/* ======================== */
+/*  PROGRESS BARS (UNCHANGED) */
+/* ======================== */
+.progress-bar-wrapper {
+  position: relative;
+  height: 20px;
+  background-color: #e0e0e0;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-bar {
+  height: 100%;
+  transition: width 0.4s ease-in-out;
+}
+
+.progress-low {
+  background-color: #ff4d4d;
+}
+
+.progress-medium {
+  background-color: #ffcc00;
+}
+
+.progress-high {
+  background-color: #00c853;
+}
+
+/* ======================== */
+/*   FIRE ANIMATION         */
+/* ======================== */
+.flame-wrapper {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: flex-end;
+  pointer-events: none;
+}
+
+.flame {
+  width: 30px;
+  height: 60px;
+  background: radial-gradient(circle, #ff9800, #ff5722, transparent);
+  border-radius: 50%;
+  box-shadow: 0 0 20px 10px rgba(255, 100, 0, 0.5);
+  animation: flame-flicker 0.6s infinite alternate ease-in-out;
+}
+
+.flame.small {
+  width: 25px;
+  height: 50px;
+  animation: flame-flicker 0.5s infinite alternate ease-in-out;
+}
+
+.flame.smaller {
+  width: 20px;
+  height: 40px;
+  animation: flame-flicker 0.4s infinite alternate ease-in-out;
+}
+
+@keyframes flame-flicker {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+    filter: brightness(1.2);
+  }
+  50% {
+    transform: translateY(-15px) scale(1.1);
+    opacity: 0.9;
+    filter: brightness(1.5);
+  }
+  100% {
+    transform: translateY(-10px) scale(1.2);
+    opacity: 1;
+    filter: brightness(1.3);
+  }
+}
+
+/* ======================== */
+/*   RESPONSIVE DESIGN      */
+/* ======================== */
+@media (max-width: 768px) {
+  .fire-streak-container {
+    top: 10px;
+    right: 10px;
+    font-size: 1rem;
+    padding: 8px;
+  }
+
+  .highlight-card {
+    padding: 15px;
+  }

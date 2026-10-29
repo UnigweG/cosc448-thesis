@@ -1,0 +1,135 @@
+"""
+Portfolio API endpoint tests.
+Tests CRUD operations, project curation, permissions, and AI summary generation.
+AI-related tests skip (not fail) when LLM service is unavailable.
+"""
+
+import os
+import sys
+import requests
+import re
+
+# Add the backend directory to the Python path if not already there
+backend_path = os.path.join(os.path.dirname(__file__), '..', 'src', 'backend')
+if backend_path not in sys.path:
+    sys.path.insert(0, backend_path)
+
+# Setup Django settings only if not already configured
+if not os.environ.get('DJANGO_SETTINGS_MODULE'):
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'src.settings')
+    import django
+    django.setup()
+
+from django.test import TestCase
+from django.urls import reverse
+from rest_framework.test import APIClient
+from django.utils import timezone
+from unittest import skipIf
+
+from app.models import Project, Portfolio, PortfolioProject
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
+
+
+def is_llm_service_available():
+    """Check if LLM service is available for AI summary tests."""
+    try:
+        from app.services.llm import LLMFactory
+        # Try a simple call to verify service is responsive
+        LLMFactory.get_provider().analyze("test", system_message="test")
+        return True
+    except Exception:
+        return False
+
+
+# Cache the result at module load time
+LLM_AVAILABLE = False
+try:
+    LLM_AVAILABLE = is_llm_service_available()
+except Exception:
+    LLM_AVAILABLE = False
+
+
+class PortfolioEndpointsTests(TestCase):
+    """Test portfolio CRUD operations and permissions."""
+    
+    def setUp(self):
+        self.client = APIClient()
+        self.user1 = User.objects.create_user(
+            username="alice", email="alice@example.com", password="pass123"
+        )
+        self.user2 = User.objects.create_user(
+            username="bob", email="bob@example.com", password="pass123"
+        )
+        
+        now = timezone.now()
+        
+        # Create projects for user1
+        self.project1 = Project.objects.create(
+            user=self.user1,
+            name="Alice Project 1",
+            description="A coding project",
+            project_tag=1,
+            classification_type="coding",
+            total_files=10,
+            code_files_count=8,
+            created_at=now,
+        )
+        self.project2 = Project.objects.create(
+            user=self.user1,
+            name="Alice Project 2",
+            description="Another project",
+            project_tag=2,
+            classification_type="mixed:coding+writing",
+            total_files=5,
+            code_files_count=3,
+            created_at=now,
+        )
+        
+        # Create project for user2
+        self.project_bob = Project.objects.create(
+            user=self.user2,
+            name="Bob Project",
+            description="Bob's project",
+            project_tag=3,
+            classification_type="writing",
+            total_files=3,
+            created_at=now,
+        )
+    
+    # ==================== Authentication Tests ====================
+    
+    def test_portfolio_list_requires_auth(self):
+        """Unauthenticated requests to list portfolios should be rejected."""
+        url = reverse("portfolio-list")
+        resp = self.client.get(url)
+        self.assertIn(resp.status_code, (401, 403))
+    
+    def test_portfolio_generate_requires_auth(self):
+        """Unauthenticated requests to generate portfolio should be rejected."""
+        url = reverse("portfolio-generate")
+        resp = self.client.post(url, data={"title": "Test"}, format="json")
+        self.assertIn(resp.status_code, (401, 403))
+    
+    # ==================== Portfolio Generation Tests ====================
+    
+    def test_generate_portfolio_basic(self):
+        """Create a basic portfolio without AI summary."""
+        self.client.force_authenticate(user=self.user1)
+        url = reverse("portfolio-generate")
+        
+        resp = self.client.post(url, data={
+            "title": "My Portfolio",
+            "description": "A showcase of my work",
+            "project_ids": [self.project1.id, self.project2.id],
+            "is_public": True,
+            "generate_summary": False,  # Skip AI summary
+        }, format="json")
+        
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertIn("portfolio", data)
+        
+        portfolio = data["portfolio"]
+        self.assertEqual(portfolio["title"], "My Portfolio")

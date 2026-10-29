@@ -1,0 +1,118 @@
+// PDFViewerContext.js
+import React, { createContext, useState, useContext, useEffect, useCallback, useRef } from "react";
+import { getUserID } from "../auth/auth";
+import { json, useParams } from 'react-router-dom';
+import { useTranslation } from "react-i18next";
+import { uploadPDF, downloadPDF } from "../libraries/pdf-handler";
+
+// Create stub implementations for test environment
+let pdf = () => Promise.resolve(new Blob());
+let Document = ({ children }) => children;
+let Page = ({ children }) => children;
+let Text = ({ children }) => children;
+let View = ({ children }) => children;
+let StyleSheet = { create: styles => styles };
+
+// Only load the actual implementation in non-test environments
+if (process.env.NODE_ENV !== 'test') {
+  const ReactPDF = require('@react-pdf/renderer');
+  pdf = ReactPDF.pdf;
+  Document = ReactPDF.Document;
+  Page = ReactPDF.Page;
+  Text = ReactPDF.Text;
+  View = ReactPDF.View;
+  StyleSheet = ReactPDF.StyleSheet;
+}
+
+export const PDFViewerContext = createContext();
+const hostURL = process.env.REACT_APP_HOST_URL || 'http://localhost:3001';
+
+export const PDFViewerProvider = ({ children }) => {
+  const [selectedColor, _setSelectedColor] = useState(null);
+  const [activeTool, _setActiveTool] = useState(null);
+  const [oldAnnotationCount, setOldAnnotationCount] = useState(0);
+  const [newAnnotationCount, setNewAnnotationCount] = useState(0);
+  const [oldCurrent, setOldCurrent] = useState(0);
+  const [newCurrent, setNewCurrent] = useState(0);
+  const [annotations, setAnnotations] = useState([]);
+  const [summary, setSummary] = useState(null);
+  const [oldCurrentAnnotationIndex, setOldCurrentAnnotationIndex] = useState(0);
+  const [newCurrentAnnotationIndex, setNewCurrentAnnotationIndex] = useState(0);
+  const [userID, _setUserID] = useState(null);
+  
+  const params = useParams();
+  const caseNumber = params.caseID; 
+
+   // Store canvas refs for both documents
+   const oldCanvasRefs = useRef([]);
+   const newCanvasRefs = useRef([]);
+   const oldContainerRef = useRef(null);
+   const newContainerRef = useRef(null);
+   const annotationsOldMap = useRef({}); 
+   const annotationsNewMap = useRef({});
+   const viewportOldScaleArray = useRef({});
+   const viewportNewScaleArray = useRef({});
+   const oldCanvasData = useRef([]);
+   const newCanvasData = useRef([]);
+   const oldCurrentAnnotationIndexRef = useRef(1);
+   const newCurrentAnnotationIndexRef = useRef(1);
+
+   const selectedColorRef = useRef(selectedColor);
+   const activeToolRef = useRef(activeTool);
+   const userIDRef = useRef(userID);
+   const { t } = useTranslation();
+
+  //Temporary Values until PDF-Store is Implemented with PDF-Analysis/Parse
+  const comparisonIdNew = "Zurich_New";
+  const comparisonIdOld = "Zurich_Old";
+
+   let isDrawing = false;
+   let startPoint = null;
+
+   const setSelectedColor = (color) => {
+    _setSelectedColor(color); // Update UI
+    selectedColorRef.current = color; // Persist value without re-render
+  };
+
+  const setActiveTool = (highlight) => {
+    _setActiveTool(highlight); // Update UI
+    activeToolRef.current = highlight; // Persist value without re-render
+  };
+
+  //Get UserId for drawing once it works
+  const fetchUserID = async () => {
+      const token = localStorage.getItem('jwt'); 
+      if (!token) {
+          console.error('No token found');
+          return;
+      }
+      const id = await getUserID(token);
+      userIDRef.current = id;
+      console.log('User ID:', userIDRef.current);
+  };
+
+
+
+
+  // Function to scroll to a specific page
+  const goToPage = useCallback((pageNum, pageContainerRefs, documentType) => {
+    // Using the containers passed from PDFViewer Scroll to that page
+      const containerRef = documentType === 'old' ? oldContainerRef : newContainerRef;
+      const targetContainer = pageContainerRefs.current[pageNum - 1];
+      if (targetContainer && containerRef.current) {
+        const containerTop = containerRef.current.scrollTop;
+        const elementTop = targetContainer.offsetTop;
+  
+        // Adjust container's scroll position
+        containerRef.current.scrollTo({
+          top: elementTop,
+          behavior: 'smooth', // Optional: smooth scrolling
+        });
+      } else {
+        console.warn(`Page ${pageNum} not found or container is missing.`);
+      }
+ 
+  }, []);
+  // Set the container for each document type
+  const setContainerRef = useCallback((passedContainerRef, documentType) => {
+    if(documentType === "old"){

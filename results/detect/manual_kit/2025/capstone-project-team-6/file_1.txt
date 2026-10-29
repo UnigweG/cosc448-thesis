@@ -1,0 +1,150 @@
+"""SQLite helpers for storing analysis results."""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import sqlite3
+import uuid
+from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, Iterable, List, Optional, Union
+
+logger = logging.getLogger(__name__)
+
+VALID_ANALYSIS_TYPES = {"llm", "non_llm"}
+DEFAULT_PORTFOLIO_SETTINGS: Dict[str, Any] = {
+    "showHeatmap": True,
+    "showSkills": True,
+    "showProjectDetails": True,
+    "showPortfolioItems": True,
+    "showProjects": True,
+    "showProfileSummary": True,
+    "skillsDisplayLimit": 10,
+    "projectDisplayMode": "full",
+    "heatmapTimeRange": "auto",
+    "theme": "default",
+    "shareAllProjects": True,
+    "publicProjectKeys": [],
+}
+
+
+def _normalize_project_share_key(value: Any) -> str:
+    return str(value or "").strip().lower()
+
+
+def build_public_project_key(project: Dict[str, Any]) -> str:
+    name = _normalize_project_share_key(project.get("project_name") or project.get("name"))
+    path = _normalize_project_share_key(project.get("project_path"))
+    return f"{name}::{path}"
+
+
+def _default_db_path() -> Path:
+    return Path(__file__).resolve().parent.parent / "myapp.db"
+
+
+def _resolve_db_path() -> Path:
+    env_path = os.getenv("ANALYSIS_DB_PATH")
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    return _default_db_path()
+
+
+_DB_PATH = _resolve_db_path()
+
+
+def get_db_path() -> Path:
+    return _DB_PATH
+
+
+def set_db_path(path: Union[Path, str]) -> Path:
+    global _DB_PATH
+    previous = _DB_PATH
+    _DB_PATH = Path(path).expanduser().resolve()
+    return previous
+
+
+def _ensure_parent_dir(path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+@contextmanager
+def get_connection() -> sqlite3.Connection:
+    db_path = get_db_path()
+    _ensure_parent_dir(db_path)
+    conn = sqlite3.connect(db_path, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_db() -> None:
+    with get_connection() as conn:
+        conn.execute("PRAGMA foreign_keys = ON;")
+
+        # Ensure a minimal users table exists so the FK on analyses.username is valid
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT,
+                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        # Per-user profile info (used for resume personal info autofill)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_profile (
+                username TEXT PRIMARY KEY REFERENCES users(username) ON DELETE CASCADE,
+                personal_info_json TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        # Per-user education entries (separate from personal profile)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_education (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+                education_text TEXT,
+                university TEXT,
+                location TEXT,
+                degree TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                awards TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        # Per-user work experience entries (separate from personal profile)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_work_experience (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL REFERENCES users(username) ON DELETE CASCADE,
+                company TEXT,
+                job_title TEXT,
+                location TEXT,
+                start_date TEXT,
+                end_date TEXT,
+                responsibilities_text TEXT,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+
+        # Per-user portfolio presentation settings (used by private preview and public view)
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_portfolio_settings (

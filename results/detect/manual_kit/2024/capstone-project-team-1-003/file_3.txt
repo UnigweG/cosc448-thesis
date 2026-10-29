@@ -1,0 +1,74 @@
+"""
+    This code contains our old logic for comparing two insurance policy docs. This code only works for comparing the Zurich expiring doc and Zurich renewing doc provided by Aysu in November. This is because our Milestone 2 requirements only required for our system to support one set of the two provided sets of docs for extracting information like coverage amounts, entities, typos, etc and arbitrary values like "confidence" which misleadingly borrow from statistical terminology. However, even figuring out a decent way to parse these documents proved challenging, and the parser we ended up using had imperfect layout parsing so this code uses regex and other kinds of pattern matching, which are specific to the Zurich docs, to meet the requirements for this milestone. 
+
+    In other words, this code is NOT generalizable to any other insurance docs, and is just a proof of concept of what *could* be done with perfect parsing and well-structured PDFs with information represented in the same format, including same structure of tables and lists between the expiring and new docs. If we had perfect extraction, the logic and NLP techniques used in this file could be extended to work for other docs. For more info about our steps of comparison, see the comments in the DocumentComparator class functions.
+
+    If the milestone 2 requirements instead focused on extracting fewer types of information but with an approach that could work for multiple docs, all this code wouldn't need to be wasted. Also, we had no idea what exactly a 'discrepancy' meant for a broker until a week before Milestone 2, from the info session with Aysu.
+"""
+
+import re
+# from bs4 import BeautifulSoup
+import nltk
+import spacy
+# from spacy import displacy
+from spacy.matcher import Matcher
+# from textacy import extract
+from difflib import SequenceMatcher
+from Levenshtein import distance as levenshtein_distance
+import pymupdf
+import os
+from app.server.python.archived_code.sections import Section, MainSection, EndorsementSection
+from typing import List, Tuple, Dict
+
+nlp = spacy.load("en_core_web_md")
+
+class DocumentComparator():
+    
+    def __init__(self, old_pdf_path: str, new_pdf_path: str):
+        self.old_pdf_path = old_pdf_path
+        self.new_pdf_path = new_pdf_path
+        self.old_sections = self.split_pdf_into_sections(old_pdf_path)        # List of Section objects from old document
+        self.new_sections = self.split_pdf_into_sections(new_pdf_path)        # List of Section objects from new document
+        self.comparable_sections = self.determine_equivalent_sections()       # List of tuples of two Section objects with the same code
+
+    def split_pdf_into_sections(self, pdf_path) -> List[Section]:
+        """
+        There are 2 types of sections: MainSection and EndorsementSection.
+            1) MainSection objects have additional attributes for comparison, such as their extracted HTML and text, codes, tables, and subsections. 
+            2) EndorsementSection objects are not compared directly
+                only stats about their counts (and maybe titles) are used in the final output, eg. 6 Endorsements in Old vs 8 Endorsements in New 
+
+        Returns a list of Section objects, with a mix of MainSection and EndorsementSection objects depending on output of split_pdf()
+        """
+        page_ranges, endorsement_ranges = self._split_pdf(pdf_path)
+        
+        pdf_doc = pymupdf.open(pdf_path)
+        document_length = pdf_doc.page_count
+
+        if pdf_path.lower().__contains__("old"):
+            renewing_doc = False
+        else:
+            renewing_doc = True
+
+        sections = []
+
+        # Iterate over the ranges
+        for start_page, end_page in zip(page_ranges, page_ranges[1:] + [document_length]):
+            end_page = end_page - 1
+            section_length = end_page - start_page + 1
+            # print(start_page, end_page)
+
+            # Create a new in-memory PDF document for this range
+            new_doc = pymupdf.open()
+            new_doc.insert_pdf(pdf_doc, from_page=start_page, to_page=end_page)
+
+            base_path = os.path.dirname(pdf_path)
+            temp_filename = f"section_{start_page+1}_to_{end_page+1}.pdf"
+            temp_path = os.path.join(base_path, temp_filename)
+
+            # Save the new document to the tempfile location
+            new_doc.save(temp_path)
+
+            section = None
+            # Create a Section object with the bytes
+            if start_page in endorsement_ranges:

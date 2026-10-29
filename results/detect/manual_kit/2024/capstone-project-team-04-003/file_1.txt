@@ -1,0 +1,103 @@
+﻿using CsvHelper;
+using CsvHelper.Configuration;
+using KelownaSoftware.Application.Interfaces;
+using KelownaSoftware.Domain.AggregateRoots.Authentication;
+using KelownaSoftware.Domain.AggregateRoots.Events;
+using KelownaSoftware.Domain.AggregateRoots.Users;
+using KelownaSoftware.Domain.Common.Entities.Countries;
+using KelownaSoftware.Domain.Common.Entities.Regions;
+using KelownaSoftware.Domain.Common.ValueObjects.EmailAddress;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using System.Diagnostics.SymbolStore;
+using System.ComponentModel;
+using System.Formats.Asn1;
+using System.Globalization;
+using KelownaSoftware.Domain.Common.ValueObjects.PostalAddresses;
+using System.Diagnostics.Metrics;
+using System.Drawing;
+using KelownaSoftware.Domain.Common.Entities;
+using KelownaSoftware.Infrastructure.Common;
+using KelownaSoftware.Persistence.Utilities;
+
+namespace KelownaSoftware.Persistence
+{
+    public class KSDbContext : IdentityDbContext<User>, IKSDbContext
+    {
+        public DbSet<User> Users { get; set; }
+        public DbSet<UserProfile> UserProfiles { get; set; }
+        public DbSet<Attendee> Attendees { get; set; }
+        public DbSet<Charity> Charities { get; set; }
+        public DbSet<GlobalCharity> GlobalCharities { get; set; }
+        public DbSet<Donation> Donations { get; set; }
+        public DbSet<Event> Events { get; set; }
+        public DbSet<Register> Signups { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
+        public DbSet<RegionValueObject> RegionValueObject { get; set; }
+        public DbSet<CountryValueObject> CountryValueObject { get; set; }
+        public DbSet<LocalCharity> LocalCharities { get; set; }
+        public DbSet<OrganizationMap> OrganizationMap { get; set; }
+
+        public KSDbContext(
+            DbContextOptions<KSDbContext> options)
+            : base(options)
+        {
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            modelBuilder.Entity<User>().Property(x => x.Email).HasConversion<DbEncryptionConverter>();
+            modelBuilder.Entity<Attendee>(entity =>
+            {
+                entity.Property(x => x.Email).HasConversion<DbEncryptionConverter>();
+                entity.Property(x => x.Name).HasConversion<DbEncryptionConverter>();
+            });
+            modelBuilder.Entity<Donation>()
+                .OwnsOne(d => d.Amount);
+            modelBuilder.Entity<Event>(entity =>
+            {
+                entity.OwnsOne(e => e.PostalAddress, pa =>
+                {
+                    pa.HasOne(p => p.Country).WithMany();
+                    pa.HasOne(p => p.Region).WithMany();
+                });
+            });
+
+            // use TPH for Charity types
+            modelBuilder.Entity<Charity>()
+                .ToTable("Charities")
+                .HasDiscriminator<string>("CharityType")
+                .HasValue<GlobalCharity>("Global")
+                .HasValue<LocalCharity>("Local");
+            modelBuilder.Entity<LocalCharity>()
+                .HasOne(lc => lc.User)
+                .WithMany()
+                .HasForeignKey(lc => lc.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<Event>()
+                .HasOne(e => e.Charity)
+                .WithMany()
+                .HasForeignKey(e => e.CharityId)
+                .IsRequired()
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<OrganizationMap>()
+                .HasOne(om => om.Organization)
+                .WithMany()
+                .HasForeignKey(om => om.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+            modelBuilder.Entity<OrganizationMap>()
+                .HasOne(om => om.Vendor)
+                .WithMany()
+                .HasForeignKey(om => om.VendorId)
+                .OnDelete(DeleteBehavior.Restrict);
+        }
+
+        public async Task SeedUsers(CancellationToken cancellationToken)
+        {
+            // Check if a seed admin user already exists
+            var existingAdmin = await Users.FirstOrDefaultAsync(u => u.UserName == "admin@example.com", cancellationToken);
+            if (existingAdmin == null)
+            {
+                // Create a new admin user

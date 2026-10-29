@@ -1,0 +1,153 @@
+import uuid
+from datetime import datetime, timezone
+import io
+import tempfile
+import shutil
+import zipfile
+import os
+from pypdf import PdfReader
+from src.api.app import _rank_score, _get_or_create_showcase, _apply_is_user_flag
+
+from sqlalchemy import text
+import re
+import json
+from sqlalchemy import text, bindparam
+from sqlalchemy.dialects.postgresql import JSONB
+from unittest.mock import MagicMock
+from unittest.mock import patch
+import hashlib
+import importlib.util
+import sys
+
+
+from PIL import Image
+
+import tempfile
+from pathlib import Path
+
+from io import BytesIO
+import base64
+from reportlab.lib.pagesizes import LETTER
+from src.api.pdf_exporter import export_portfolio_top_projects_pdf,export_resume_item_pdf_bytes
+
+from git import Repo, InvalidGitRepositoryError, Actor
+
+from src.api.ingest import extract_commits_from_git_zip, extract_commit_counts_from_git_zip
+
+
+
+def _u() -> str:
+    return str(uuid.uuid4())
+
+def _mk_graph(engine):
+    """
+    Creates: users -> portfolios -> projects -> snapshots.
+    Returns (user_id, portfolio_id, project_id, snapshot_id).
+    """
+    user_id = _u()
+    portfolio_id = _u()
+    project_id = _u()
+    snapshot_id = _u()
+
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO users (id) VALUES (:id)"), {"id": user_id})
+        conn.execute(
+            text("INSERT INTO portfolios (id, user_id, name) VALUES (:id, :uid, 'default')"),
+            {"id": portfolio_id, "uid": user_id},
+        )
+        conn.execute(
+            text("INSERT INTO projects (id, portfolio_id, name) VALUES (:id, :pf, 'P')"),
+            {"id": project_id, "pf": portfolio_id},
+        )
+        conn.execute(
+            text(
+                """
+                INSERT INTO snapshots (id, project_id, source_zip_name, source_zip_sha256, snapshot_label)
+                VALUES (:id, :pid, 'z.zip', :zh, 'S')
+                """
+            ),
+            {"id": snapshot_id, "pid": project_id, "zh": "d" * 64},
+        )
+
+    return user_id, portfolio_id, project_id, snapshot_id
+
+
+def _register_user(client, *, email: str):
+    response = client.post(
+        "/auth/register",
+        json={
+            "email": email,
+            "password": "password123",
+            "display_name": "Dashboard User",
+            "consent_data_access": True,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    return {
+        "user_id": payload["user"]["user_id"],
+        "portfolio_id": payload["user"]["portfolio_id"],
+        "token": payload["token"],
+    }
+
+# def fake_thumbnail_blob():
+#     # 1x1 PNG transparent pixel
+#     png_base64 = (
+#         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8"
+#         "/w8AAgMBAQEGxEAAAAAASUVORK5CYII="
+#     )
+#     return {
+#         "data_base64": png_base64,
+#         "mime_type": "image/png"
+#     }
+
+
+
+def test_privacy_consent_creates_user_and_config(client):
+    r = client.post(
+        "/privacy-consent",
+        json={"consent_type": "data_access", "granted": True, "version": 1},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert "user_id" in body
+    user_id = body["user_id"]
+
+    r2 = client.get(f"/users/{user_id}/config")
+    assert r2.status_code == 200
+    assert r2.json()["user_id"] == user_id
+    assert isinstance(r2.json()["config"], dict)
+
+
+def test_upload_rejects_non_zip(client):
+    # Endpoint requires filename ending with .zip
+    files = {"file": ("not-a-zip.txt", b"hello", "text/plain")}
+    r = client.post("/projects/upload", files=files, data={})
+    assert r.status_code == 400
+    assert "Expected a .zip upload" in r.text
+
+
+def test_delete_snapshot_does_not_gc_shared_file_blob(client, engine):
+    # Create user/portfolio/project + two snapshots sharing one blob.
+    user_id = _u()
+    portfolio_id = _u()
+    project_id = _u()
+    snapshot_a = _u()
+    snapshot_b = _u()
+
+    sha_shared = "a" * 64
+
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO users (id) VALUES (:id)"), {"id": user_id})
+        conn.execute(
+            text("INSERT INTO portfolios (id, user_id, name) VALUES (:id, :uid, 'default')"),
+            {"id": portfolio_id, "uid": user_id},
+        )
+        conn.execute(
+            text("INSERT INTO projects (id, portfolio_id, name) VALUES (:id, :pf, 'P1')"),
+            {"id": project_id, "pf": portfolio_id},
+        )
+
+        conn.execute(
+            text(
+                """

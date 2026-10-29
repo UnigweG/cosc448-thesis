@@ -1,0 +1,161 @@
+import * as React from "react";
+import {
+  Bell,
+  Palette,
+  Landmark,
+  Settings,
+  X,
+  Database,
+  Trash2,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Alert } from "@/components/ui/alert";
+import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import {
+  fetchUserData,
+  updateUserData,
+  deleteUserData,
+} from "@/services/userService";
+import { getSession, signOut } from "next-auth/react";
+import PlaidLink from "@/components/plaidLink";
+import { handlePlaidLinkSuccess } from "@/services/plaidSuccessService";
+import { getAccounts, deleteAccount } from "@/services/accountService";
+import { ACCOUNT_CHANGED_EVENT } from '@/components/Sidebar';
+
+const categories = [
+  { id: "general", name: "General", icon: Settings },
+  { id: "personalization", name: "Personalization", icon: Palette },
+  { id: "accounts", name: "Accounts", icon: Landmark },
+  { id: "notifications", name: "Notifications", icon: Bell },
+  { id: "data-controls", name: "Data Controls", icon: Database },
+];
+
+interface SettingsSidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+type Account = {
+  id: string;
+  name: string;
+  mask: string;
+};
+
+export default function SettingsSidebar({ isOpen, onClose }: SettingsSidebarProps) {
+  const { theme, setTheme } = useTheme();
+
+  const [activeCategory, setActiveCategory] = React.useState("general");
+  const [user, setUser] = React.useState({
+    id: "",
+    firstname: "",
+    lastname: "",
+    email: "",
+    hasPassword: false,
+    currency: "CAD",
+  });
+  const [error, setError] = React.useState<string | null>(null);
+  const [success, setSuccess] = React.useState<string | null>(null);
+  const [accounts, setAccounts] = React.useState<Account[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [settingsChanged, setSettingsChanged] = React.useState(false);
+  const [pendingTheme, setPendingTheme] = React.useState<string>(theme || "light");
+  const [pendingEmailNotifications, setPendingEmailNotifications] = React.useState(false);
+
+  const modalRef = React.useRef<HTMLDivElement | null>(null);
+
+  const handleThemeToggle = (checked: boolean) => {
+    setPendingTheme(checked ? "dark" : "light");
+    setSettingsChanged(true);
+  };
+
+  const handleEmailNotificationsToggle = (checked: boolean) => {
+    setPendingEmailNotifications(checked);
+    setSettingsChanged(true);
+  };
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      if (isOpen) {
+        try {
+          const session = await getSession();
+          if (session?.user?.id) {
+            const userData = await fetchUserData(session.user.id);
+            setUser(prevState => ({
+              ...prevState,
+              ...userData,
+              currency: userData.currency || 'CAD',
+            }));
+
+            const accountsData = await getAccounts(session.user.id);
+            setAccounts(accountsData);
+          }
+        } catch (error) {
+          console.error('Error fetching data:', error);
+        }
+      }
+    };
+
+    fetchData();
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setError(null);
+      setSuccess(null);
+    }
+  }, [isOpen]);
+
+  const fetchAccounts = async () => {
+    setIsLoading(true);
+    try {
+      const session = await getSession();
+      if (session?.user?.id) {
+        const accountsData = await getAccounts(session.user.id);
+        setAccounts(accountsData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePlaidSuccess = async (publicToken: string, metadata: any) => {
+    setIsLoading(true);
+    try {
+      await handlePlaidLinkSuccess(publicToken, metadata);
+      await fetchAccounts();
+
+      window.dispatchEvent(new CustomEvent(ACCOUNT_CHANGED_EVENT));
+
+    } catch (error) {
+      console.error("Failed to connect account:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {

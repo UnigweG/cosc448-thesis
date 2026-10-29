@@ -1,0 +1,103 @@
+import { JsonObject } from "@prisma/client/runtime/library";
+import { openAI } from "@/lib/openAI/client";
+import { gemini } from "@/lib/gemini/geminiClient";
+import { generateGraph } from "@/lib/clearbot/generateGraph";
+import prismapg from "../../../../backend/db";
+import { extractPrismaSchema } from "@/lib/extractPrismaSchema";
+import { Account, Transaction } from "@/interfaces/interfaces";
+import { pinecone } from "../pinecone/client";
+
+const GEMINI_MODEL = process.env.GEMINI_CHAT_MODEL || "gemini-2.0-flash";
+if (!GEMINI_MODEL) {
+    throw new Error("GEMINI_MODEL is not set in environment variables.");
+}
+
+const OPENAI_MODEL = process.env.OPENAI_CHAT_MODEL || "gpt-3.5-turbo";
+if (!OPENAI_MODEL) {
+    throw new Error("OPENAI_MODEL is not set in environment variables.");
+}
+
+const prismaSchema = extractPrismaSchema();
+const prismaColumns = [
+    "id", "email", "firstName", "lastName", "password", "role", "preferredCurrency",
+    "createdAt", "updatedAt", "itemId", "accessToken", "userId", "accountId",
+    "availableBalance", "currentBalance", "isoCurrencyCode", "mask", "name",
+    "officialName", "persistentAccId", "subtype", "type", "transactionId",
+    "plaidItemId", "amount", "date", "authorizedDate", "category", "subCategory",
+    "categoryId", "personalFinanceCategory", "personalFinanceCategoryIconUrl",
+    "merchantName", "merchantLogoUrl", "paymentChannel", "pending", "currencyCode",
+    "transactionType", "website", "title", "message", "timestamp", "chatId",
+    "sender", "feedback", "targetAmount", "currentProgress", "priority", "dueDate"
+];
+
+function wrapColumnsInQuotes(sql: string, columns: string[]): string {
+    return columns.reduce((acc, column) => {
+        const regex = new RegExp(`(?<!")\\b${column}\\b(?!")`, "g");
+        return acc.replace(regex, `"${column}"`);
+    }, sql);
+}
+
+export async function generateUserSpecific(query: string, preferredCurrency: string, userId: string, convertedTransactions: Transaction[], convertedAccounts: Account[], chatHistory: {role: string;content: string;}[], doGenerateGraph: boolean): Promise<string> {
+    try { 
+        
+        const embedding = await openAI.embeddings.create({
+            model: "text-embedding-ada-002",
+            input: query
+        });
+
+        const index = await pinecone.index(process.env.PINECONE_INDEX_NAME);
+
+        const vectorQueryResults = await index.namespace("transactions").query({
+            topK: 10,
+            vector: embedding.data[0].embedding,
+            includeMetadata: true,
+        });
+
+        const pineconeFilters = {
+            merchants: new Set<string>(),
+            categories: new Set<string>(),
+            subcategories: new Set<string>(),
+        };
+
+        vectorQueryResults.matches?.forEach((match) => {
+            const merchant = match.metadata?.merchantName;
+            if (typeof merchant === "string") pineconeFilters.merchants.add(merchant);
+          
+            const category = match.metadata?.category;
+            if (typeof category === "string") pineconeFilters.categories.add(category);
+          
+            const subCategory = match.metadata?.subCategory;
+            if (typeof subCategory === "string") pineconeFilters.subcategories.add(subCategory);
+        });          
+
+        const pineconeContext = `
+- **Relevant Filters from Pinecone Semantic Search**:
+Merchants: ${Array.from(pineconeFilters.merchants).join(", ") || "None"}
+Categories: ${Array.from(pineconeFilters.categories).join(", ") || "None"}
+Subcategories: ${Array.from(pineconeFilters.subcategories).join(", ") || "None"}
+        `;
+
+        const sqlPrompt = `
+            You are an expert in generating SQL queries for a Prisma-backed PostgreSQL database. Your goal is to create accurate, optimized queries that retrieve relevant data while adhering to the database schema and user query requirements.
+        
+            - **Database Schema**:
+            ${prismaSchema}
+            
+            - **User Information**:
+            User ID: ${userId}
+            
+            - **User Query**:
+            "${query}"
+            
+            - **Chat History**:
+            ${JSON.stringify(chatHistory, null, 2)}
+
+            - **Transactions Context**:
+            ${JSON.stringify(convertedTransactions, null, 2)}
+
+            - **Accounts Context**:
+            ${JSON.stringify(convertedAccounts, null, 2)}
+
+            - **Pinecone Context**:
+            ${pineconeContext}
+            

@@ -1,0 +1,152 @@
+const request = require("supertest");
+const app = require("../src/app");
+const bcrypt = require("bcryptjs");
+const { describe } = require("node:test");
+let server;
+let agent;
+const prisma = require("../prisma/prisma");
+const {
+  createTestUser,
+  clearUserTable,
+  addMockAccount,
+  addMockItem,
+  addMockTransaction,
+  clearTransactions,
+  getTestPublicToken,
+  getItemsForUser,
+  getItemFromPlaid,
+  clearItems,
+} = require("./testHelpers");
+const jwt = require("jsonwebtoken");
+import { addItem } from "../src/controllers/dbPlaid";
+
+beforeAll(async () => {
+  await clearUserTable();
+});
+
+beforeEach(async () => {
+  server = await app.listen(4000);
+  agent = request.agent(server);
+});
+
+afterEach(async () => {
+  if (server) {
+    await server.close();
+  }
+  await clearUserTable();
+});
+
+describe("Create user account", () => {
+  it("invalid input", async () => {
+    const response = await agent.post("/users/signup").send({
+      email: "",
+      password: "",
+      name: "",
+    });
+    expect(response.statusCode).toBe(422);
+  });
+
+  it("Create user account", async () => {
+    const response = await agent.post("/users/signup").send({
+      email: "test@test.com",
+      password: "password",
+      name: "test_name",
+    });
+    expect(response.body.response).toBe("Account Created");
+    expect(response.statusCode).toBe(201);
+  });
+});
+
+describe("Delete user account", () => {
+  it("Invalid inputs", async () => {
+    const user = await createTestUser();
+    const res = await agent.post("/users/login").send({
+      email: user.email,
+      password: user.password,
+    });
+    const token = res.body.token;
+    // Removed: delete user can only be applied to one's own account, there's an admin method for any other necessary deletions.
+
+    //const response = await agent.delete("/users").send({
+    //  email: "bogus@email.com",
+    //  password: user.password,
+    //})
+    //  .set("Cookie", [`transactionQueryingToken=${token}`]);
+    //expect(response.statusCode).toBe(422);
+    //expect(response.body.error).toBe("Email not in database.");
+
+    const response1 = await agent.delete("/users").send({
+      email: user.email,
+      password: "bogus",
+    })
+      .set("Cookie", [`transactionQueryingToken=${token}`]);
+    expect(response1.statusCode).toBe(401);
+    expect(response1.body.error).toBe("Incorrect password.");
+  });
+
+  it("Delete account", async () => {
+    const user = await createTestUser();
+    const res = await agent.post("/users/login").send({
+      email: user.email,
+      password: user.password,
+    });
+    const token = res.body.token;
+    const response = await agent.delete("/users").send({
+      email: user.email,
+      password: user.password,
+    })
+      .set("Cookie", [`transactionQueryingToken=${token}`]);
+    expect(response.statusCode).toBe(200);
+    expect(response.text).toBe("Account deleted");
+  });
+
+  it("Delete account with plaid items", async () => {
+    const user = await createTestUser();
+    const loginResponse = await agent.post("/users/login").send({
+      email: user.email,
+      password: user.password,
+    });
+    const authToken = loginResponse.body.token;
+    // create item in Plaid
+    const token = await getTestPublicToken();
+    await agent
+      .post("/plaidtokens/exchange_public_token")
+      .send({
+        publicToken: token.public_token,
+      })
+      .set("Cookie", [`transactionQueryingToken=${authToken}`]);
+    const items = await getItemsForUser(user.id);
+    const item = items[0];
+    await agent.delete("/users").send({
+      email: user.email,
+      password: user.password,
+    })
+      .set("Cookie", [`transactionQueryingToken=${authToken}`]);
+    const dbItem = await prisma.Item.findUnique({
+      where: {
+        id: item.id,
+      },
+    });
+    // try to get item from plaid
+    const response = await getItemFromPlaid(item.accessToken);
+    // clear items
+    await clearItems();
+    expect(dbItem).toEqual(null);
+    expect(response.error_code).toEqual("ITEM_NOT_FOUND");
+  });
+});
+describe("Login actions", () => {
+  it("Invalid login", async () => {
+    const user = await createTestUser();
+    const response = await agent.post("/users/login").send({
+      email: "bogus@email.com",
+      password: user.password,
+    });
+    expect(response.statusCode).toBe(422);
+
+    const response2 = await agent.post("/users/login").send({
+      email: user.email,
+      password: "bogus password",
+    });
+    expect(response2.statusCode).toBe(422);
+  });

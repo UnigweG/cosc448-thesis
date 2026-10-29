@@ -1,0 +1,96 @@
+import { TIMEOUT } from '../../../../utils/constants'
+import runWithRetry from '../../../../utils/runUntilExist'
+import dayjs from 'dayjs'
+
+describe('Receiving Dashboard Details Page Tests', () => {
+    const email = 'requestedDetail@page.test'
+    const fakeEmail = 'invalidUser@mail.com'
+    const moreFakeEmail = 'wowsuchuser@person.com'
+    const password = 'Pass1234'
+
+    beforeEach(() => {
+        cy.task('clearDB')
+        // Can create the same user for each test, but need to create two separate submission boxes
+        cy.task('createUser', { email, password })
+        cy.task('createUser', { email: fakeEmail, password })
+        cy.task('createUser', { email: moreFakeEmail, password })
+        cy.visit('/login')
+        cy.get('[data-cy=email]').type(email)
+        cy.get('[data-cy=password]').type(password)
+        cy.get('[data-cy=submit]').click()
+        cy.url({ timeout: TIMEOUT.EXTRA_LONG }).should('not.contain', 'login')
+    })
+
+    it('should display a submission box with no information inputted other than title', () => {
+        const submissionBoxTitle = 'Test Receiving'
+        cy.task('getUserId', email).then((userId) => {
+            cy.task('createSubmissionBoxForSubmissions', { submissionBoxTitle, userId })
+        })
+        cy.reload()
+        cy.visit('/dashboard')
+        runWithRetry(() => {
+            cy.get('[data-cy="Manage Boxes"]')
+            cy.wait(1000)
+            cy.get('[data-cy="Manage Boxes"]').click()
+
+            cy.get(`[data-cy="${ submissionBoxTitle }"]`)
+            cy.wait(1000)
+            cy.get(`[data-cy="${ submissionBoxTitle }"]`).click()
+
+            cy.get('[data-cy="no-video-text"]').should(
+                'contain',
+                'No Videos Have Been Submitted to Your Box'
+            )
+        })
+        cy.get('[data-cy="submissionBoxTitle"]').should('contain', submissionBoxTitle)
+    })
+
+    it('should display a submission box with all information inputted and videos', () => {
+        const submissionBoxTitle = 'Test Receiving with Data'
+        const submissionBoxDescription =
+            'This is a description that describes what users need to submit and have in their videos.  The description is a good tool to make sure that participants in the submission box are able to determine what is needed in their submissions and the ability for them to hit their goals. :)'
+        const videoTitle = ['Test video1', 'Test video2']
+        cy.task('getUserId', email).then((userId) => {
+            cy.task('createSubmissionBoxForSubmissions', {
+                submissionBoxTitle,
+                userId,
+                submissionBoxDescription,
+                closesAt: new Date,
+            }).then((submissionBoxId) => {
+                cy.task('getUserId', fakeEmail).then((fakeUserId) => {
+                    cy.task('createRequestedBoxForSubmissionBox', {
+                        submissionBoxId: submissionBoxId,
+                        userId: fakeUserId,
+                    }).then((requestedSubmissionId) => {
+                        cy.task('createOneVideoAndRetrieveVideoId', { title: videoTitle[0] }).then((videoId) => {
+                            cy.task('submitVideoToSubmissionBox', {
+                                requestedSubmissionId: requestedSubmissionId,
+                                videoId,
+                            })
+                        })
+                    })
+                })
+                cy.task('getUserId', moreFakeEmail).then((moreFakeUserId) => {
+                    cy.task('createRequestedBoxForSubmissionBox', {
+                        submissionBoxId: submissionBoxId,
+                        userId: moreFakeUserId,
+                    }).then((requestedSubmissionId) => {
+                        cy.task('createOneVideoAndRetrieveVideoId', { title: videoTitle[1] }).then((videoId) => {
+                            cy.task('submitVideoToSubmissionBox', {
+                                requestedSubmissionId: requestedSubmissionId,
+                                videoId,
+                            })
+                        })
+                    })
+                })
+            })
+        })
+
+        runWithRetry(() => {
+            cy.visit('/dashboard')
+            cy.get('[data-cy="Manage Boxes"]')
+            cy.wait(1000)
+            cy.get('[data-cy="Manage Boxes"]').click()
+
+            cy.get(`[data-cy="${ submissionBoxTitle }"]`)
+            cy.wait(1000)  // Wait for it to be clickable

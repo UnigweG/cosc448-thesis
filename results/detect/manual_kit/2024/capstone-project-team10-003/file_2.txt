@@ -1,0 +1,128 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using KelownaSoftware.Server.Areas.Models;
+using KelownaSoftware.Server.Areas.Context;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authorization;
+using System.Linq;
+using System;
+using KelownaSoftware.Server.Areas.Models; // Ensure this is included
+using Microsoft.IdentityModel.Tokens;
+using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
+using KelownaSoftware.Infrastructure.Common.Security;
+
+namespace KelownaSoftware.Server.Areas.Controllers
+{
+    [ApiController]
+    [Route("api/[controller]")]
+    public class VendorController : ControllerBase
+    {
+        private readonly UserManager<Vendor> _userManager;
+        private readonly SignInManager<Vendor> _signInManager;
+        private readonly IConfiguration _configuration;
+        private readonly DataContext _context;
+
+        public VendorController(
+            UserManager<Vendor> userManager,
+            SignInManager<Vendor> signInManager,
+            IConfiguration configuration,
+            DataContext context
+        )
+        {
+            _userManager = userManager;
+            _signInManager = signInManager;
+            _configuration = configuration;
+            _context = context;
+        }
+
+        // Sign-In Method
+        [HttpPost("sign-in")]
+        public async Task<IActionResult> SignIn([FromBody] SignInModel model)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(ModelState);
+
+            // Authenticate user
+            var result = await _signInManager.PasswordSignInAsync(model.UserName, model.Password, isPersistent: false,
+                lockoutOnFailure: false);
+
+            if (!result.Succeeded)
+                return Unauthorized("Invalid username or password");
+
+            // Get user and roles
+            var user = await _userManager.FindByNameAsync(model.UserName);
+            if (user == null)
+                return NotFound("User not found");
+
+            var role = await _userManager.GetRolesAsync(user);
+
+            // Determine redirect URL
+
+            string redirectUrl = role.Contains("Admin") ? "/admin" : "/dashboard";
+
+
+            // Generate JWT token
+            var token = GenerateJwtToken(user, role);
+
+            // Return token and redirect URL
+            return Ok(new { token, redirectUrl, role });
+        }
+
+        // Helper method to generate JWT token
+        private string GenerateJwtToken(Vendor user, IList<string> role)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.NameIdentifier, user.Id),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email)
+            };
+
+            // Add role claims
+            claims.AddRange(role.Select(role => new Claim(ClaimTypes.Role, role)));
+
+            var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(_configuration["Jwt:PrivateKey"]));
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+            var expires = DateTime.UtcNow.AddMinutes(Convert.ToDouble(_configuration["Jwt:ExpiryMinutes"]));
+
+            var token = new JwtSecurityToken(
+                issuer: _configuration["Jwt:Issuer"],
+                audience: _configuration["Jwt:Audience"],
+                claims: claims,
+                expires: expires,
+                signingCredentials: creds
+            );
+
+            return new JwtSecurityTokenHandler().WriteToken(token);
+        }
+
+        // Additional CRUD methods for vendors
+        [HttpGet("all")]
+        public async Task<ActionResult<IEnumerable<Vendor>>> GetAllVendors()
+        {
+            var vendors = await _userManager.Users.ToListAsync();
+            return Ok(vendors);
+        }
+        
+        [HttpGet("count")]
+        public async Task<ActionResult<int>> GetAllVendorsCount()
+        {
+            var vendorCount = await _userManager.Users.CountAsync();
+            return Ok(vendorCount);
+        }
+
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Vendor>> GetVendorById(string id)
+        {
+            var vendor = await _userManager.FindByIdAsync(id);
+
+            if (vendor == null)
+                return NotFound();
+
+            return Ok(vendor);
+        }
+
+        [HttpGet("username/{userName}")]

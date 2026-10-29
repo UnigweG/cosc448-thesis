@@ -1,0 +1,137 @@
+import ast
+import csv
+import json
+import logging
+import os
+import re
+import shutil
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Callable, Dict, Optional
+
+from fpdf import FPDF
+from fpdf.enums import XPos, YPos
+
+import src.log.log as log
+import src.param.param as param
+from src.fas.fas import FileAnalysis
+from src.log.log_sorter import LogSorter
+from src.resume.resume_manager import manager
+from utils.extension_mappings import CODING_FILE_EXTENSIONS as em
+
+# Template for resume entry in PDF
+resume_entry_template = """
+{project_name} - {project_type}
+Date: {created_time} to {last_modified}"""
+
+# Template for each portfolio entry in HTML
+portfolio_entry_template = """
+<div class='{file_type}'>
+  <h2><a href={new_file_path} >{file_name}</a> - {file_type_upper}</h2>
+  <h3>Date Active: {created} to {modified}</h3>
+  {details}
+</div>
+<hr/>
+"""
+
+# Supported image file types
+image_types = [
+    "jpeg",
+    "jpg",
+    "png",
+    "gif",
+    "webp",
+    "tiff",
+    "bmp",
+    "heif",
+    "heic",
+    "avif",
+]
+
+# Supported collaborative file types
+collaborative_types = ["git"]
+
+
+def format_last_modified(file_analysis: FileAnalysis) -> str:
+    if file_analysis.last_modified == "N/A":
+        return "Current"
+    last_modified = datetime.fromisoformat(file_analysis.last_modified)
+    now = datetime.now()
+    one_month_ago = now - timedelta(days=30)
+    if last_modified > one_month_ago:
+        return "Current"
+    else:
+        return last_modified.strftime("%Y-%m-%d")
+
+
+def format_created_time(file_analysis: FileAnalysis) -> str:
+    if file_analysis.created_time == "N/A":
+        return "N/A"
+    created_time = datetime.fromisoformat(file_analysis.created_time)
+    return created_time.strftime("%Y-%m-%d")
+
+
+def clean_text(text):
+    text = " ".join(text.split())  # Remove extra spaces
+    text = text.replace("\u00a0", " ")  # Replace non-breaking spaces
+    return text
+
+
+def parse_collaborative(file_analysis: FileAnalysis):
+    key_skills = []
+    extra_data_skills = []
+    commits = []
+    author = []
+    extra_data_raw = file_analysis.extra_data
+
+    # Get key skills of git project
+    if isinstance(extra_data_raw, str):
+        try:
+            parsed = ast.literal_eval(extra_data_raw)
+            if isinstance(parsed, dict):
+                key_skills = parsed.get("key_skills", []) or []
+                extra_data_skills = parsed.get("extra data", []) or []
+                commits = parsed.get("commits", []) or []
+                author = parsed.get("author", []) or []
+        except (ValueError, SyntaxError):
+            key_skills = []
+            commits = []
+    elif isinstance(extra_data_raw, dict):
+        key_skills = extra_data_raw.get("key_skills", []) or []
+        extra_data_skills = extra_data_raw.get("extra data", []) or []
+        commits = extra_data_raw.get("commits", []) or []
+        author = extra_data_raw.get("author", []) or []
+
+    total_commits = commits.get("total_commits", 0)
+    total_insertions = commits.get("total_insertions", 0)
+    total_deletions = commits.get("total_deletions", 0)
+    net_change = commits.get("net_change", 0)
+    message_analysis_raw = commits.get("message_analysis", "N/A")
+
+    if message_analysis_raw != "N/A":
+        if isinstance(message_analysis_raw, str):
+            try:
+                # Try to parse if it's a string representation of a set
+                parsed_set = ast.literal_eval(message_analysis_raw)
+                if isinstance(parsed_set, (set, list)):
+                    message_analysis = ", ".join(sorted(parsed_set))
+                else:
+                    message_analysis = message_analysis_raw
+            except (ValueError, SyntaxError):
+                message_analysis = message_analysis_raw
+        elif isinstance(message_analysis_raw, (set, list)):
+            message_analysis = ", ".join(sorted(message_analysis_raw))
+        else:
+            message_analysis = str(message_analysis_raw)
+    else:
+        message_analysis = "N/A"
+
+    # Extract key_skills from extra_data_skills (which is a list of file dicts)
+    all_project_skills = []
+    if isinstance(extra_data_skills, list):
+        for file_dict in extra_data_skills:
+            if isinstance(file_dict, dict):
+                file_extra_data = file_dict.get("Extra data", {})
+                if isinstance(file_extra_data, dict):
+                    file_skills = file_extra_data.get("key_skills", [])
+                    if file_skills:

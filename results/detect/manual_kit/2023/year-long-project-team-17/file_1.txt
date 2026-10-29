@@ -1,0 +1,135 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.views.generic import CreateView
+from django.contrib import messages
+from django.contrib.auth.models import Group, User
+from django.urls import reverse_lazy
+from django.views import generic
+from .decorators import *
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from .forms import SignUpForm, EditProfileForm, ProfilePageForm, ChangePasswordForm, EditProfilePageForm
+from .models import Profile, Message, Presentations
+from util.generate_summary import generate_summary
+from util.generate_presentation import generate_presentation, get_presentation_info
+from util.detect_plagiarism import detect_plagiarism
+from util.generate_exercises import generate_exercises_from_prompt, generate_similar_exercises
+from util.adapt_content import generate_adapted_content
+from util.modify_presentation import check_user_message, generate_modification_assistant_response, generate_modified_presentation
+from django.http import FileResponse
+from django.core.cache import cache
+from django.http import JsonResponse
+from django.utils import timezone
+from django.core.files.storage import FileSystemStorage
+from threading import Thread
+from uuid import uuid4
+
+import subprocess
+import platform
+import docx
+from pptx import Presentation
+import PyPDF2
+import logging
+from django.http import HttpResponse, JsonResponse, Http404
+from openai import OpenAI
+import json
+from django.contrib.auth.decorators import login_required
+from django.db import models
+from django_ratelimit.decorators import ratelimit
+from django_ratelimit.core import get_usage, is_ratelimited
+from humanfriendly import format_timespan
+from django.db import connection
+from django.http import JsonResponse
+from .models import Message  
+
+
+from django.core.mail import send_mail, BadHeaderError
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
+from util import config
+from datetime import datetime, timezone
+import math
+from django.shortcuts import get_object_or_404
+from django.core.paginator import Paginator
+from collections import deque 
+from django_htmx.http import HttpResponseClientRefresh
+
+from reportlab.pdfgen import canvas
+
+from django.http import HttpResponse
+from django.conf import settings
+import os
+
+
+import subprocess
+import platform
+import os
+from django.contrib.auth import update_session_auth_hash
+# Create your views here.
+# logging.info("----"*100)
+#
+# logging.info(os.environ.get("OPENAI_API_KEY"))
+# print("----"*100)
+#
+# print(os.environ.get("OPENAI_API_KEY"))
+
+
+client = OpenAI(
+    api_key=os.environ.get("OPENAI_API_KEY"),
+)
+
+system_platform = platform.system()
+if system_platform == 'Windows':
+    presentation_root = 'media'
+elif system_platform == 'Darwin':  # macOS
+     presentation_root = 'app/media'
+elif system_platform == 'Linux':
+     presentation_root = 'app/media'
+    
+class AboutUsView(CreateView):
+    template_name = 'about_page.html'
+    model = Profile
+    form_class = ProfilePageForm
+    # fields = '__all__'
+
+
+    def form_valid(self, form):
+        form.instance.user = self.request.user
+        return super().form_valid(form)
+    
+
+def upload(request):
+    context = {}
+    if request.method == 'POST':
+        uploaded_file = request.FILES['document']
+        fs = FileSystemStorage()
+        name = fs.save(uploaded_file.name, uploaded_file)
+        context['url'] = fs.url(name)
+    return render(request, 'upload.html', context)
+
+
+
+@login_required
+def new_chats(request):
+    users = User.objects.all().exclude(username=request.user.username)
+    return render(request, 'new_chats.html', {'users': users})
+
+
+
+def get_recent_messages(request, user_id):
+    user_messages = Message.objects.filter(receiver=request.user).order_by('-timestamp')[:1]
+    if user_messages.exists():
+        latest_timestamp = user_messages[0].timestamp.date()  # Extracting only the date
+        return JsonResponse({'timestamp': latest_timestamp})
+    else:
+        return JsonResponse({'timestamp': None})
+
+
+@login_required
+def chat(request, username):
+    receiver = User.objects.get(username=username)
+    messages = Message.objects.filter(
+        (models.Q(sender=request.user) & models.Q(receiver=receiver)) |
+        (models.Q(sender=receiver) & models.Q(receiver=request.user))
+    ).order_by('timestamp')

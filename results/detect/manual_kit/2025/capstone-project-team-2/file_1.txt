@@ -1,0 +1,153 @@
+/* ==========================================================================
+   Theme Tokens
+   Shared color, surface, and sizing variables consumed by all components.
+   ========================================================================== */
+:root {
+  --bg-0: #ffffff;
+  --bg-1: #f7f8fa;
+  --bg-2: #eef1f5;
+  --bg-3: #e6ebf1;
+  --acc-0: #c6c6c6;
+  --acc-1: #bbbbbb;
+  --acc-2: #b0b0b0;
+  --acc-3: #a6a6a6;
+  --acc-4: #9c9c9c;
+  --acc-5: #929292;
+  --acc-6: #888888;
+  --acc-7: #7e7e7e;
+  --ink-0: #1d1d1f;
+  --ink-1: #515154;
+  --line: #000000;
+  --glass: rgba(0, 0, 0, 0.08);
+  --glass-strong: rgba(0, 0, 0, 0.14);
+  --glass-weak: rgba(0, 0, 0, 0.04);
+  --focus: rgba(0, 113, 227, 0.35);
+  --hover-green: #1f8f3a;
+  --control-h: 2.05rem;
+  --pill-h-nav: 3.4rem;
+  --pill-h-segmented: 2.95rem;
+  --control-py: 0.34rem;
+  --control-px: 0.64rem;
+  --control-radius: 999px;
+  --pill-radius: 9999px;
+  --surface-radius: 14px;
+  --danger: #b4232f;
+  --success: #1f8f3a;
+  --layer-nav: #ffffff;
+  --layer-shell: #ffffff;
+  --layer-card: #ffffff;
+  --layer-subcard: #ffffff;
+  --layer-control: #ffffff;
+  --layer-border: #000000;
+  --layer-status-card: #f5f5f5;
+  --layer-status-card-border: #c7c7c7;
+  --layer-status: #ececec;
+  --layer-status-border: #b3b3b3;
+  --layer-status-accent: rgba(31, 143, 58, 0.72);
+  --layer-status-accent-2: rgba(149, 167, 201, 0.52);
+  --field-fill: #f8fbff;
+  --field-border: rgba(47, 111, 214, 0.38);
+  --field-border-strong: rgba(47, 111, 214, 0.48);
+  --field-accent: rgba(47, 111, 214, 0.62);
+  --field-shadow: none;
+  --field-hover-border: rgba(47, 111, 214, 0.58);
+  --field-hover-fill: #f2f8ff;
+  --field-hover-accent: rgba(47, 111, 214, 0.9);
+  --field-hover-shadow: none;
+  --field-focus-border: rgba(0, 113, 227, 0.86);
+  --field-focus-ring: rgba(0, 113, 227, 0.28);
+  --surface-stroke: rgba(255, 255, 255, 0.8);
+  --surface-shadow: rgba(9, 16, 24, 0.14);
+  --status-row-bg: #ffffff;
+  --status-row-border: rgba(31, 143, 58, 0.32);
+  --status-row-accent: rgba(31, 143, 58, 0.62);
+  --status-ok-bg: #f7fcf8;
+  --status-ok-border: rgba(31, 143, 58, 0.46);
+  --status-ok-accent: rgba(31, 143, 58, 0.82);
+  --status-missing-bg: #fdf7f8;
+  --status-missing-border: rgba(180, 35, 47, 0.46);
+  --status-missing-accent: rgba(180, 35, 47, 0.82);
+  --status-missing-text: #8e1f29;
+}
+
+/* ==========================================================================
+   Global Reset
+   ========================================================================== */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+  background: transparent;
+}
+
+body {
+  color: var(--ink-0);
+  font-family: "SF Pro Display", "Avenir Next", "Segoe UI", sans-serif;
+  background: linear-gradient(
+    180deg,
+    #fcfdfc 0%,
+    #f3f6f4 42%,
+    #e3e8e5 72%,
+    #cad2ce 90%,
+    #aeb8b3 100%
+  );
+}
+
+[data-theme="dark"] {
+  --bg-0: #0f141a;
+  --bg-1: #141a21;
+  --bg-2: #1a222b;
+  --bg-3: #23303b;
+  --ink-0: #edf3fb;
+  --ink-1: #b7c3d3;
+  --line: #c8d1dd;
+  --hover-green: #73db97;
+  --success: #55c97d;
+  --danger: #ff7a86;
+  --layer-nav: #161e27;
+  --layer-shell: #131b24;
+  --layer-card: #18212b;
+  --layer-subcard: #1d2632;
+  --layer-control: #202b37;
+  --layer-border: rgba(219, 229, 241, 0.36);
+  --layer-status-card: #1d2733;
+  --layer-status-card-border: rgba(213, 223, 236, 0.28);
+  --layer-status: #23303c;
+  --layer-status-border: rgba(213, 223, 236, 0.32);
+  --field-fill: #1b2632;
+  --field-border: rgba(123, 177, 255, 0.46);
+  --field-border-strong: rgba(141, 189, 255, 0.62);
+  --field-accent: rgba(96, 160, 255, 0.7);
+  --field-hover-border: rgba(158, 202, 255, 0.68);
+  --field-hover-fill: #223142;
+  --field-hover-accent: rgba(123, 177, 255, 0.88);
+  --field-focus-border: rgba(147, 196, 255, 0.9);
+  --field-focus-ring: rgba(119, 180, 255, 0.32);
+  --focus: rgba(147, 196, 255, 0.4);
+  --status-row-bg: #1d2733;
+  --status-row-border: rgba(85, 201, 125, 0.44);
+  --status-row-accent: rgba(85, 201, 125, 0.78);
+  --status-ok-bg: #182b21;
+  --status-ok-border: rgba(85, 201, 125, 0.56);
+  --status-ok-accent: rgba(85, 201, 125, 0.9);
+  --status-missing-bg: #311f27;
+  --status-missing-border: rgba(255, 122, 134, 0.62);
+  --status-missing-accent: rgba(255, 122, 134, 0.88);
+  --status-missing-text: #ffd7dc;
+}
+
+[data-theme="dark"] body {
+  background: linear-gradient(
+    180deg,
+    #0d131a 0%,
+    #111a23 38%,
+    #151f2a 70%,
+    #1c2835 100%
+  );
+}
+
+/* ==========================================================================

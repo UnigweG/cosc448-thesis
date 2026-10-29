@@ -1,0 +1,145 @@
+/*
+ * Copyright [2023] [Privacypal Authors]
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+import {
+  AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminUpdateUserAttributesCommand,
+  AdminRespondToAuthChallengeCommand,
+  AttributeType,
+  ChallengeNameType,
+  CognitoIdentityProviderClient,
+  ListUsersCommand,
+  ListUsersInGroupCommand,
+  UserType,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { UserRole } from "./userRole";
+import { User } from "next-auth";
+import { createHmac } from "crypto";
+
+const userPoolId = process.env.COGNITO_POOL_ID || "";
+const clientId = process.env.COGNITO_CLIENT || "";
+const clientSecret = process.env.COGNITO_CLIENT_SECRET || "";
+
+export const client = new CognitoIdentityProviderClient();
+export interface CognitoUser {
+  username?: string;
+  email?: string;
+  lastName?: string;
+  firstName?: string;
+}
+
+/**
+ * Construct a Cognito filter string
+ * @param username string
+ * @returns string
+ */
+export function getClientSecretHash(username: string) {
+  const hasher = createHmac("sha256", clientSecret);
+  hasher.update(`${username}${clientId}`);
+  return hasher.digest("base64");
+}
+
+/**
+ * Construct a Cognito filter string
+ * @param key the Cognito attribute to filter by
+ * @param value the value to search for
+ * @param operator the operator to use for the filter, must be one of "=" (exact match) or "^=" (matching prefix)
+ * @returns a string that can be used as a filter in a Cognito API call or undefined if the value is not provided
+ */
+function buildCognitoFilter(
+  key: string,
+  value?: string,
+  operator: "=" | "^=" = "^=",
+): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+  return `\"${key}\"${operator}\"${value}\"`;
+}
+
+/**
+ * Call Cognito and returns all user information in user pool
+ * @param filterBy attribute to filter by, must be one of "username", "email", "familyName", "givenName"
+ * @param filterValue attribute value to filter by
+ * @param operator filter operator, must be one of "=" (exact match) or "^=" (matching prefix)
+ * @returns returns list of CognitoUser
+ * { username: string,
+ *   email: string,
+ *   familyName: string,
+ *   givenName: string }
+ *
+ */
+export async function getUsrList(
+  filterBy?: "username" | "email" | "firstName" | "lastName",
+  filterValue?: string,
+  operator: "=" | "^=" = "^=",
+): Promise<CognitoUser[] | null> {
+  if (filterBy && !filterValue) {
+    Promise.reject("Missing filter value.");
+  }
+
+  let filter: string | undefined;
+  switch (filterBy) {
+    case "email": {
+      filter = buildCognitoFilter("email", filterValue, operator);
+      break;
+    }
+    case "username": {
+      filter = buildCognitoFilter("username", filterValue, operator);
+      break;
+    }
+    case "firstName": {
+      filter = buildCognitoFilter("given_name", filterValue, operator);
+      break;
+    }
+    case "lastName": {
+      filter = buildCognitoFilter("family_name", filterValue, operator);
+      break;
+    }
+  }
+  const res = await client.send(
+    new ListUsersCommand({
+      UserPoolId: userPoolId,
+      AttributesToGet: ["email", "family_name", "given_name"],
+      Filter: filter,
+    }),
+  );
+  if (res.Users) {
+    return parseUsersInfo(res.Users);
+  }
+  return null;
+}
+
+/**
+ * Call Cognito and returns specified user information in user pool
+ * @param filterBy attribute to filter by, must be one of "username", "email", "familyName", "givenName"
+ * @param filterValue attribute value to filter by
+ * @param attributes array of attribute strings to query cognito for
+ * @returns returns list of CognitoUser with the specified attributes
+ * { attributes[0]: string,
+ *   attributes[1]: string,
+ *   etc }
+ *
+ */
+export async function getUsrListCustomAttributes(
+  filterBy?: "username" | "email" | "familyName" | "givenName",
+  filterValue?: string,
+  attributes?: string[],
+): Promise<CognitoUser[] | null> {
+  if (filterBy && !filterValue) {
+    Promise.reject("Missing filter value.");
+  }
+  let filter: string | undefined;

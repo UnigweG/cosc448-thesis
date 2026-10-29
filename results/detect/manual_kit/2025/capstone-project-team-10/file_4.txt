@@ -1,0 +1,143 @@
+import os
+
+import pytest
+
+import src.log.log as log
+import src.param.param as param
+from src.fas.fas import FileAnalysis
+
+path_to_test_zip = "tests/testdata/test_cli/testScanFolder.zip"
+path_to_test_folder = "tests/testdata/test_cli/testScanFolder"
+
+
+def clean_log_folder():
+    import shutil
+
+    log_folder = str(param.result_log_folder_path)
+    if os.path.exists(log_folder):
+        shutil.rmtree(log_folder)
+    os.makedirs(log_folder)
+
+
+def setup_log_tests():
+    param.init()
+    clean_log_folder()
+
+
+def clean_up_log_tests():
+    clean_log_folder()
+
+
+def checkLogOutput(file_path: str, expected_rows: list[str]) -> bool:
+    with open(file_path, "r") as log_file:
+        lines = [line.strip() for line in log_file.readlines()]
+        print("Log file contents:")
+        for line in lines:
+            print(line)
+        if len(lines) != len(expected_rows):
+            print(f"Expected {len(expected_rows)} rows, got {len(lines)}")
+            return False
+        for expected, actual in zip(expected_rows, lines):
+            if expected != actual:
+                print(f"Expected: {expected}")
+                print(f"Actual:   {actual}")
+                return False
+        return True
+
+
+test_file_analysis: FileAnalysis = FileAnalysis(
+    file_path="tests/testdata/fakeTestFile/file1.txt",
+    file_name="file1.txt",
+    file_type="txt",
+    last_modified="2023-10-01T12:00:00",
+    created_time="2023-09-30T11:00:00",
+    extra_data={"description": "EXTRA EXTRA DATA"},
+    importance=0.0,
+    customized=False,
+    project_id="ID-1",
+    file_hash="x",
+)
+
+test_file_analysis_customized: FileAnalysis = FileAnalysis(
+    file_path="tests/testdata/fakeTestFile/file1.txt",
+    file_name="file1.txt",
+    file_type="txt",
+    last_modified="2023-10-01T12:00:00",
+    created_time="2023-09-30T11:00:00",
+    extra_data={"description": "EXTRA EXTRA DATA"},
+    importance=0.0,
+    customized=True,
+    project_id="ID-2",
+    file_hash="x",
+)
+
+import json
+
+expectedHeader: str = "File path analyzed,File name,File type,Last modified,Created time,Extra data,Importance,Customized,Project id,File hash"
+expectedProjectRow: str = (
+    'ID-1,ID-1,Project,,,"{""description"": """"}",0.0,False,ID-1,'
+)
+expectedBody: str = 'tests/testdata/fakeTestFile/file1.txt,file1.txt,txt,2023-10-01T12:00:00,2023-09-30T11:00:00,"{""description"": ""EXTRA EXTRA DATA""}",0.0,False,ID-1,x'
+expectedBodyCustomized: str = 'tests/testdata/fakeTestFile/file1.txt,file1.txt,txt,2023-10-01T12:00:00,2023-09-30T11:00:00,"{""description"": ""EXTRA EXTRA DATA""}",0.0,True,ID-2,x'
+
+
+class TestLog:
+    def test_log_start(self):
+        setup_log_tests()
+        log.open_log_file()
+        global test_file_analysis
+        log.write(test_file_analysis)
+        log_file_path = str(os.path.join(param.result_log_folder_path, "0.log"))
+        expected_rows = [
+            expectedHeader,
+            expectedProjectRow,
+            expectedBody,
+        ]
+        assert checkLogOutput(log_file_path, expected_rows)
+        clean_up_log_tests()
+
+    def test_log_append(self):
+        setup_log_tests()
+        global test_file_analysis
+        log.write(test_file_analysis)
+        log_file_path = str(os.path.join(param.result_log_folder_path, "0.log"))
+        expected_rows = [
+            expectedHeader,
+            expectedProjectRow,
+            expectedBody,
+        ]
+        assert checkLogOutput(log_file_path, expected_rows)
+        clean_up_log_tests()
+
+    def test_log_continue(self):
+        setup_log_tests()
+        log.open_log_file()
+        log.open_log_file()
+        log.resume_log_file()
+        global test_file_analysis
+        log.write(test_file_analysis)
+        log_file_path = str(os.path.join(param.result_log_folder_path, "1.log"))
+        expected_rows = [
+            expectedHeader,
+            expectedProjectRow,
+            expectedBody,
+        ]
+        assert checkLogOutput(log_file_path, expected_rows)
+        clean_up_log_tests()
+
+    def test_log_no_available_continue(self):
+        setup_log_tests()
+        log.resume_log_file()
+        global test_file_analysis
+        log.write(test_file_analysis)
+        log_file_path = str(os.path.join(param.result_log_folder_path, "0.log"))
+        expected_rows = [
+            expectedHeader,
+            expectedProjectRow,
+            expectedBody,
+        ]
+        assert checkLogOutput(log_file_path, expected_rows)
+        clean_up_log_tests()
+
+    def test_log_max_logs(self):
+        setup_log_tests()

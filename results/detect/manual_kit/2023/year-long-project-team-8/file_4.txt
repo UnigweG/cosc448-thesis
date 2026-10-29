@@ -1,0 +1,132 @@
+import React, { useState, useEffect, useRef, useContext } from "react";
+import {
+  ScrollView,
+  TouchableWithoutFeedback,
+  Keyboard,
+  TouchableOpacity,
+  ImageBackground,
+  Image,
+  ActivityIndicator,
+  View,
+  Text,
+} from "react-native";
+import { useRoute, useNavigation } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
+import { categoryIcons } from "../Categories";
+import { allergens } from "../Allergens";
+import DatePicker from "./DatePicker";
+import TitleInput from "./TitleInput";
+import DescriptionInput from "./DescriptionInput";
+import CategoriesSelector from "./CategoriesSelector";
+import AllergensSelector from "./AllergensSelector";
+import SubmitButton from "./SubmitButton";
+import CancelButton from "./CancelButton";
+import ImagePickerComponent from "./ImagePickerComponent";
+import styles from "./styles";
+import CustomAlertModal from "../CustomAlertModal";
+import { updateProduct } from "../helperFunctions/apiHelpers";
+import AuthContext from "../../context/AuthContext";
+import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
+import { GOOGLE_API_KEY } from "@env";
+
+const EditPost = () => {
+  const route = useRoute();
+  const navigation = useNavigation();
+  const scrollViewRef = useRef();
+  const { post } = route.params;
+  const { authTokens } = useContext(AuthContext);
+
+  // state variables for the post attributes
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedAllergens, setSelectedAllergens] = useState([]);
+  const [bestBefore, setBestBefore] = useState("");
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(new Date(post.best_before));
+  const [images, setImages] = useState([]);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const [isTitleValid, setIsTitleValid] = useState(true);
+  const [isContentValid, setIsContentValid] = useState(true);
+  const [isAlertVisible, setIsAlertVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
+  const backArrowIcon = require("../../assets/icons/back-arrow.png");
+  const [longitude, setLongitude] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [location, setLocation] = useState("");
+  const autoCompleteRef = useRef();
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Function to handle date change
+  const handleDateChange = (event, selectedDate) => {
+    const currentDate = selectedDate || bestBefore;
+    setDatePickerVisible(Platform.OS === "ios");
+    setSelectedDate(currentDate);
+
+    // Format the date and update bestBefore state
+    const formattedDate = currentDate.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+    setBestBefore(formattedDate);
+  };
+
+  // Function to show the date picker
+  const showDatePicker = () => {
+    setDatePickerVisible(true);
+  };
+
+  useEffect(() => {
+    if (autoCompleteRef.current && post.location) {
+      autoCompleteRef.current.setAddressText(post.location);
+    }
+  }, [post]);
+  useEffect(() => {
+    if (autoCompleteRef.current && post.location) {
+      autoCompleteRef.current.setAddressText(post.location);
+    }
+  }, []);
+
+  useEffect(() => {
+    setTitle(post.title);
+    setContent(post.content);
+    setLocation(post.location);
+    setLatitude(post.latitude);
+    setLongitude(post.longitude);
+    setSelectedCategories(
+      post.categories
+        ? post.categories.split(",").map((category) => category.trim())
+        : []
+    );
+    setSelectedAllergens(
+      post.allergens
+        ? post.allergens.split(",").map((allergen) => allergen.trim())
+        : []
+    );
+    if (post.best_before) {
+      const date = new Date(post.best_before);
+      const formattedDate = date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+      setBestBefore(formattedDate);
+      setImages(post.images.map((img) => img.image));
+      console.log(post.images.map((img) => img));
+    }
+  }, [post, route.params]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => (
+        <TouchableOpacity onPress={handleCancel}>

@@ -1,0 +1,144 @@
+"use client";
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import Logo from "@/public/Logo.svg";
+import { UserIcon } from "@heroicons/react/solid";
+import {
+  TrashIcon,
+  PencilIcon,
+  CheckIcon,
+  XIcon,
+  SearchIcon,
+} from "@heroicons/react/solid";
+import { logout } from "@/lib";
+import { User } from "@/interfaces/interfaces";
+
+const base_path = process.env.BASE_PATH!;
+
+export default function AdminView() {
+  const [users, setUsers] = useState<User[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [editUserId, setEditUserId] = useState<string | null>(null);
+  const [editedFirstName, setEditedFirstName] = useState("");
+  const [editedLastName, setEditedLastName] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    role: "USER",
+  });
+  const [errors, setErrors] = useState<string | null>(null);
+
+  // Fetch users from the database
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${base_path}api/admin`);
+        if (!response.ok) throw new Error("Failed to fetch users");
+        const data = await response.json();
+        const nonAdminUsers = data.filter(
+          (user: User) => user.role !== "ADMIN"
+        );
+        setUsers(nonAdminUsers);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  // Filter users
+  const filteredUsers = users.filter((user) => {
+    const fullName = `${user.firstName} ${user.lastName}`.toLowerCase();
+    const email = user.email;
+    return (
+      fullName.includes(searchTerm.toLowerCase()) ||
+      email.includes(searchTerm.toLowerCase())
+    );
+  });
+
+  // Handle user deletion
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      const response = await fetch(`${base_path}api/admin`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (!response.ok) throw new Error("Failed to delete user");
+
+      setUsers(users.filter((user) => user.id !== userId));
+      setShowDeleteConfirm(false);
+      setUserToDelete(null);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // Handle name update
+  const handleUpdateUser = async (userId: string) => {
+    try {
+      const response = await fetch(`${base_path}api/admin`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          firstName: editedFirstName,
+          lastName: editedLastName,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update user");
+
+      const updatedUser = await response.json();
+      setUsers(
+        users.map((user) => (user.id === userId ? updatedUser.user : user))
+      );
+      setEditUserId(null);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const openDeleteConfirm = (userId: string) => {
+    setShowDeleteConfirm(true);
+    setUserToDelete(userId);
+  };
+
+  const enableEditMode = (user: User) => {
+    setEditUserId(user.id);
+    setEditedFirstName(user.firstName);
+    setEditedLastName(user.lastName);
+  };
+
+  const cancelEdit = () => {
+    setEditUserId(null);
+    setEditedFirstName("");
+    setEditedLastName("");
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-gray-200 text-black">
+      {/* Header */}
+      <div className="mb-16 flex flex-row justify-between items-center bg-blue-600 p-6 shadow-md">
+        <a href={base_path} className="flex flex-row items-center">
+          <Image src={Logo} alt="Clearjar Logo" height={60} width={60} />
+          <span className="ml-2 text-white font-bold text-2xl italic">
+            ClearJar
+          </span>
+        </a>
+        <h1 className="text-3xl font-extrabold text-white">Admin Dashboard</h1>
+        <span className="bg-white w-24 text-center px-3 py-2 rounded-md text-black hover:bg-gray-700 hover:text-white transition-colors duration-300 ease-in-out">
+          <button className="capitalize font-semibold" onClick={() => logout()}>
+            Logout
+          </button>
+        </span>
+      </div>
+  
+      <div className="flex-grow space-y-6 w-full max-w-4xl mx-auto">

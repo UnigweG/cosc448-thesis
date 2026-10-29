@@ -1,0 +1,114 @@
+import pymysql
+from sshtunnel import SSHTunnelForwarder
+import os 
+from dotenv import load_dotenv
+import sys 
+from datetime import datetime, timezone
+
+sys.path.append(os.path.abspath('../app'))
+load_dotenv() 
+SSH = os.getenv("SSH") == 'True'
+SSHUSER = os.getenv("SSHUSER")
+KPATH = os.getenv("KEYPATH")
+ADDRESS = os.getenv("ADDRESS")
+PORT = int(os.getenv("PORT"))
+DBUSER = os.getenv("DBUSER")
+DBPASS = os.getenv("PASS")
+HOST = os.getenv("HOST")
+DBNAME = os.getenv("MYDB")
+TEST = os.getenv("TEST")
+EC2 = os.getenv("EC2_ADDRESS")
+TESTDB = os.getenv("TESTDB")
+
+if(TEST.lower() == "true"):
+    DBNAME = TESTDB
+
+def insert_user(email:str, password:str, firstname:str, lastname:str, salthash, pubKey, verifyKey, verifiedAcc: bool =False) -> int:
+    '''
+    Insert a new user into the database.
+
+    Args:
+        email (str): The email address of the new user.
+        password (str): The hashed password of the new user.
+        firstname (str): The first name of the new user.
+        lastname (str): The last name of the new user.
+
+    Returns:
+        int: An integer result code indicating the outcome of the insertion operation.
+             - 1: Insertion was successful.
+             - -1: An error occurred during insertion.
+
+    Example:
+        # Example usage to insert a new user into the database
+        result = insert_user("new_email", "hashed_password", "John", "Doe")
+    '''
+    db = None
+    result = None
+    try:
+        if SSH:
+            # Creates the SSH tunnel to connect to the DB
+            with SSHTunnelForwarder((EC2), ssh_username=SSHUSER, ssh_pkey=KPATH, remote_bind_address=(ADDRESS,PORT)) as tunnel:
+        # Creates the SSH tunnel to connect to the DB
+                print("SSH Tunnel Established")
+                # Db connection string using SSH tunnel
+                db = pymysql.connect(host=HOST, user=DBUSER, password=DBPASS, port=tunnel.local_bind_port, database=DBNAME)
+                cur = db.cursor()
+                # Insert String
+                query = "INSERT INTO userprofile (email, password_hash, firstname, lastname, salthash, publickey, verifyKey, verifiedAcc) values (%s,%s,%s,%s,%s,%s,%s,%s)"
+                # Creates list of the insertations
+                data = (email, password, firstname, lastname, salthash, pubKey, verifyKey, verifiedAcc)
+                # Executes the query w/ the corresponding data
+                cur.execute(query, data)
+                print("Insertation Complete")
+                db.commit()
+                # Returns 1 if successful
+                result = 1
+        else:
+            # Db connection string without SSH tunnel
+            db = pymysql.connect(host=HOST, user=DBUSER, password=DBPASS, port=PORT, database=DBNAME)
+            cur = db.cursor()
+            # Insert String
+            query = "INSERT INTO userprofile (email, password_hash, firstname, lastname, salthash, publickey, verifyKey, verifiedAcc) values (%s,%s,%s,%s,%s,%s,%s,%s)"
+            # Creates list of the insertations
+            data = (email, password, firstname, lastname, salthash, pubKey, verifyKey, verifiedAcc)
+            # Executes the query w/ the corresponding data
+            cur.execute(query, data)
+            print("Insertation Complete")
+            db.commit()
+            # Returns 1 if successful
+            result = 1
+    except Exception as e:
+        print(e)
+        # Returns 1 if errors
+        result = -1
+    finally:
+        if db:
+            db.close()
+        # Returns what 1 or -1 
+        return result
+
+def insert_video(videoId:str, videoName:str, retDate:datetime, senderEmail:str, receiverEmail:str, senderEncryption, receiverEncryption) -> int:
+    '''
+    Insert a new video into the database.
+
+    Args:
+        subDate (str): The username of the new user.
+        retDate (str): The email address of the new user.
+        senderID (int): The hashed password of the new user.
+        receiverID (int): The last name of the new user.
+
+    Returns:
+        int: An integer result code indicating the outcome of the insertion operation.
+             - 1: Insertion was successful.
+             - -1: An error occurred during insertion.
+
+    Example:
+        # Example usage to insert a new video into the database
+        result = insert_video("29-10-23T10:34:09", "01-01-24T01:00:00", "1", "2")
+    '''
+    db = None
+    result = None
+    print(videoName)
+    try:
+        if SSH:
+            # Creates the SSH tunnel to connect to the DB

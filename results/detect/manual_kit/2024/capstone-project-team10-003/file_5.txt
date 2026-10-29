@@ -1,0 +1,215 @@
+/* Header Styles */
+header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    padding: 1rem 0; /* Reduced horizontal padding */
+    z-index: 2;
+}
+
+.header-white-bg {
+    background-color: white;
+}
+
+.header-container {
+    max-width: 1200px; /* Limits the width to bring elements closer */
+    margin: 0 auto; /* Centers the container */
+    display: flex;
+    justify-content: space-between; /* Keeps logo and nav apart within container */
+    align-items: center;
+    padding: 0 2rem; /* Inner padding for spacing */
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #1e90ff;
+    text-decoration: none;
+}
+
+.nav-menu {
+    display: flex;
+    gap: 1rem; /* Reduced gap from 1.5rem to 1rem for tighter spacing */
+    align-items: center;
+}
+
+.nav-btn {
+    color: #333333;
+    text-decoration: none;
+    font-size: 1rem;
+    transition: color 0.3s ease;
+}
+
+.nav-btn:hover {
+    color: #1e90ff;
+}
+
+.nav-get-started {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    margin-left: 1.5rem;
+    background: transparent;
+    border: 2px solid #1e90ff;
+    border-radius: 2rem;
+    color: #1e90ff;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s ease;
+}
+
+.nav-get-started .arrow {
+    font-size: 1.2rem;
+}
+
+.nav-get-started:hover {
+    background: #1e90ff;
+    color: #ffffff;
+}
+
+/* Hero Section Styles */
+.hero-section {
+    position: relative;
+    display: flex;
+    min-height: 100vh;
+    width: 100%;
+    max-width: 100vw;
+    flex-direction: column;
+    overflow: hidden;
+    background: radial-gradient(circle at center, #ffffff 0%, #e6f0fa 100%);
+    background-image: url('data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"%3E%3Cg fill="%23d3e0ea" fill-opacity="0.05"%3E%3Ccircle cx="50" cy="50" r="1"/%3E%3Ccircle cx="25" cy="25" r="1"/%3E%3Ccircle cx="75" cy="75" r="1"/%3E%3Ccircle cx="25" cy="75" r="1"/%3E%3Ccircle cx="75" cy="25" r="1"/%3E%3C/g%3E%3C/svg%3E');
+    background-size: 100px 100px;
+}
+
+.hero-content {
+    display: flex;
+    height: 100%;
+    min-height: 100vh;
+    width: 100%;
+    flex-direction: column;
+    justify-content: center;
+    gap: 1.5rem;
+    padding: 5%;
+    position: relative;
+    z-index: 1;
+}
+
+.text-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.gradient-text {
+    text-align: center;
+    font-size: 3.75rem;
+    font-weight: 600;
+    /*text-transform: uppercase;*/
+    line-height: 80px;
+    background: linear-gradient(90deg, #1e90ff, #87cefa);
+    -webkit-background-clip: text;
+    color: transparent;
+}
+
+.subtext {
+    margin-top: 2.5rem;
+    max-width: 450px;
+    padding: 0.5rem;
+    text-align: center;
+    color: #666666;
+}
+
+.button-container {
+    margin-top: 2.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.btn {
+    padding: 0.75rem 1.5rem;
+    text-decoration: none;
+    border-radius: 0.375rem;
+    transition: all 0.3s ease;
+}
+
+.primary-btn {
+    background: linear-gradient(90deg, #1e90ff, #87cefa);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(30, 144, 255, 0.5);
+}
+
+.primary-btn:hover {
+    transform: scaleX(1.03);
+}
+
+.secondary-btn {
+    display: flex;
+    gap: 0.5rem;
+    background-color: #ffffff;
+    color: #1e90ff;
+    border: 1px solid #1e90ff;
+    align-items: center;
+}
+
+.secondary-btn:hover {
+    background-color: #1e90ff;
+    color: #ffffff;
+}
+
+.play-icon {
+    width: 1rem;
+    height: 1rem;
+    position: relative;
+    display: inline-block;
+}
+
+.play-icon::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-40%, -50%);
+    width: 0;
+    height: 0;
+    border-left: 0.6rem solid #1e90ff;
+    border-top: 0.4rem solid transparent;
+    border-bottom: 0.4rem solid transparent;
+    transition: border-left-color 0.3s ease;
+}
+
+.secondary-btn:hover .play-icon::before {
+    border-left-color: #ffffff;
+}
+
+.dashboard-container {
+    position: relative;
+    margin-top: 2rem;
+    display: flex;
+    width: 100%;
+    justify-content: center;
+    align-items: center;
+}
+
+.dashboard {
+    position: relative;
+    max-width: 80%;
+    overflow: hidden;
+    border-radius: 0.75rem;
+    background: transparent;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.95;
+}
+
+.hero-img-bg-grad {
+    position: absolute;
+    left: 20%;

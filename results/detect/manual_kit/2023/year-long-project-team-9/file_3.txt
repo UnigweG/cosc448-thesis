@@ -1,0 +1,164 @@
+"use client";
+{
+  /*IMPORTS*/
+}
+import React from "react";
+import { format } from "date-fns";
+import { useRouter } from "next/navigation";
+import {
+  useForm,
+  SubmitHandler,
+  useFieldArray,
+  Controller,
+} from "react-hook-form";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Plus, X, Calendar as CalendarIcon } from "lucide-react";
+import { createRequestValidation } from "../app/functions/createRequestValidation";
+import { ScrollArea } from "./ui/scroll-area";
+
+// export async function getServerSideProps() {
+//   return {
+//     props: {}, // nothing yet
+//   };
+// }
+
+{
+  /*FUNCTIONS*/
+}
+{
+  /*Create a type to determine the data of the form*/
+}
+export interface formSchema {
+  title: string;
+  clients: { value: string }[];
+  description: string;
+  blurred: boolean;
+  dueDate: Date;
+  language: string;
+  terms: boolean;
+}
+{
+  /*Create a function to form the CreateRequest page*/
+}
+const CreateRequest = () => {
+  {
+    /*Create a router object to handle cancelling and submitting the form*/
+  }
+  const router = useRouter();
+  {
+    /*Create a register and handle submit function using React Hook Forms and add default values to form values*/
+  }
+  const {
+    control,
+    register,
+    handleSubmit,
+    setValue,
+    formState: { errors },
+  } = useForm<formSchema>({
+    defaultValues: {
+      title: "",
+      clients: [{ value: "" }],
+      description: "",
+      blurred: true,
+      dueDate: new Date(),
+      language: "",
+      terms: false,
+    },
+  });
+  {
+    /*Create a field array and appropriate methods to add and remove items*/
+  }
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "clients",
+    rules: {
+      required: true,
+    },
+  });
+  {
+    /*Create a function to cancel the request and return to the homepage*/
+  }
+  const handleCancel = () => {
+    router.push("/");
+  };
+  {
+    /*Create a function to submit data*/
+  }
+  const onSubmit: SubmitHandler<formSchema> = (data: formSchema) => {
+    if (createRequestValidation(data)) {
+      const response = fetch("/api/createRequest", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+    } else {
+      console.log("Invalid!");
+    }
+  };
+  const [title, setTitle] = React.useState("");
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setTitle(value);
+  };
+  const [clientList, setClientList] = React.useState([{ client: "" }]);
+  const handleClientAdd = () => {
+    setClientList([...clientList, { client: "" }]);
+    append({ value: "" });
+  };
+  const handleClientRemove = (index: number) => {
+    const list = [...clientList];
+    list.splice(index, 1);
+    setClientList(list);
+    remove(index);
+  };
+  const handleClientChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    index: number
+  ) => {
+    const { name, value } = e.target;
+    const list = [...clientList];
+    list[index].client = value;
+    setClientList(list);
+  };
+  const [desc, setDesc] = React.useState("");
+  const handleDescChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setDesc(value);
+  };
+  const [isBlurred, setBlurred] = React.useState(true);
+  const [date, setDate] = React.useState<Date>(new Date());
+  const [language, setLanguage] = React.useState("");
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setLanguage(value);
+  };
+  const [terms, setTerms] = React.useState(false);
+  const handleTermsChange = () => {
+    const newTerms = !terms;
+    setTerms(newTerms);
+    setValue("terms", newTerms);
+  };
+  {
+    /*Main return function to create web page*/
+  }
+  return (
+    <ScrollArea>
+      <form role="form" onSubmit={handleSubmit(onSubmit)} className="md:px-24">
+        {/*Div to contain the request card and the preview card*/}
+
+        <div
+          id="cards"

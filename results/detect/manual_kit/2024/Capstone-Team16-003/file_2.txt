@@ -1,0 +1,117 @@
+import React, { useState, useEffect } from 'react';
+import { DndContext, DragOverlay, useSensor, useSensors, PointerSensor } from '@dnd-kit/core';
+import DraggableCard from '../components/main/DraggableCard';
+import DroppableTeam from '../components/main/DroppableTeam';
+import CreateUserModal from '../components/main/CreateUserModal';
+import CreateTeamModal from '../components/main/CreateTeamModal';
+import '../styles/AdminPage.css';
+import '../styles/Common.css';
+import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from 'react-i18next';
+
+const AdminPage = () => {
+  const { t } = useTranslation();
+  const { authState } = useAuth();
+  const navigate = useNavigate();
+
+  const [teams, setTeams] = useState([]);
+  const [brokers, setBrokers] = useState([]);
+  const [managers, setManagers] = useState([]);
+  
+  const [activeItem, setActiveItem] = useState(null);
+  const [activeTab, setActiveTab] = useState('brokers');
+  const [brokerSearch, setBrokerSearch] = useState('');
+  const [managerSearch, setManagerSearch] = useState('');
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [showTeamModal, setShowTeamModal] = useState(false);
+  const [editingTeam, setEditingTeam] = useState(null);
+  const [editingUser, setEditingUser] = useState(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const teamsRes = await fetch('/api/teams');
+        const brokersRes = await fetch('/api/brokers');
+        const managersRes = await fetch('/api/managers');
+
+        if (teamsRes.ok) {
+          const teamsData = await teamsRes.json();
+          // Map team id with prefix and ensure arrays exist.
+          const mappedTeams = teamsData.map(team => ({
+            ...team,
+            id: "team-" + team.id,
+            brokerIds: team.brokerIds || [],
+            managerIds: team.managerIds || []
+          }));
+          setTeams(mappedTeams);
+        } else {
+          console.error("Failed to fetch teams");
+        }
+        if (brokersRes.ok) {
+          const brokersData = await brokersRes.json();
+          const mappedBrokers = brokersData.map(broker => ({
+            ...broker,
+            id: "broker-" + broker.id,
+            teamId: broker.team_id // numeric value from backend
+          }));
+          setBrokers(mappedBrokers);
+        } else {
+          console.error("Failed to fetch brokers");
+        }
+        if (managersRes.ok) {
+          const managersData = await managersRes.json();
+          const mappedManagers = managersData.map(manager => ({
+            ...manager,
+            id: "manager-" + manager.id,
+            teamId: manager.team_id // numeric value from backend
+          }));
+          setManagers(mappedManagers);
+        } else {
+          console.error("Failed to fetch managers");
+        }
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Drag and drop handlers (unchanged)
+  const handleDragStart = (event) => {
+    const { active } = event;
+    if (active.id.startsWith('broker-')) {
+      const item = brokers.find(b => b.id === active.id);
+      setActiveItem({ ...item, type: 'broker' });
+    } else if (active.id.startsWith('manager-')) {
+      const item = managers.find(m => m.id === active.id);
+      setActiveItem({ ...item, type: 'manager' });
+    }
+  };
+
+  const handleDragEnd = async (event) => {
+    const { over } = event;
+    if (over && over.id && over.id.startsWith('team-') && activeItem) {
+      const targetTeamNumericId = over.id.split('-')[1];
+      const userNumericId = activeItem.id.split('-')[1];
+      
+      if (activeItem.type === 'broker') {
+        try {
+          const res = await fetch(`/api/brokers/${userNumericId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ team_id: targetTeamNumericId })
+          });
+          if (res.ok) {
+            setBrokers(prev =>
+              prev.map(b => b.id === activeItem.id ? { ...b, teamId: targetTeamNumericId } : b)
+            );
+            setTeams(prevTeams =>
+              prevTeams.map(team => {
+                if (team.id === over.id) {
+                  if (!team.brokerIds.includes(userNumericId)) {

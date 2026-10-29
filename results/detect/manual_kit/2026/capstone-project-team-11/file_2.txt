@@ -1,0 +1,127 @@
+"""Result validation and CSV import endpoints.
+
+Endpoints
+---------
+POST /courses/{course_id}/exams/{exam_id}/results/preview
+    Parse a CSV upload and return a full validation report (no DB writes).
+
+POST /courses/{course_id}/exams/{exam_id}/results/confirm
+    Re-parse the same CSV, validate, and commit rows only if the file has no
+    blocking validation errors.
+
+Error vs warning policy
+-----------------------
+Errors   — block import:
+    missing_student_number      student_number field is blank
+    unknown_variant             variant_code not in this exam
+    not_enrolled                student not enrolled in this course
+    duplicate_student           student_number appears more than once in the file
+    invalid_answer              answer format doesn't match the question type
+    unexpected_question_number  answer for a question that doesn't exist in the variant
+    non_omr_answer              answer submitted for a written question
+
+Warnings — non-blocking:
+    missing_answer      answer field is blank
+    already_imported    student already has a result (will overwrite on confirm)
+"""
+
+from dataclasses import asdict
+import math
+import re
+import statistics
+from typing import Annotated, Literal, Optional
+
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from app.api.v1.routers._exam_guards import get_own_exam as _get_own_exam
+from app.api.v1.routers._exam_guards import get_own_variant as _get_own_variant
+from app.core.db import get_db
+from app.core.deps import get_course_for_instructor, require_instructor
+from app.modules.course import Course
+from app.modules.exam import Exam
+from app.modules.exam_result import ExamResult
+from app.modules.exam_variant import ExamVariant
+from app.modules.question import (
+    DIFFICULTY_LEVELS,
+    OMR_GRADABLE_QUESTION_TYPES,
+    QUESTION_TYPES,
+    Question,
+)
+from app.modules.student import Student
+from app.modules.student_course import StudentCourse
+from app.modules.student_response import StudentResponse
+from app.modules.activity_log import ActivityEventType
+from app.modules.user import User
+from app.modules.variant_question import VariantQuestion
+from app.schemas.question import TagRead
+from app.schemas.result import (
+    ChoiceBreakdown,
+    CommonlyMissedQuestion,
+    CourseExamBreakdown,
+    CourseStudentResultDetail,
+    CourseStudentResultList,
+    CourseSummaryStats,
+    CsvPreviewReport,
+    ExamBreakdownItem,
+    ExamQualityStats,
+    ExamQuestionStats,
+    ExamResultScoreUpdate,
+    ExamStudentResultBulkDeleteRequest,
+    ExamStudentResultBulkDeleteResponse,
+    ExamStudentResultDetail,
+    ExamStudentResultList,
+    ExamSummaryStats,
+    ExamTeamResultBulkDeleteRequest,
+    ExamTeamResultBulkDeleteResponse,
+    ExamVariantComparison,
+    ImportSummary,
+    IncorrectChoiceFrequency,
+    QuestionPairAgreementRead,
+    QuestionReportExportRequest,
+    QuestionStats,
+    ResponsePatternStats,
+    ScoreDistribution,
+    SelectedTeamReportExportRequest,
+    SelectedStudentReportExportRequest,
+    SimilarResponsePairRead,
+    TeamBreakdownItem,
+    TeamTestStats,
+    UnusualPatternFlagRead,
+)
+from app.services.activity_logger import log_activity
+from app.services.analytics_filters import (
+    normalize_tag_name_filter,
+    validate_enum_values,
+    validate_range,
+)
+from app.services.csv_import import build_preview, parse_csv_bytes
+from app.services.csv_utils import CSV_CONTENT_TYPES
+from app.services.exam_statistics import classify_difficulty, compute_p_value
+from app.services.marking_scheme import (
+    compute_bulk_student_result_breakdowns,
+    compute_exam_question_statistics,
+    compute_exam_student_question_matrix,
+)
+from app.services.pass_thresholds import (
+    calculate_pass_rate,
+    percentage_passed,
+    resolve_pass_threshold,
+    result_passed,
+    score_percentage,
+)
+from app.services.response_patterns import (
+    compute_question_pair_agreement,
+    detect_unusual_answer_patterns,
+    find_similar_response_pairs,
+    rank_commonly_missed_questions,
+    rank_commonly_selected_incorrect_choices,
+)
+from app.services.import_templates import build_exam_results_import_template
+from app.services.printable_exam_format import safe_filename_part
+from app.services.report_export import (
+    build_all_teams_report_csv,
+    build_all_teams_report_pdf,
+    build_bulk_course_report_csv,

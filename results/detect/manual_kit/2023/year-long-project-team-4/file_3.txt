@@ -1,0 +1,146 @@
+import React, {useState, useEffect} from 'react'
+import {Container, Row, Alert, Form, Offcanvas, Modal, Button, ToggleButtonGroup, Spinner, ToggleButton, Col} from 'react-bootstrap'
+import Webcam from 'react-webcam';
+import  {ReactComponent as Record} from "../Assets/record-btn.svg"
+import axios from "axios";
+import info from "../Assets/info-circle.svg"
+import { Fade } from 'react-reveal';
+import { IP_ADDRESS , viewSentVideoPath} from '../Path';
+import Sidebar from './Sidebar';
+import ysfixWebmDuration from "fix-webm-duration";
+import { useNavigate } from 'react-router-dom';
+import '../css/UploadVideoPage.css'
+
+const UploadVideoPage = ({setIsCollapsed, isCollapsed}) => {
+  const [type, setType] = useState(1);
+  const [time, setTime] = useState(0);
+  const [backend, setBackend] = useState(null);
+  const [disable, setDisable] = useState(true);
+  const [disableRecord, setDisableRecord] = useState(false);
+  const webcamRef = React.useRef(null);
+  const mediaRecorderRef = React.useRef(null);
+  const [capturing, setCapturing] = React.useState(false);
+  const [recordedChunks, setRecordedChunks] = React.useState([]);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [show, setShow] = useState(false);
+  const [load, setLoad] = useState(false);
+  const [modal, setModal] = useState(true);
+  const [isMobile, setIsMobile] = useState(false)
+
+  //user fields
+  const [file, setFile] = useState(null);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [tags, setTags] = useState([]);
+  const [retentionPeriod, setRetentionPeriod] = useState(90);
+  const [videoName, setVideoName] = useState('');
+
+  let startTime;
+  var duration;
+  const navigate = useNavigate();
+
+  const width = 400; 
+  const height = 225;
+
+  const handleResize = () => {
+    if (window.innerWidth < 720) {
+        setIsMobile(true)
+    } else {
+        setIsMobile(false)
+    }
+  }
+
+  useEffect(() => {
+    window.addEventListener("resize", handleResize)
+  })
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && tagsInput.trim()) {
+      setTags([...tags, tagsInput.trim()]);
+      setTagsInput(''); // Reset input field to empty string
+      event.preventDefault();
+    }
+  };
+
+  const removeTag = (indexToRemove) => {
+    setTags(tags.filter((_, index) => index !== indexToRemove));
+  };
+
+  const handleClose = () => setShow(false);
+  
+  const handleShow = () => setShow(true);  
+
+  const handleType = (typeNumber) => {
+    setType(typeNumber);
+    setFile(null);
+  }
+
+  const handleStartRecord = React.useCallback(() => {
+    setCapturing(true);
+    startTime = Date.now();
+    mediaRecorderRef.current = new MediaRecorder(webcamRef.current.stream, {
+      mimeType: "video/webm"
+      });
+
+    mediaRecorderRef.current.addEventListener(
+      "dataavailable",
+      handleDataAvailable
+      );
+
+    mediaRecorderRef.current.start();
+    }, [webcamRef, setCapturing, mediaRecorderRef]);
+    
+    const handleDataAvailable = React.useCallback(
+      ({ data }) => {
+        if (data.size > 0) {
+          setRecordedChunks((prev) => prev.concat(data));
+        }
+      },
+      [setRecordedChunks]
+    );
+
+  const handleStopRecord =  React.useCallback(() => {
+      duration = Date.now() - startTime;
+      setDisableRecord(true);
+      setTime(duration);
+      mediaRecorderRef.current.stop();
+      
+      setCapturing(false);
+
+  }, [mediaRecorderRef, webcamRef, setCapturing]);
+
+  const handleSubmit =(e)=>{
+    e.preventDefault();
+    
+    const videoData = new FormData();
+
+    // Appends the video file and recipient's email to the FormData object
+    videoData.append('video_name', videoName);
+    videoData.append('file', backend, 'videoFile.mp4');
+    videoData.append('recipient', recipientEmail);
+
+    const tagsPayload = { tags }; // Ensure the payload structure is correct
+    videoData.append('json', new Blob([JSON.stringify(tagsPayload)], { type: "application/json" }));
+  
+    axios.post(`${IP_ADDRESS}/bucket/upload`, videoData, {
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+  })
+  .then(response => {
+    console.log('Video uploaded successfully', response.data);
+    setUploadSuccess(true);
+    navigate(viewSentVideoPath);
+  })
+  .catch(error => {
+    console.error('Error uploading video', error);
+  });
+   };
+
+   const sendMain = () => {
+    navigate(viewSentVideoPath);
+  }
+
+   const handleChange = (event) => {
+    try {

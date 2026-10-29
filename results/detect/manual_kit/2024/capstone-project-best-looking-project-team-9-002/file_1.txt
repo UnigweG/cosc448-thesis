@@ -1,0 +1,119 @@
+import { useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { 
+  Box, Button, Center, Flex, Input, Radio, RadioGroup, Select, Stack, Text, VStack, 
+  Modal, ModalOverlay, ModalContent, ModalHeader, ModalBody, ModalFooter, CircularProgress, 
+  CircularProgressLabel, Alert, AlertIcon 
+} from "@chakra-ui/react";
+import { useTranslation } from "react-i18next";
+import Cookies from "js-cookie";
+import { List, ListItem } from "@chakra-ui/react";
+const isProduction = process.env.NODE_ENV === 'production';
+
+// Function to shuffle array
+const shuffleArray = (array) => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+const ViewSurvey = () => {
+  const navigate = useNavigate();
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [responses, setResponses] = useState([]);
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [startTime, setStartTime] = useState(null);
+  const [quickResponseCount, setQuickResponseCount] = useState(0);
+  const [quickResponseWarning, setQuickResponseWarning] = useState(false);
+  const [nextButtonDisabled, setNextButtonDisabled] = useState(false);
+  const [submissionAlert, setSubmissionAlert] = useState(null);
+  const [ageAlert, setAgeAlert] = useState(null);
+  const [loadingProgress, setLoadingProgress] = useState(0);
+
+  const [fieldsAlert, setFieldsAlert] = useState(null);
+  const [consent, setConsent] = useState(() => Cookies.get("surveyConsent") === "true");
+  const [modalIsOpen, setModalIsOpen] = useState(!consent);
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [enlargedIndex, setEnlargedIndex] = useState(null);
+  const [demographicModalOpen, setDemographicModalOpen] = useState(false);
+  const [demographics, setDemographics] = useState(() => {
+    return Cookies.get("demographicsData")
+      ? JSON.parse(Cookies.get("demographicsData"))
+      : { Age: "", Gender: "", TakenArtCourse: "" };
+  });
+  const [answeredQuestions, setAnsweredQuestions] = useState(new Set());
+
+
+  const { t } = useTranslation();
+
+  const loadQuestionsFromJSON = async () => {
+    if (questions.length > 0) return; // Skip if questions are already loaded
+
+    try {
+      const res = await fetch(
+        isProduction
+          ? "/aesthetics/group9/app/api/survey-config"
+          : "http://localhost:5050/api/survey-config",
+        { credentials: "include" }
+      );
+      
+      if (res.ok) {
+        const data = await res.json();
+
+        // Attach the original config order (as configIndex) to each question.
+        const generatedQuestions = data.questions.map((question, index) => ({
+          configIndex: index, // <-- New property to track the question's original index
+          options: question.options.map((option) => ({
+            text: option.text,
+            image: option.image,
+          })),
+          question: question.question || ""
+        }));
+        
+        generatedQuestions.forEach((generatedQuestion, index) => {
+          console.log(t("viewSurvey.questionPrompt", { pairNumber: index + 1 }));
+        });
+  
+        setQuestions(shuffleArray(generatedQuestions));
+        setStartTime(Date.now());
+      } else {
+        console.error("Failed to fetch survey configuration.");
+      }
+    } catch (error) {
+      console.error("Error fetching survey configuration:", error);
+    }
+  };
+
+  useEffect(() => {
+    loadQuestionsFromJSON();
+  }, []);
+
+  // Check if survey is already completed and redirect if so
+  useEffect(() => {
+    fetch("http://localhost:5050/api/cookie/cookie-value", {
+      method: "GET",
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("UserID fetched:", data.userId);
+        if (data.completedSurvey === 1 || data.completedSurvey === true) {
+          navigate("/user/results");
+        }
+      })
+      .catch((error) =>
+        console.error("Error checking survey status:", error)
+      );
+  }, [navigate]);
+
+  useEffect(() => {
+    const checkCookie = async () => {
+      try {
+        const userConsentCookie = Cookies.get("surveyConsent");
+        const userDemographics = Cookies.get("demographicsData");
+  
+        if (userConsentCookie !== "true") {

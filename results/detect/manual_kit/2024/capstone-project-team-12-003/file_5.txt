@@ -1,0 +1,117 @@
+const { JSDOM } = require("jsdom");
+
+describe("Dark Mode Toggle", () => {
+    let dom, document, window, localStorageMock, toggleButton;
+
+    beforeEach(() => {
+        // Create a virtual DOM environment
+        dom = new JSDOM(`<!DOCTYPE html>
+            <html>
+                <body>
+                    <button id="darkModeToggle">🌙 Dark Mode</button>
+                </body>
+            </html>`, { runScripts: "dangerously", url: "http://localhost" });
+
+        document = dom.window.document;
+        window = dom.window;
+
+        // Mock localStorage
+        localStorageMock = {};
+        window.localStorage = {
+            getItem: jest.fn((key) => localStorageMock[key] || null),
+            setItem: jest.fn((key, value) => { localStorageMock[key] = value; }),
+            removeItem: jest.fn((key) => { delete localStorageMock[key]; }),
+        };
+
+        // Mock console to avoid warnings in the test output
+        console.warn = jest.fn();
+
+        // Attach script to the virtual DOM
+        require("./darkmode");  // Assuming your script is named darkmode.js
+
+        toggleButton = document.getElementById("darkModeToggle");
+    });
+
+    // ✅ Default State Tests
+    test("Default state is light mode", () => {
+        expect(document.body.classList.contains("dark-mode")).toBe(false);
+        expect(toggleButton.textContent).toBe("🌙 Dark Mode");
+    });
+
+    test("Button exists in DOM", () => {
+        expect(toggleButton).not.toBeNull();
+    });
+
+    test("Body exists in DOM", () => {
+        expect(document.body).not.toBeNull();
+    });
+
+    // ✅ LocalStorage Behavior Tests
+    test("Dark mode is enabled when localStorage is set to 'enabled'", () => {
+        localStorageMock["darkMode"] = "enabled";
+        require("./darkmode");  // Reload script
+        expect(document.body.classList.contains("dark-mode")).toBe(true);
+        expect(toggleButton.textContent).toBe("☀️ Light Mode");
+    });
+
+    test("Dark mode remains disabled when localStorage is set to 'disabled'", () => {
+        localStorageMock["darkMode"] = "disabled";
+        require("./darkmode");  // Reload script
+        expect(document.body.classList.contains("dark-mode")).toBe(false);
+        expect(toggleButton.textContent).toBe("🌙 Dark Mode");
+    });
+
+    test("Invalid localStorage value does not enable dark mode", () => {
+        localStorageMock["darkMode"] = "invalidValue";
+        require("./darkmode");
+        expect(document.body.classList.contains("dark-mode")).toBe(false);
+        expect(toggleButton.textContent).toBe("🌙 Dark Mode");
+    });
+
+    test("Case sensitivity in localStorage ('Enabled' should be ignored)", () => {
+        localStorageMock["darkMode"] = "Enabled";
+        require("./darkmode");
+        expect(document.body.classList.contains("dark-mode")).toBe(false);
+        expect(toggleButton.textContent).toBe("🌙 Dark Mode");
+    });
+
+    // ✅ Button Click Behavior Tests
+    test("Clicking the button toggles dark mode ON", () => {
+        toggleButton.click();
+        expect(document.body.classList.contains("dark-mode")).toBe(true);
+        expect(localStorageMock["darkMode"]).toBe("enabled");
+        expect(toggleButton.textContent).toBe("☀️ Light Mode");
+    });
+
+    test("Clicking the button toggles dark mode OFF", () => {
+        toggleButton.click(); // Enable dark mode
+        toggleButton.click(); // Disable dark mode
+        expect(document.body.classList.contains("dark-mode")).toBe(false);
+        expect(localStorageMock["darkMode"]).toBe("disabled");
+        expect(toggleButton.textContent).toBe("🌙 Dark Mode");
+    });
+
+    test("LocalStorage updates correctly after multiple toggles", () => {
+        toggleButton.click();
+        expect(localStorageMock["darkMode"]).toBe("enabled");
+
+        toggleButton.click();
+        expect(localStorageMock["darkMode"]).toBe("disabled");
+
+        toggleButton.click();
+        expect(localStorageMock["darkMode"]).toBe("enabled");
+    });
+
+    // ✅ Page Reload Behavior
+    test("Dark mode persists after reloading the page", () => {
+        localStorageMock["darkMode"] = "enabled";
+        require("./darkmode");
+        expect(document.body.classList.contains("dark-mode")).toBe(true);
+        expect(toggleButton.textContent).toBe("☀️ Light Mode");
+    });
+
+    // ✅ Edge Cases
+    test("Clicking button multiple times in quick succession works correctly", () => {
+        toggleButton.click();
+        toggleButton.click();
+        toggleButton.click();

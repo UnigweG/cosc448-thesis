@@ -1,0 +1,136 @@
+package com.example.VideoWeb.controller;
+
+import com.example.VideoWeb.entity.User;
+import com.example.VideoWeb.result.Result;
+import com.example.VideoWeb.result.ResultMsgEnum;
+import com.example.VideoWeb.service.UserService;
+import com.example.VideoWeb.utils.TokenUtils;
+import com.example.VideoWeb.vo.UserVO;
+import org.apache.commons.mail.EmailException;
+import org.springframework.beans.BeanUtils;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.annotation.Resource;
+import java.io.IOException;
+import java.sql.Blob;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/user")
+@CrossOrigin
+public class UserController {
+    @Resource
+    private UserService userService;
+
+    // Get all users
+    @GetMapping("/all")
+    public Result<ArrayList> getUserList() {
+        ArrayList<UserVO> voList = new ArrayList<>();
+        userService.findAll().forEach(user -> {
+            UserVO userVO = new UserVO();
+            BeanUtils.copyProperties(user, userVO);
+            voList.add(userVO);
+        });
+        return Result.success(voList);
+    }
+
+    // Get user by ID
+    @GetMapping("/id={id}")
+    public Result<UserVO> getUserById(@PathVariable("id") Long id) {
+        User user = userService.findById(id);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+
+        return Result.success(userVO);
+    }
+    @PostMapping("/getCurrentUser")
+    public Result<UserVO> postUserById() {
+        User currentUser = TokenUtils.getCurrentUser();
+        Long id = Long.valueOf(currentUser.getId());
+        User user = userService.findById(id);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+
+        return Result.success(userVO);
+    }
+    @GetMapping("/getAvatar={id}")
+    public Result<String> getAvatar(@PathVariable("id") Long id){
+        User user = userService.findById(id);
+        if(user.getAvatar()!=null){
+        String base64String = Base64.getEncoder().encodeToString(user.getAvatar());
+            return Result.success(base64String);
+        }else return Result.success(null);
+
+    }
+
+    // Get user by username
+    @GetMapping("/userName={userName}")
+    public Result<UserVO> getUserByUserName(@PathVariable("userName") String userName) {
+        User user = userService.findByUserName(userName);
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return Result.success(userVO);
+    }
+
+    // Add a new user
+    @PostMapping("/import")
+    public String addUser(@RequestBody User user) {
+        userService.save(user);
+        return "success";
+    }
+
+    // Update user information
+    @PutMapping("/update")
+    public String updateUser(@RequestParam(value = "avatar", required = false) MultipartFile Multavatar,
+                             @RequestParam(value = "age", required = false) Integer age,
+                             @RequestParam(value = "gender", required = false) String gender,
+                             @RequestParam(value = "email", required = false) String email) {
+        User user = TokenUtils.getCurrentUser();
+        assert user != null;
+
+        if (Multavatar != null) {
+            try {
+                byte[] avatar = Multavatar.getBytes();
+                user.setAvatar(avatar);
+            } catch (IOException e) {
+                throw new RuntimeException("Error processing avatar file", e);
+            }
+        }
+
+        if (age != null) {
+            user.setAge(age);
+        }
+
+        if (gender != null) {
+            user.setGender(gender);
+        }
+
+        if (email != null) {
+            user.setEmail(email);
+        }
+
+        userService.updateById(user);
+        return "success";
+    }
+
+
+    // Delete user by ID
+    @DeleteMapping("/{id}")
+    public String deleteUser(@PathVariable("id") Long id) {
+        userService.deleteById(id);
+        return "success";
+    }
+
+    // User login
+    @PostMapping("/login")
+    public Result<UserVO> loginUser(@RequestBody User user) {
+        return userService.loginCheck(user.getUserName(), user.getPassword());
+    }
+
+    // User registration
+    @PostMapping("/register")
+    public Result<UserVO> createUser(@RequestBody User user) {
+        return userService.creatAccount(user);

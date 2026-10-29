@@ -1,0 +1,116 @@
+"""Project-related endpoints."""
+from fastapi import APIRouter, HTTPException, UploadFile, File, Query, Body, Form
+from typing import Optional
+import base64
+import json
+import tempfile
+import os
+import io
+from PIL import Image
+from upload_file import add_file_to_db, list_uploaded_files, add_thumbnail_bytes_to_project, merge_zip_to_project
+from project_manager import list_projects, get_project_by_id
+from project_analyzer import analyze_project_by_id
+from analysis.project_ranking import rank_all_projects, save_rankings_with_summaries, rank_and_summarize_top_projects
+from analysis.ranking_storage import get_stored_rankings, save_rankings_to_db
+from project_summarizer import summarize_project
+from analysis.gemini_ranker import rank_projects_with_gemini
+from analysis.project_replay import build_project_replay, enrich_replay_with_ai
+from tools.cleanup_insights import delete_insights
+from database.user_preferences import update_user_git_username, get_user_git_username
+from config.db_config import with_db_cursor
+from common.logger import setup_logger
+from consent.consent_storage import ConsentStorage
+from external_services.permission_manager import ExternalServicePermission
+from account.user_manager import AuthManager
+
+router = APIRouter()
+logger = setup_logger(__name__)
+
+def _detect_image_type(image_bytes: bytes) -> Optional[str]:
+    """Return a short image type label based on magic bytes, or None."""
+    if not image_bytes:
+        return None
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png"
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "jpeg"
+    if image_bytes.startswith(b"GIF87a") or image_bytes.startswith(b"GIF89a"):
+        return "gif"
+    if image_bytes.startswith(b"BM"):
+        return "bmp"
+    if image_bytes.startswith(b"II*\x00") or image_bytes.startswith(b"MM\x00*"):
+        return "tiff"
+    # WEBP: "RIFF" .... "WEBP"
+    if len(image_bytes) >= 12 and image_bytes[0:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "webp"
+    return None
+
+
+def _ensure_llm_allowed(user_name: Optional[str]) -> str:
+    """
+    Ensure that LLM / external AI usage is allowed for the given user.
+    Raises HTTPException(403) when not permitted.
+    Returns the resolved username for downstream use.
+    """
+    if not user_name:
+        raise HTTPException(
+            status_code=400,
+            detail="user_name is required for LLM-powered operations",
+        )
+
+    consent = ConsentStorage.get_consent_status(user_name) or {}
+    consent_given = consent.get("consent_given", False)
+
+    permission_manager = ExternalServicePermission(user_name)
+    llm_permission = permission_manager.has_permission("LLM")
+
+    if not consent_given or not llm_permission:
+        raise HTTPException(
+            status_code=403,
+            detail="LLM features are disabled for this user. Enable AI features in settings to use Gemini analysis.",
+        )
+
+    return user_name
+
+
+@router.post("/projects/upload")
+async def upload_project(
+    file: UploadFile = File(...),
+    user_name: Optional[str] = Query(None, description="Username for the upload"),
+    custom_filename: Optional[str] = Form(None, description="Optional custom filename for the project")
+):
+    """
+    Upload a project file (ZIP archive).
+    
+    Args:
+        file: The ZIP file to upload
+        user_name: Optional username (defaults to None if not provided)
+        custom_filename: Optional custom filename (defaults to original filename if not provided)
+        
+    Returns:
+        dict: Upload result with file information
+    """
+    # Validate file type
+    if not file.filename.endswith('.zip'):
+        raise HTTPException(
+            status_code=400,
+            detail="Only ZIP files are supported"
+        )
+    
+    # Determine which filename to use
+    # If custom_filename is provided, use it; otherwise use original filename
+    filename_to_use = custom_filename if custom_filename else file.filename
+    
+    # Ensure the filename has .zip extension
+    if not filename_to_use.endswith('.zip'):
+        filename_to_use += '.zip'
+    
+    # Create temporary file to save upload
+    temp_file = None
+    try:
+        # Save uploaded file to temporary location
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.zip') as temp_file:
+            content = await file.read()
+            temp_file.write(content)
+            temp_path = temp_file.name
+        

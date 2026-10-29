@@ -1,0 +1,133 @@
+import { ChangeDetectionStrategy, Component, inject, OnInit, ViewChild } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { CampaignsService } from '../campaigns.service';
+import confetti from 'canvas-confetti';
+import { ProfileService } from 'src/app/profile.service';
+import { AttendeeService } from '../attendee.service';
+import { FireStreakService } from '../../firestreak/fire-streak.service';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { NgForm } from '@angular/forms';
+import { Subscription } from 'rxjs';
+import { EmailService } from '../email.service';
+
+@Component({
+  selector: 'app-attendee-view',
+  templateUrl: './attendee-view.component.html',
+  styleUrls: ['./attendee-view.component.css']
+})
+export class AttendeeViewComponent implements OnInit {
+  @ViewChild('signupForm') signupForm!: NgForm;
+
+  campaignId!: number;
+  campaignOptions: any;
+  attendee: any = {};
+  chosenCharities: string[] = [];
+  selectedCharity: string = '';
+  totalQuestions: number = 0;
+  answeredQuestions: number = 0;
+  progress: number = 0;
+  isLoading: boolean = false;
+  donationProgress: number = 0;
+  donationLeft: number = 0;
+  totalDonationAmount: number = 0;
+  qrCodeDataUrl: string = '';
+  showThankYou: boolean = false;
+  showFlash: boolean = false;
+  streakActive = false;
+  streakCount = 0;
+  timeLeft = 0;
+
+  private streakCountSubscription: Subscription | undefined;
+  private timeLeftSubscription: Subscription | undefined;
+
+  attendeeService = inject(AttendeeService);
+  fireStreakService = inject(FireStreakService);
+  private _snackBar = inject(MatSnackBar);
+  private emailService = inject(EmailService);
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private profileService: ProfileService,
+    private campaignsService: CampaignsService
+  ) {}
+
+  ngOnInit(): void {
+    this.campaignId = +(this.route.snapshot.paramMap.get('id') ?? 0) ||
+      +(localStorage.getItem('campaignId') ?? 0);
+
+    if (this.campaignId) {
+      localStorage.setItem('campaignId', this.campaignId.toString());
+      this.loadCampaignData();
+    }
+
+    this.qrCodeDataUrl = window.location.href;
+
+    // Subscribe to Fire Streak updates
+    this.streakCountSubscription = this.fireStreakService.getStreakCount().subscribe(count => {
+      this.streakCount = count;
+      this.streakActive = this.streakCount > 0;
+    });
+
+    this.timeLeftSubscription = this.fireStreakService.getTimeLeft().subscribe(time => {
+      this.timeLeft = time;
+    });
+
+    // Check for thank you query parameter
+    this.route.queryParams.subscribe(params => {
+      if (params['thankyou'] === 'true') {
+        this.showThankYou = true;
+        this.triggerConfetti();
+        this.triggerExplosion();
+        this.triggerFallingStars();
+        const audio = new Audio('assets/submit-sound.mp3');
+        audio.play().catch(err => console.error('Error playing sound:', err));
+        // Reset after 5 seconds
+        setTimeout(() => {
+          this.showThankYou = false;
+        }, 5000);
+      }
+    });
+  }
+
+  ngOnDestroy(): void {
+    if (this.streakCountSubscription) {
+      this.streakCountSubscription.unsubscribe();
+    }
+    if (this.timeLeftSubscription) {
+      this.timeLeftSubscription.unsubscribe();
+    }
+  }
+
+  loadCampaignData(): void {
+    this.isLoading = true;
+    this.campaignsService.getById(this.campaignId).subscribe(
+      campaign => {
+        if (!campaign) {
+          console.error('Campaign not found. Redirecting to campaigns list.');
+          this.router.navigate(['/vendor/campaigns']);
+          return;
+        }
+        this.campaignOptions = campaign;
+        this.chosenCharities = campaign.chosenCharities;
+        this.attendee.campaignId = this.campaignOptions.id;
+        this.attendee.vendorID = this.campaignOptions.vendorID;
+        this.attendee.charity = this.selectedCharity ?? '';
+
+        this.calculateTotalQuestions();
+        this.calculateDonationProgress();
+        this.isLoading = false;
+      },
+      error => {
+        console.error('Error loading campaign data:', error);
+        this.router.navigate(['/vendor/campaigns']);
+        this.isLoading = false;
+      }
+    );
+  }
+
+  calculateTotalQuestions(): void {
+    this.totalQuestions = 0;
+    if (this.campaignOptions?.nameBoolean) this.totalQuestions += 2;
+    if (this.campaignOptions?.emailBoolean) this.totalQuestions++;
+    if (this.campaignOptions?.companyBoolean) this.totalQuestions++;

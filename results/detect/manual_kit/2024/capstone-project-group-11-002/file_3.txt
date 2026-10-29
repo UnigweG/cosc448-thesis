@@ -1,0 +1,151 @@
+from fastapi import APIRouter, Depends, HTTPException, status, Body
+from app.models.notification import Notification
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+from datetime import datetime
+from app.db import get_db
+from app.models.ticket import Ticket
+from app.models.user import User 
+from typing import List
+from app.models.comparison_result import ComparisonResult
+from app.models.document import Document
+from app.models.ticketActivity import ActivityType, TicketActivity
+from app.routers.auth import getCurrentUser
+from app.utils.notification_email import send_notification_email  
+
+router = APIRouter()
+
+
+class UpdateStatusRequest(BaseModel):
+    status: str
+    note: str | None = None
+
+class UpdatePriorityRequest(BaseModel):
+   new_priority: str
+
+class TicketCreate(BaseModel):
+    uid: int 
+    customerName: str
+    notes: str
+    priority: str
+    issueDate: datetime
+    status: str
+
+class TeamTicketResponse(BaseModel):
+    id: int
+    uid: int
+    customerName: str
+    notes: str
+    priority: str
+    issueDate: datetime
+    status: str
+    broker: str
+
+    class Config:
+        from_attributes = True  # For Pydantic v2
+        
+class GetTickets(BaseModel):
+    id: int
+    uid: int
+    customerName: str
+    notes: str
+    priority: str
+    issueDate: datetime
+    status: str
+    broker: str 
+
+
+    class Config:
+        orm_mode = True
+
+@router.post("/tickets")
+def createTicket(ticket: TicketCreate, db: Session = Depends(get_db), user: User = Depends(getCurrentUser)):
+    user = db.query(User).filter(User.id == ticket.uid).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found. Could not create a ticket")
+
+
+    dbTicket = Ticket(uid=ticket.uid, priority=ticket.priority, customerName = ticket.customerName, notes = ticket.notes, issueDate = datetime.now(), status = "Draft")
+    db.add(dbTicket)
+    db.commit()
+    db.refresh(dbTicket)
+    
+     # Log activity
+    new_activity = TicketActivity(
+        ticket_id=dbTicket.id,
+        user_id=user.id,
+        activity_type=ActivityType.STATUS_CHANGED_SYSTEM.value,
+        description="Ticket's status has been marked as Draft by system."
+    )
+     # Log activity
+    new_activity_status = TicketActivity(
+        ticket_id=dbTicket.id,
+        user_id=user.id,
+        activity_type=ActivityType.CREATED.value,
+        description=f"Ticket created for customer {ticket.customerName}"
+    )
+    db.add(new_activity_status)
+    db.add(new_activity)
+        
+    notification_message = f"Ticket has been created and status has been marked as Draft by system for {ticket.customerName}"
+    notification = Notification(
+        user_id=ticket.uid,
+        message=notification_message,
+        link=f"/ticket/{dbTicket.id}",
+        type="status_change",
+        ticket_id=dbTicket.id,
+        created_at=datetime.utcnow(),
+        is_read=False
+        )
+    db.add(notification)
+    
+    send_notification_email(db, ticket.uid, notification_message, dbTicket.id, "status_change")  
+    
+    if user.managerId:
+        notification = Notification(
+            user_id=user.managerId,
+            message=notification_message,
+            link=f"/ticket/{dbTicket.id}",
+            type="comment",
+            ticket_id=dbTicket.id,
+            created_at=datetime.utcnow(),
+            is_read=False
+            )
+        db.add(notification)
+        
+        send_notification_email(db, user.managerId, notification_message, dbTicket.id, "comment")
+    
+    db.commit()
+    
+    return {"id": dbTicket.id, "message": "Ticket created successfully"}
+
+
+@router.get("/tickets/{ticket_id}")
+def get_ticket_details(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
+
+
+    if ticket:
+        user = db.query(User).filter(User.id == ticket.uid).first()
+        if user:
+            ticket.firstName = user.firstName
+            ticket.lastName = user.lastName
+        return ticket
+    else:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+
+@router.get("/tickets/user/{id}", response_model=List[GetTickets])
+def getTicketsByUser(id: int, db: Session = Depends(get_db)):
+   """
+   Fetch all tickets for a specific user and include broker name.
+   """
+   tickets = (
+        db.query(
+            Ticket.id,
+            Ticket.uid,
+            Ticket.customerName,
+            Ticket.notes,
+            Ticket.priority,
+            Ticket.issueDate,
+            Ticket.status,

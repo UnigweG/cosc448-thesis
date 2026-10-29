@@ -1,0 +1,109 @@
+<div class="wholepage">
+  <div class="event-form-wrapper">
+    <h1>{{ "CREATE_NEW_EVENT_TITLE" | translate }}</h1>
+
+    <form (ngSubmit)="onSubmit()" #eventForm="ngForm" class="event-form">
+      <div class="form-sections-container">
+        <!-- EVENT DETAILS SECTION -->
+
+        
+        <div class="form-section event-details">
+
+          <h2>{{ 'EVENT_DETAILS_TITLE' | translate }}</h2>
+
+          <div class="form-group">
+            <label for="templateSelect">Use a Template (Optional):</label>
+            <select id="templateSelect" (change)="handleTemplateChange($event)">
+
+
+              <option value="">-- Select a Template --</option>
+              <option *ngFor="let temp of availableTemplates" [value]="temp.templateId">
+                {{ temp.templateTitle }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="title">
+              {{ 'EVENT_TITLE_LABEL' | translate }}
+              <span class="edit-status" [ngClass]="allowEdit.title ? 'editable' : 'non-editable'">
+                {{ allowEdit.title ? '(Editable)' : '(Locked)' }}
+              </span>
+            </label>
+            <input type="text" id="title" name="title" [(ngModel)]="event.title" required [disabled]="!allowEdit.title" />
+          </div>
+
+          <div class="form-group">
+            <label for="description">
+              {{ 'EVENT_DESCRIPTION_LABEL' | translate }}
+              <span class="edit-status" [ngClass]="allowEdit.description ? 'editable' : 'non-editable'">
+                {{ allowEdit.description ? '(Editable)' : '(Locked)' }}
+              </span>
+            </label>
+            <textarea id="description" name="description" [(ngModel)]="event.description" [disabled]="!allowEdit.description"></textarea>
+
+          </div>
+          
+          <div class="form-group mb-3">
+              <label for="location">
+                {{ 'EVENT_LOCATION_LABEL' | translate }}
+                <span class="edit-status" [ngClass]="allowEdit.location ? 'editable' : 'non-editable'">
+                  {{ allowEdit.location ? '(Editable)' : '(Locked)' }}
+                </span>
+              </label>
+
+              <div class="input-group">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="location"
+                  [(ngModel)]="event.location"
+                  name="location"
+                  placeholder="Click on the map to select a location"
+                  [disabled]="!allowEdit.location"
+                  [class.location-selected]="locationSelected"
+                  [class.location-loading]="locationLoading"
+                />
+                <div class="input-group-text">
+                  <i class="fas fa-map-marker-alt"></i>
+                </div>
+              </div>
+
+              <div class="mt-2" *ngIf="allowEdit.location">
+                <div
+                  id="map"
+                  style="height: 300px; width: 100%; border-radius: 4px"
+                ></div>
+                <div class="location-status">
+                  <small class="text-muted" *ngIf="!locationSelected">
+                    Click on the map to select a location
+                  </small>
+                  <small class="text-success" *ngIf="locationSelected && !locationLoading">
+                    Location selected!
+                  </small>
+                  <small class="text-warning" *ngIf="locationLoading">
+                    Getting location details...
+                  </small>
+                </div> 
+                 
+              </div>
+
+              
+            </div> 
+
+            <div class="form-group-inline">
+
+              <div>
+                <label for="startTime">
+                  {{ 'EVENT_START_TIME_LABEL' | translate }}
+                  <span class="edit-status" [ngClass]="allowEdit.startTime ? 'editable' : 'non-editable'">
+                    {{ allowEdit.startTime ? '(Editable)' : '(Locked)' }}
+                  </span>
+                </label>
+                <input type="datetime-local" id="startTime" name="startTime" [(ngModel)]="event.startTime" [disabled]="!allowEdit.startTime" required />
+              </div>
+  
+              <div>
+                <label for="endTime">
+                  {{ 'EVENT_END_TIME_LABEL' | translate }}
+                  <span class="edit-status" [ngClass]="allowEdit.endTime ? 'editable' : 'non-editable'">

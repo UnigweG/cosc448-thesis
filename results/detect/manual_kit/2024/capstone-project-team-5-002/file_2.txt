@@ -1,0 +1,108 @@
+#pip install scikit-learn numpy matplotlib seaborn pandas opencv-python Pillow
+import json
+import os
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, learning_curve
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.decomposition import PCA
+import matplotlib.pyplot as plt
+import seaborn as sns
+from collections import defaultdict
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
+from PIL import Image, ImageTk, PngImagePlugin
+import matplotlib.backends.backend_tkagg as tkagg
+from matplotlib.figure import Figure
+import cv2
+import matplotlib.transforms as transforms
+
+def load_parameters(params_file):
+    """Load and parse parameters file"""
+    with open(params_file, 'r') as f:
+        return json.load(f)
+
+def load_3d_image_selections(json_file):
+    """Load 3D image selection data from JSON file"""
+    try:
+        with open(json_file, 'r') as f:
+            selections = json.load(f)
+        return selections
+    except Exception as e:
+        print(f"Error loading 3D image selections data: {e}")
+        return []
+
+def extract_png_metadata(image_path):
+    """Extract metadata from a PNG file using PIL"""
+    try:
+        with Image.open(image_path) as img:
+            metadata = img.info
+            
+            # Parse any JSON strings in the metadata
+            parsed_metadata = {}
+            for key, value in metadata.items():
+                if isinstance(value, str):
+                    try:
+                        if key in ['global_params', 'image_params', 'surfaces']:
+                            parsed_metadata[key] = json.loads(value)
+                        else:
+                            parsed_metadata[key] = value
+                    except json.JSONDecodeError:
+                        parsed_metadata[key] = value
+                else:
+                    parsed_metadata[key] = value
+                    
+            return parsed_metadata
+    except Exception as e:
+        print(f"Error extracting metadata from {image_path}: {e}")
+        return {}
+
+def extract_features_from_image_metadata(image_a_metadata, image_b_metadata, image_c_metadata=None):
+    """Extract features from image metadata for machine learning"""
+    features = []
+    
+    # Process image A metadata
+    if image_a_metadata:
+        try:
+            # Try different metadata structures
+            if 'image_params' in image_a_metadata:
+                img_a_params = image_a_metadata['image_params']
+            else:
+                # For the example in 11.1.json structure
+                img_a_params = json.loads(image_a_metadata.get('Image_params', '{}'))
+                
+            # Extract features
+            features.extend([
+                float(img_a_params.get('simplicity', 0)),
+                float(img_a_params.get('expressiveness', 0)),
+                float(img_a_params.get('size_uniformity', 0)),
+                float(img_a_params.get('orientation_uniformity', 0.5)),
+                float(img_a_params.get('symmetry_axis', 0)),
+                float(img_a_params.get('asymmetric_objects', 0)),
+                # Add number of surfaces if available, otherwise use a default value
+                len(json.loads(image_a_metadata.get('surfaces', '[]')) if isinstance(image_a_metadata.get('surfaces'), str) else 
+                    image_a_metadata.get('surfaces', [])) if 'surfaces' in image_a_metadata else 1
+            ])
+        except Exception as e:
+            print(f"Error extracting features from image A metadata: {e}")
+            features.extend([0, 0, 0, 0, 0, 0, 0])  # Default values
+    else:
+        features.extend([0, 0, 0, 0, 0, 0, 0])  # Default values
+        
+    # Process image B metadata
+    if image_b_metadata:
+        try:
+            # Try different metadata structures
+            if 'image_params' in image_b_metadata:
+                img_b_params = image_b_metadata['image_params']
+            else:
+                # For the example in 11.1.json structure
+                img_b_params = json.loads(image_b_metadata.get('Image_params', '{}'))
+                
+            # Extract features
+            features.extend([
+                float(img_b_params.get('simplicity', 0)),
+                float(img_b_params.get('expressiveness', 0)),
+                float(img_b_params.get('size_uniformity', 0)),
+                float(img_b_params.get('orientation_uniformity', 0.5)),

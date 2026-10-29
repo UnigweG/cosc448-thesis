@@ -1,0 +1,133 @@
+import React, { useState } from "react";
+import Cookies from "js-cookie";
+import { useNavigate } from "react-router-dom";
+import MoonLoader from "react-spinners/MoonLoader";
+import { Tooltip } from "react-tooltip";
+
+export default function Prompt() {
+  const [targetGrade, setTargetGrade] = useState("none");
+  const [file, setFile] = useState(null);
+  const [context, setContext] = useState("");
+  const [prompt, setPrompt] = useState("");
+  const [backgroundColor, setBackgroundColor] = useState("white");
+  const [fontColor, setFontColor] = useState("black");
+  const [fontType, setFontType] = useState("Arial");
+  const [showStyleOptions, setShowStyleOptions] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [questionType, setQuestionType] = useState("choice");
+  const [formType, setFormType] = useState("present");
+  const navigate = useNavigate();
+  const csrfToken = Cookies.get("csrftoken");
+
+  const toggleFormType = () => {
+    if (formType === "present") {
+      setFormType("quiz");
+    }
+    if (formType === "quiz") {
+      setFormType("present");
+    }
+  }
+
+  const getColorCode = (color) => {
+    switch (color) {
+      case "black":
+        return "rgb(0, 0, 0)";
+      case "white":
+        return "rgb(255, 255, 255)";
+      case "lightblue":
+        return "rgb(135, 206, 235)";
+      case "cream":
+        return "rgb(255, 253, 208)";
+      case "grey":
+        return "rgb(128, 128, 128)";
+      default:
+        return "rgb(0, 0, 0)";
+    }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+
+    setIsLoading(true);
+
+    console.log(prompt);
+    console.log(context);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("prompt", prompt);
+    formData.append("ctx", context);
+    formData.append("targetGrade", targetGrade);
+    formData.append("backgroundColor", backgroundColor);
+    formData.append("fontColor", fontColor);
+    formData.append("fontType", fontType);
+    formData.append("username", localStorage.getItem("username"));
+
+    fetch("http://localhost:8000/api/generate_presentation/", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log(data);
+        // console.log(data.response);
+        navigate('/Regenerate', { state: { type: formType, output: data.response, filename: data.filename, documentText: data.file_text, fontColor: data.style.fontcolor, fontType: data.style.fonttype, backgroundColor: data.style.bg } });
+      })
+      .catch((error) => {
+        console.error("Error: ", error);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      })
+  };
+
+  const handleQuizSubmit = (e) => {
+    e.preventDefault();
+
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("prompt", prompt);
+    formData.append("ctx", context);
+    formData.append("targetGrade", targetGrade);
+    formData.append("questionType", questionType);
+    formData.append("username", localStorage.getItem("username"));
+
+    fetch("http://localhost:8000/api/generate_quiz/", {
+      method: 'POST',
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        console.log(data);
+        console.log(data.response);
+        navigate('/Regenerate', { state: { type: formType, output: data.response, filename: data.filename, documentText: data.file_text, questionType: questionType } })
+      })
+  }
+
+  const isLoggedIn = localStorage.getItem('access_token') ? true : false;
+  return (
+    <div>
+      {isLoading ? (
+        <div className="h-screen grid place-items-center">
+          <MoonLoader
+            size={80}
+            loading={isLoading}
+          />
+        </div>
+      ) : (
+        <div>
+          {/* Nav Bar */}
+          <nav class="bg-[#E2E2E2]">
+            <div class="flex justify-between mr-5 ml-2 py-2">
+              {/* General Area (Left side) */}
+              <div class="flex items-center space-x-1">
+                {/* <div class="font-bold">(Logo) EduSynth</div> */}
+                <a href="/Prompt"><img alt="Edusynth Logo" src={require("./img/logo/logo-landscape.png")} height={60} width={100} /></a>

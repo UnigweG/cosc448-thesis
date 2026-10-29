@@ -1,0 +1,121 @@
+// PDFViewer.js
+
+import React, { createContext, useContext, useState, useRef, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { PDFViewerContext } from "../context/PDFViewerContext";
+import { uploadPDF, downloadPDF } from "../libraries/pdf-handler";
+import { json, useParams } from 'react-router-dom';
+
+
+const hostURL = process.env.REACT_APP_HOST_URL || 'http://localhost:3001';
+
+
+let pdfjsLib;
+
+// Don't load if module == test to fix testing
+if (process.env.NODE_ENV !== "test") {
+  import("pdfjs-dist/webpack").then((module) => {
+    pdfjsLib = module;
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.js`;
+  }).catch((error) => {
+    console.error("Failed to load pdfjs-dist for production:", error);
+  });
+}
+export const PDFViewer = ({ file, documentType }) => {
+  // Context provider values to be passed between PDFViewer and PDFViewerToolbar
+  const {
+    updateCanvasRefs,
+    setContainerRef,
+    setOldMapAndScale,
+    setNewMapAndScale,
+    updateCounts,
+    updateAnnotations,
+    updateSummary,
+    attachAnnotationListeners,
+    setRenderingCanvas,
+    fetchUserID,
+    goToNextDiscrepency,
+    oldCurrent,
+    newCurrent
+
+  } = useContext(PDFViewerContext);
+
+  const { t } = useTranslation();
+  let oldAnnotationCountTemp = 0; //Not best practice to include the global variable but works for the case at hand
+  let newAnnotationCountTemp = 0; //Can work to fix these once we are finished with M2
+  let currentPage = 1;
+  const annotationsOldMap = useRef({}); // Store annotations for each page in Old/New Document, old JSON ones and newly user drawn ones
+  const annotationsNewMap = useRef({});
+  const viewportOldScaleArray = useRef({}); //Used to hold viewports old page scale since they cant be passed through mouse click functions
+  const viewportNewScaleArray = useRef({});
+  
+  const containerRef = useRef(null);
+  const canvasRefs = useRef([]);
+  const annotationRefs = useRef([]);
+  const pageContainerRefs = useRef([]);
+  const [annotations, setAnnotations] = useState([]); //Holding the annotations for each page in a list
+  
+  const [pdfDoc, setPdfDoc] = useState(null);
+  const [numPages, setNumPages] = useState(0);
+  const comparisonIdNew = "Zurich_New";
+  const comparisonIdOld = "Zurich_Old";
+  const params = useParams();
+  const caseNumber = params.caseID;
+
+  
+  const getScale = (viewport, containerWidth) => {
+    const scale = (containerWidth / viewport.width) * 0.99; // Change to adjust width of rendered pdf component
+    return scale;
+  };
+  
+  useEffect(() => {
+    // If count changes, update in the provider
+    updateAnnotationCounts(); 
+  }, []);
+
+  
+
+
+  const updateAnnotationCounts = async () => {
+    // Call to check if the JSON exists in PDF-Store
+    var data;  
+    try {
+        // Will be replaced with file.exists soon, this throws errors if it doesn't exist
+        var response = await downloadPDF("json", caseNumber);
+    
+        // Convert Blob to text and parse it
+        const text = await response.text();
+         data = JSON.parse(text);
+        
+    } catch (error) {
+      //Commented out to clean up the console, can be removed once the "Exists" is added
+        //console.warn("File does not exist", error);
+    }
+      // If it doesn't exist, call it directly
+      var entireJson;
+      if(!response){
+        response = await fetch(`${hostURL}/api/public/pdf/${comparisonIdOld}+${comparisonIdNew}.json`); // If not in database get the other one
+        entireJson = await response.json();
+      }else {
+        entireJson = data;
+      }
+      const { matches: matching_annotations, unmatched_in_old: unmatchedOld, unmatched_in_new: unmatchedNew, summary } = entireJson;
+      var annotations = matching_annotations;
+      
+      // Seperate and Extract new and old matching annotations
+      const newAnnotations = annotations
+      .filter(annotation =>
+        annotation.new &&
+        Array.isArray(annotation.new.bbox) &&
+        annotation.new.bbox.length === 1
+      )
+        .map(annotation => ({
+          page: annotation.new.page,
+          text: annotation.new.text,
+          type: annotation.new.type,
+          bbox: Array.isArray(annotation.new.bbox) && annotation.new.bbox.length === 1 ? annotation.new.bbox[0] : {},
+          distance: annotation.distance,
+          documentType: "new"
+        }));
+      // Get rid of parent key and keep distance
+      const oldAnnotations = annotations

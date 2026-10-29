@@ -1,0 +1,112 @@
+import {useAuth} from "../contexts/AuthContext";
+import React, {useEffect, useState} from "react";
+import {getComparisonData, getDocument, postDeleteComparison} from "../services/documentService";
+import {useNavigate, useSearchParams} from "react-router-dom";
+import {useCustomerData} from "../hooks/useCustomerData";
+import {useHeaderContent} from "../contexts/HeaderContext";
+import {t} from "i18next";
+import "../styles/ReportPage.css"
+import ReactMarkdown from "react-markdown";
+import Comparison from "../model/Comparison";
+import ManualComparisons from "../components/docupload/ManualComparisons";
+
+const ReportPage = () => {
+    const {authState} = useAuth();
+    const {customers, setCustomers} = useCustomerData(authState.isBroker);
+    const [sourceDoc, setSourceDoc] = useState(null);
+    const [targetDoc, setTargetDoc] = useState(null);
+    const {setHeaderContent} = useHeaderContent();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [customerName, setCustomerName] = useState(null);
+    const [comparison, setComparison] = useState(null);
+    const [manualComparisons, setManualComparisons] = useState(null);
+    const navigate = useNavigate();
+
+    const customerId = searchParams.get('customer');
+    const source = searchParams.get('source');
+    const target = searchParams.get('target');
+
+    useEffect(() => {
+        async function fetchData() {
+            const customer = customers[customerId];
+            if (!customer) {
+                setCustomerName(null);
+                return;
+            }
+            setCustomerName(customer.getName());
+
+            const sourceDoc = await getDocument(source);
+            if (!sourceDoc.success) {
+                console.error('Failed to retrieve source document');
+                setSourceDoc({absent: true})
+                return;
+            }
+            setSourceDoc({
+                name: sourceDoc.document.getName(),
+                file: sourceDoc.document.getFile(),
+                parsed: sourceDoc.document.getParsed(),
+                id: sourceDoc.document.getId(),
+                comments: sourceDoc.document.getParsed().getComments()
+            });
+
+            const targetDoc = await getDocument(target);
+            if (!targetDoc.success) {
+                console.error('Failed to retrieve target document');
+                setTargetDoc({absent: true})
+                return;
+            }
+            setTargetDoc({
+                name: targetDoc.document.getName(),
+                file: targetDoc.document.getFile(),
+                parsed: targetDoc.document.getParsed(),
+                id: targetDoc.document.getId(),
+                comments: targetDoc.document.getParsed().getComments()
+            });
+            const comparisonData = await getComparisonData(source, target);
+            if (!comparisonData.success) {
+                console.error('Failed to retrieve AI overview');
+                setComparison("No AI overview available");
+                return;
+            }
+            const comparisons = Comparison.fromJsonArray(comparisonData.data);
+            const autoComparison = Comparison.getAutoComparison(comparisons);
+            if(autoComparison) {
+                const aiComments = autoComparison.getComparisons();
+                if(aiComments) {
+                    setComparison(aiComments.map(comp => {
+                        return `\n\n### ${comp.headerText}\n${comp.comparison}`;
+                    }));
+                }
+                if (autoComparison.isErrored()) {
+                    setComparison(["No AI overview available"]);
+                }
+            } else {
+                setComparison(["No AI overview available"]);
+            }
+
+            const manualComparisons = Comparison.getManualComparisons(comparisons);
+            if (manualComparisons.length > 0) {
+                setManualComparisons(manualComparisons);
+            } else {
+                setManualComparisons(null);
+            }
+        }
+
+        fetchData().then();
+
+    }, [searchParams, customers, setCustomers, customerId, setComparison]);
+
+
+    useEffect(() => {
+        setHeaderContent(<div className={"report-page-title"}>
+            {t('report_page.report_for', {name: customerName})}
+        </div>);
+
+        return () => setHeaderContent(null);
+    }, [setHeaderContent, customerName]);
+
+    if (!authState.isBroker) return;
+
+    if (!source) {
+        return <div className="invalid">
+            <h1>Invalid URL</h1>

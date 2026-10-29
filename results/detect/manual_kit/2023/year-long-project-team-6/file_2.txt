@@ -1,0 +1,135 @@
+import React, { useContext, useState } from "react";
+import { useNavigate } from 'react-router-dom';
+import "../component/CSS/loginS.css";
+import email_image from "../component/image/email.png"
+import exchange from "../component/image/exchange.png"
+import password from "../component/image/password.png"
+import person from "../component/image/person.png"
+
+function LoginSignupForm() {
+    const [showPassword, setShowPassword] = useState(false);
+    const [action, setAction] = useState("Login");
+    const [email, setEmail] = useState("");
+    const [name, setName] = useState("");
+    const [role, setRole] = useState("");
+    const [passw, setPassw] = useState("");
+    const [emailError, setEmailError] = useState(false);
+    const [passwError, setPasswError] = useState(false);
+    const navigate = useNavigate();
+
+    const handleLogin = () => {
+        fetch('http://localhost:5001/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email: email,
+                password: passw
+            })
+        })
+            .then(response => {
+                if (response.headers.get("Content-Type").includes("application/json")) {
+                    return response.json();
+                }
+                return response.text();
+            })
+            .then(data => {
+
+                if (data.success) { // Check if login was successful
+                    console.log(JSON.stringify(data.user))
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    navigate('/'); // navigate to the home page. 
+                } else {
+                    alert("Login failed: Invalid email or password");
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+    };
+    const handleSignup = () => {
+        fetch('http://localhost:5001/signup', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: name,
+                email: email,
+                password: passw,
+                role: role,
+                userImage: ''
+            })
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Signup successful:', JSON.stringify(data.user));
+                    alert("Signup successful!");
+                    sessionStorage.setItem('user', JSON.stringify(data.user));
+                    navigate('/');
+                } else {
+                    console.error('Signup failed:', data.message);
+                    alert("Signup failed: " + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert("An error occurred during signup.");
+            });
+    };
+
+
+    const togglePasswordVisibility = () => {
+        setShowPassword(!showPassword);
+    };
+
+    const validateEmail = () => {
+        const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
+
+        if (emailRegex.test(email) && email.length <= 30) {
+            setEmailError(false);
+            return (true);
+        } else {
+            setEmailError(true);
+            return (false);
+        }
+    };
+    const validateName = () => {
+        if (name.length > 5) {
+            return true;
+        } else {
+            // alert("Name must be more than 5 characters.");
+            return false;
+        }
+    };
+
+    const validatePassw = () => {
+        const isLengthValid = passw.length >= 6 && passw.length <= 30;
+        const hasDigit = /\d/.test(passw);
+        const hasLetter = /[a-zA-Z]/.test(passw);
+        const hasSymbol = /[^a-zA-Z\d]/.test(passw);
+
+        if (isLengthValid && hasDigit && hasLetter && hasSymbol) {
+            setPasswError(false);
+            return (true);
+        } else {
+            setPasswError(true);
+            return (false);
+        }
+    };
+
+    const toggleAction = () => {
+        setAction(action === "Login" ? "Sign Up" : "Login");
+    };
+
+    const handleFormSubmit = (event) => {
+        event.preventDefault();
+        if (validateEmail() && validatePassw()) {
+            handleLogin();
+        } else {
+            alert("Please check your email or password.");
+        }
+
+    };

@@ -1,0 +1,158 @@
+"""Analysis service - main orchestration for project analysis pipeline."""
+
+import hashlib
+import logging
+import os
+import shutil
+import tempfile
+import time
+import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from src.config.settings import settings
+
+# Core analyzers
+from src.core.analyzers.contributor import (
+    analyze_contributors as git_analyze_contributors,
+)
+from src.core.analyzers.contributor import (
+    get_first_commit_date,
+)
+from src.core.analyzers.project_stats import (
+    analyze_project,
+    calculate_project_stats,
+    project_analysis_to_dict,
+)
+from src.core.detectors.framework import detect_frameworks_recursive
+from src.core.detectors.language import ProjectAnalyzer
+from src.core.detectors.library import detect_libraries_recursive
+from src.core.detectors.skill import analyze_project_skills
+from src.core.detectors.tool import detect_tools_recursive
+from src.core.generators.resume import generate_resume_item
+from src.core.utils.file_walker import (
+    FileInfo,
+    collect_all_file_info,
+    file_info_to_metadata_dict,
+)
+from src.core.utils.project_detection import detect_project_roots
+from src.core.validators.cross_validator import CrossValidator
+from src.models.orm.complexity import Complexity
+from src.models.orm.contributor import Contributor, ContributorFile
+from src.models.orm.contributor_commit import ContributorCommit
+from src.models.orm.file import File
+from src.models.orm.framework import ProjectFramework
+from src.models.orm.library import ProjectLibrary
+from src.models.orm.project import ProjectAnalysisSummary
+from src.models.orm.resume import ResumeItem
+from src.models.orm.skill import ProjectSkill, ProjectSkillTimeline
+from src.models.orm.tool import ProjectTool
+from src.models.schemas.analysis import (
+    AnalysisResult,
+    AnalysisStatus,
+    ComplexitySummary,
+)
+from src.repositories.complexity_repository import ComplexityRepository
+from src.repositories.contributor_repository import ContributorRepository
+from src.repositories.file_repository import FileRepository
+from src.repositories.framework_repository import FrameworkRepository
+from src.repositories.library_repository import LibraryRepository
+from src.repositories.project_repository import ProjectRepository
+from src.repositories.resume_repository import ResumeRepository
+from src.repositories.skill_repository import SkillRepository
+from src.repositories.tool_repository import ToolRepository
+
+PROJECT_MARKERS = {
+    ".git",
+    "package.json",
+    "pyproject.toml",
+    "requirements.txt",
+    "Pipfile",
+    "poetry.lock",
+    "pom.xml",
+    "build.gradle",
+    "settings.gradle",
+    "Cargo.toml",
+    "go.mod",
+    "composer.json",
+    "Makefile",
+}
+
+CODE_EXTS = {
+    ".py",
+    ".js",
+    ".ts",
+    ".tsx",
+    ".jsx",
+    ".java",
+    ".kt",
+    ".c",
+    ".cpp",
+    ".h",
+    ".hpp",
+    ".cs",
+    ".go",
+    ".rs",
+    ".php",
+    ".rb",
+    ".swift",
+}
+
+IGNORE_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".idea",
+    ".vscode",
+}
+
+logger = logging.getLogger(__name__)
+logger.info("LOADED analysis_service from: %s", __file__)
+
+
+def _is_macos_junk_zip_name(name: str) -> bool:
+    n = name.replace("\\", "/")
+    base = Path(n).name
+    return (
+        n.startswith("__MACOSX/")
+        or "/__MACOSX/" in n
+        or base == ".DS_Store"
+        or base.startswith("._")
+    )
+
+
+def _extract_zip_skipping_macos_junk(zip_path: Path, dest: Path) -> None:
+    with zipfile.ZipFile(zip_path, "r") as zf:
+        members = []
+        for info in zf.infolist():
+            name = info.filename.replace("\\", "/")
+            if info.is_dir():
+                continue
+            if _is_macos_junk_zip_name(name):
+                continue
+            members.append(info)
+        zf.extractall(dest, members=members)
+
+
+def _is_under_ignored_dir(rel_path: Union[str, Path]) -> bool:
+
+    p = Path(str(rel_path).replace("\\", "/"))
+    return any(part in IGNORE_DIRS for part in p.parts)
+
+
+def _extract_inner_zips_recursively(root: Path, max_zip_depth: int = 2) -> None:
+    """

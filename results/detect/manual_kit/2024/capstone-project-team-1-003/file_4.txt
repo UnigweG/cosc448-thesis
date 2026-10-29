@@ -1,0 +1,130 @@
+import React, { useState, useEffect } from 'react';
+import NavBar from '../components/NavBar';
+import RowInsert from '../components/RowInsert';
+import RowEdit from '../components/RowEdit';
+import {
+  createUserFrontend,
+  deleteUserFrontend,
+  updateFirstNameFrontend,
+  updateLastNameFrontend,
+  updatePasswordFrontend,
+  updateUserRoleFrontend,
+  getAllUsersFrontend
+} from '../libraries/database-interface-library';
+import { newURL } from '../libraries/file-path-provider';
+import { useTranslation } from "react-i18next";
+
+
+const AdminPage = () => {
+  
+  // For translation
+  const { t } = useTranslation();
+  const [editing, setEditing] = useState(false);
+  const [editingRow, setEditingRow] = useState({});
+  const [index, setIndex] = useState(0); //Added this because a test was failing, please remove if you can fix this test
+  /*
+    Test was "does not display error message when all fields are valid"
+    in AdminPage.test.js
+  */
+  // state change for displaying new row (when user is adding a new row)
+  const [showAddRow, setShowAddRow] = useState(false);
+
+  // Search query state variable
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Initialize newRowValues with default values, for when a new table is added these values will be updated to the onChange fields
+  const [newRowValues, setNewRowValues] = useState({
+    employeeID: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    rawPassword: "",
+    userRole: ""
+  });
+  // Initialize list to store row objects, temporarily added mock accounts to test table overflow
+  const [rows, setRows] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+
+  // useState functions to handle validation errors (blank inputs, incorrent email format, etc)
+  const [error, setError] = useState('');
+  const [rowErrors, setRowErrors] = useState({});
+
+  // useState function to store rowEdit information so we do not need to reload the webpage
+  const [originalRow, setOriginalRow] = useState(null);
+  // Stash returned users JSON into list [rows, setRows]
+  useEffect(() => {
+    const fetchData = async () => {
+      const users = await getAllUsersFrontend();
+      setRows(users);
+      setLoaded(true);
+    };
+    fetchData();
+  }, []);
+
+  // HANDLERS
+  const handleSearch = () => {
+    console.log('Search query:', searchQuery); // log search query for testing
+    // Implement API fetch call for search query
+  };
+  // for displaying the input fields
+  const handleAddRow = () => {
+    setShowAddRow(true);
+  };
+  // for hiding the input fields if the user changes their mind
+  const handleHideAddRow = () => {
+    setShowAddRow(false);
+    setError('');
+  };
+  //resets form and logs entry
+  const handleSaveChanges = async (event) => {
+    event.preventDefault();
+    console.log("New Row Values"); // test for logging submitted account
+    // API Call to ex. INSERT INTO users (email) VALUES (newRowValues.email)
+    // check to ensure that there are no blank values
+    if (!newRowValues.firstName || !newRowValues.lastName || !newRowValues.email || !newRowValues.rawPassword || !newRowValues.userRole) {
+      setError(t("all_fields_required"));
+      return;
+    }
+
+    // check to ensure that email is of proper format
+    if (!/\S+@\S+\.\S+/.test(newRowValues.email)) {
+      setError(t("invalid_email"));
+      return;
+    }
+
+    // Check for duplicate employeeID
+    if (rows.some((row) => row.employeeID === parseInt(newRowValues.employeeID))) {
+      setError(t("duplicate_employee_id"));
+      return;
+    }
+
+    // Check for duplicate email
+    if (rows.some((row) => row.email === newRowValues.email)) {
+      setError(t("duplicate_email"));
+      return;
+    }
+
+    try {
+      // console.log(employeeId, firstName, lastName, email, password, userRole)
+      const newUser = await createUserFrontend(newRowValues.employeeID - 0, newRowValues.firstName, newRowValues.lastName, newRowValues.email, newRowValues.rawPassword, newRowValues.userRole.toLowerCase())
+      console.log(newUser)
+
+      setError('');
+    } catch (err) {
+      console.log(err);
+      setError(err.message);
+    }
+
+    // Reset the form and hide editable row
+    setRows([...rows, newRowValues]);
+    setNewRowValues({ // Reset newRowValues to its initial blank state
+      employeeID: "",
+      firstName: "",
+      lastName: "",
+      email: "",
+      rawPassword: "",
+      userRole: ""
+    });
+    setShowAddRow(false);
+  };
+  // function to handle user inputting changes into the text box fields in the new row

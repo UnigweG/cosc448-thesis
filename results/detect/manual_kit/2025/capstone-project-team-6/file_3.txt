@@ -1,0 +1,135 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import Navigation from '../components/Navigation';
+import { useAuth } from '../contexts/AuthContext';
+import { portfoliosAPI, curationAPI } from '../services/api';
+
+const DEFAULT_PORTFOLIO_SETTINGS = {
+  showHeatmap: true,
+  showSkills: true,
+  showProjectDetails: true,
+  showPortfolioItems: true,
+  showProjects: true,
+  showProfileSummary: true,
+  skillsDisplayLimit: 10,
+  projectDisplayMode: 'full', // 'full' or 'summary'
+  heatmapTimeRange: 'auto', // 'auto', '1year', '2years', '3years'
+  theme: 'default', // 'default', 'minimal', 'professional'
+  shareAllProjects: false,
+  publicProjectKeys: [],
+  publicAnalysisUuids: [],
+};
+
+const normalizeProjectShareKey = (value) => String(value || '').trim().toLowerCase();
+const getProjectShareKey = (project) =>
+  `${normalizeProjectShareKey(project?.project_name || project?.name)}::${normalizeProjectShareKey(project?.project_path)}`;
+
+const formatTimestamp = (value) => {
+  if (!value) return 'N/A';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+};
+
+const COMPARISON_ATTRIBUTE_LABELS = {
+  primary_language: 'Primary Language',
+  total_files: 'Total Files',
+  has_tests: 'Has Tests',
+  has_readme: 'Has README',
+  has_ci_cd: 'Has CI/CD',
+  has_docker: 'Has Docker',
+  total_commits: 'Total Commits',
+  project_active_days: 'Active Days',
+  test_coverage_estimate: 'Test Coverage',
+};
+
+const formatComparisonValue = (value) => {
+  if (value === null || value === undefined || value === '') return 'N/A';
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if (typeof value === 'number') return Number.isFinite(value) ? `${value}` : 'N/A';
+  return `${value}`;
+};
+
+const getProjectAttributeValue = (project, attributeKey) => {
+  if (!project) return null;
+  const stats = project.project_statistics || {};
+  switch (attributeKey) {
+    case 'primary_language':
+      return project.primary_language ?? stats.primary_language;
+    case 'total_files':
+      return project.total_files ?? stats.total_files;
+    case 'has_tests':
+      return project.has_tests ?? stats.has_tests;
+    case 'has_readme':
+      return project.has_readme ?? stats.has_readme;
+    case 'has_ci_cd':
+      return project.has_ci_cd ?? stats.has_ci_cd;
+    case 'has_docker':
+      return project.has_docker ?? stats.has_docker;
+    case 'total_commits':
+      return project.total_commits ?? stats.total_commits;
+    case 'project_active_days':
+      return project.project_active_days ?? stats.project_active_days;
+    case 'test_coverage_estimate':
+      return project.test_coverage_estimate ?? stats.test_coverage_estimate;
+    default:
+      return null;
+  }
+};
+
+const getProjectIdentityKey = (project) => {
+  if (!project) return '';
+  return `${project.id ?? ''}::${project.project_name ?? project.name ?? ''}`;
+};
+
+const UserProfileSummary = ({ 
+  selectedPortfolioDetail, 
+  orderedProjectList, 
+  skillTags, 
+  auth, 
+  totalProjects,
+  analysisType,
+  isPrivateMode,
+  updateSettings,
+  portfolioSettings 
+}) => {
+  // Calculate overall role assessment
+  const roleAssessment = useMemo(() => {
+    const roles = orderedProjectList.map(p => p.curated_role || p.predicted_role).filter(Boolean);
+    const roleFreq = roles.reduce((acc, role) => {
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, {});
+    
+    if (Object.keys(roleFreq).length === 0) return null;
+    
+    const dominantRole = Object.entries(roleFreq)
+      .sort(([,a], [,b]) => b - a)[0];
+    
+    const avgConfidence = orderedProjectList
+      .filter(p => p.predicted_role_confidence)
+      .reduce((sum, p) => sum + p.predicted_role_confidence, 0) / 
+      orderedProjectList.filter(p => p.predicted_role_confidence).length;
+    
+    return {
+      role: dominantRole[0],
+      frequency: dominantRole[1],
+      totalProjects: roles.length,
+      confidence: avgConfidence || 0,
+      diversity: Object.keys(roleFreq).length
+    };
+  }, [orderedProjectList]);
+
+  // Top programming languages
+  const topLanguages = useMemo(() => {
+    const langFreq = orderedProjectList.reduce((acc, project) => {
+      if (project.primary_language) {
+        acc[project.primary_language] = (acc[project.primary_language] || 0) + 1;
+      }
+      return acc;

@@ -1,0 +1,168 @@
+"""
+Pipeline Orchestrator
+Connects ZIP parser, file categorizer, and local analyzer components
+"""
+
+import json
+import os
+import zipfile
+import tempfile
+import shutil
+import re
+from pathlib import Path
+from typing import Dict, Any, List, Optional
+import getpass
+from datetime import datetime
+from collections import Counter
+
+from src.ingest.zip_parser import parse_zip
+from src.categorize.file_categorizer import categorize_folder_structure
+from src.analyze.text_analyzer import TextAnalyzer, TextMetrics
+from src.analyze.code_analyzer import CodeAnalyzer
+from src.analyze.video_analyzer import VideoAnalyzer
+from src.analyze.advanced_skill_extractor import AdvancedSkillExtractor
+from src.analyze.success_metrics import SuccessMetricsAnalyzer
+from src.image_processor import ImageProcessor
+from src.insights import ProjectInsightsStore
+from src.pipeline.progress_tracker import ProgressTracker
+from src.project.presentation import (
+    extract_project_metrics,
+    generate_portfolio_item,
+    generate_resume_item,
+)
+from src.resume.resume_artifact import generate_resume_pdf_artifact
+from src.config.config_manager import UserConfigManager
+from src.git.individual_contrib_analyzer import summarize_author_contrib
+
+
+class ArtifactPipeline:
+    """
+    Orchestrator that connects the ZIP parser, file categorizer, and local analyzers.
+    
+    Usage:
+        pipeline = ArtifactPipeline()
+        result = pipeline.start('/path/to/project.zip')
+        print(result['analysis_results'])
+    """
+    
+    # Video file extensions to detect in "other" category
+    VIDEO_EXTENSIONS = {'.mp4', '.mov', '.avi', '.mkv', '.wmv'}
+
+    PROJECT_MARKER_FILES = {
+        "README.md",
+        "README.rst",
+        "README.txt",
+        "pyproject.toml",
+        "setup.py",
+        "setup.cfg",
+        "requirements.txt",
+        "Pipfile",
+        "Pipfile.lock",
+        "package.json",
+        "yarn.lock",
+        "pnpm-lock.yaml",
+        "Cargo.toml",
+        "go.mod",
+        "pom.xml",
+        "build.gradle",
+        "build.gradle.kts",
+        "Makefile",
+        "CMakeLists.txt",
+        "Dockerfile",
+        "composer.json",
+        "Gemfile",
+        ".gitignore",
+        ".editorconfig",
+    }
+
+    GITHUB_NOREPLY_RE = re.compile(r"^(?:\d+\+)?([^@]+)@users\.noreply\.github\.com$")
+    COMMON_TOP_LEVEL_DIRS = {
+        "src",
+        "tests",
+        "test",
+        "docs",
+        "doc",
+        "documentation",
+        "assets",
+        "asset",
+        "images",
+        "img",
+        "static",
+        "public",
+        "scripts",
+        "script",
+        "build",
+        "dist",
+        "lib",
+        "include",
+        "bin",
+        "config",
+        "configs",
+        "examples",
+        "example",
+        "data",
+        "notebooks",
+        "notebook",
+        "models",
+        "media",
+        "templates",
+        "app",
+        "apps",
+        "client",
+        "server",
+        "backend",
+        "frontend",
+        "android",
+        "ios",
+        "shared",
+        "common",
+        "core",
+    }
+    PROJECT_CODE_EXTENSIONS = {
+        ".py",
+        ".js",
+        ".ts",
+        ".java",
+        ".cpp",
+        ".c",
+        ".go",
+        ".rs",
+        ".cs",
+        ".rb",
+        ".php",
+        ".swift",
+        ".kt",
+        ".m",
+    }
+
+    
+    def __init__(
+        self,
+        insights_store: Optional[ProjectInsightsStore] = None,
+        enable_insights: bool = True,
+    ):
+        """
+        Initialize the pipeline orchestrator and all analyzers.
+
+        Args:
+            insights_store: Optional ProjectInsightsStore used to persist pipeline output.
+            enable_insights: When True, automatically initialize the default store if one
+                isn't provided (requires INSIGHTS_ENCRYPTION_KEY).
+        """
+        self.text_analyzer = TextAnalyzer()
+        self.code_analyzer = CodeAnalyzer()
+        self.video_analyzer = VideoAnalyzer()
+        self.image_processor = ImageProcessor()
+        self.skill_extractor = AdvancedSkillExtractor()
+        self.success_metrics_analyzer = SuccessMetricsAnalyzer()
+        self.temp_dir = None
+        self.insights_store = insights_store
+        self.sha256_lookup = {}  # Maps abs_path -> sha256 hash for caching
+
+        self.file_info: List[Dict[str, Any]] = []
+        self.progress_tracker = ProgressTracker()
+
+
+        if self.insights_store is None and enable_insights:
+            try:
+                self.insights_store = ProjectInsightsStore()

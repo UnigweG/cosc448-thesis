@@ -1,0 +1,109 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.widgets import Button
+from datetime import datetime
+import os
+from dataclasses import dataclass
+import json
+import math
+from PIL import Image, PngImagePlugin  # Add PIL import for metadata
+
+@dataclass
+class SceneParameters:
+    """Parameters for scene generation"""
+    simplicity: int           # Number of shapes (1-20)
+    expressiveness: float     # Distortion amount (0-1)
+    size_uniformity: float    # Size variation (0-1)
+    orientation_uniformity: float  # Rotation variation (0-1)
+    symmetry_axis: int        # Symmetry axis (0-none, 1-x, 2-y, 3-z)
+    asymmetric_objects: int   # Number of objects not in symmetry
+    
+    def to_dict(self):
+        return {
+            'simplicity': self.simplicity,
+            'expressiveness': self.expressiveness,
+            'size_uniformity': self.size_uniformity,
+            'orientation_uniformity': self.orientation_uniformity,
+            'symmetry_axis': self.symmetry_axis,
+            'asymmetric_objects': self.asymmetric_objects
+        }
+    
+    def generate_similar(self):
+        """Generate slightly varied parameters"""
+        return SceneParameters(
+            simplicity=max(1, min(20, self.simplicity + np.random.randint(-1, 1))),
+            expressiveness=max(0, min(1, self.expressiveness + np.random.normal(0, 0.01))),
+            size_uniformity=max(0, min(1, self.size_uniformity + np.random.normal(0, 0.01))),
+            orientation_uniformity=max(0, min(1, self.orientation_uniformity + np.random.normal(0, 0.01))),
+            symmetry_axis=self.symmetry_axis,  # Keep same symmetry axis
+            asymmetric_objects=max(0, min(self.simplicity, 
+                                        self.asymmetric_objects + np.random.randint(-1, 1)))
+        )
+
+def generate_scene(params: SceneParameters, previous_surfaces=None):
+    """Generate a scene based on parameters"""
+    global ax, fig, surface_list, u, v
+    
+    # Create new figure and axes
+    fig = plt.figure(figsize=(10, 10))
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Define surface parameters
+    u = np.linspace(0, 1, 20)
+    v = np.linspace(0, 1, 20)
+    
+    # Clear surface list but keep track of previous surfaces if provided
+    surface_list = []
+    
+    # Available shape functions
+    shape_functions = [add_cube, add_torus, add_cone, add_wave, 
+                      add_star, add_heart, add_sphere, 
+                      add_teapot, add_teaspoon]
+    
+    # Store the control points used for each surface
+    control_points_list = []
+    
+    # If we have previous surfaces, reuse them first
+    if previous_surfaces and len(previous_surfaces) > 0:
+        surface_list.extend(previous_surfaces)
+        control_points_list.extend([surface.get('control_points', None) for surface in previous_surfaces])
+        
+        # Plot the reused surfaces
+        for surface in previous_surfaces:
+            ax.plot_surface(surface['X'], surface['Y'], surface['Z'],
+                          alpha=0.5,
+                          color=surface['color'])
+    
+    # Generate additional new shapes if needed
+    num_new_shapes = params.simplicity - len(surface_list)
+    if num_new_shapes > 0:
+        for i in range(num_new_shapes):
+            # Select random shape generator
+            initial_control_points = control_points.copy()  # Store initial state
+            add_func = shape_functions[np.random.randint(0, len(shape_functions))]
+            
+            # Add the shape using its specific add function
+            add_func(None)
+            # Store the control points that were used for this shape
+            control_points_list.append(initial_control_points)
+    
+    # Apply expressiveness (distortion) to ALL surfaces if needed
+    if params.expressiveness > 0:
+        # Clear current plot
+        ax.cla()
+        
+        # Apply distortion to all surfaces
+        for surface in surface_list:
+            distortion = np.random.normal(0, params.expressiveness, surface['X'].shape)
+            new_X = surface['X'] + distortion
+            new_Y = surface['Y'] + distortion
+            new_Z = surface['Z'] + distortion
+            
+            # Plot distorted surface
+            ax.plot_surface(new_X, new_Y, new_Z,
+                          alpha=0.5,
+                          color=surface['color'])
+    
+    # Apply symmetry if needed
+    if params.symmetry_axis > 0:

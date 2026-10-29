@@ -1,0 +1,131 @@
+# LLM Client Module
+# Handles integration with OpenAI API for analysis tasks
+
+import asyncio
+import base64
+import logging
+import threading
+import mimetypes
+import os
+import time
+from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Dict, List, Any, Mapping, Tuple
+import openai
+from openai import OpenAI
+import tiktoken
+from pathlib import Path
+import json
+import re
+
+try:
+    from scanner.media import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+except ImportError:  # pragma: no cover - fallback when scanner isn't on sys.path
+    from ...scanner.media import AUDIO_EXTENSIONS, IMAGE_EXTENSIONS, VIDEO_EXTENSIONS
+
+try:
+    from analyzer.file_filters import (
+        is_test_path as _is_test_path_filter,
+        is_generated_or_package_path as _is_generated_or_package_path_filter,
+        is_non_implementation_path as _is_non_implementation_path_filter,
+    )
+except ImportError:
+    from backend.src.analyzer.file_filters import (
+        is_test_path as _is_test_path_filter,
+        is_generated_or_package_path as _is_generated_or_package_path_filter,
+        is_non_implementation_path as _is_non_implementation_path_filter,
+    )
+
+
+logger = logging.getLogger(__name__)
+
+# ── Rolling context limits ────────────────────────────────────────────────────
+_ROLLING_CONTEXT_MAX_CHARS = 1200  # hard cap on rolling context length
+
+
+
+class LLMError(Exception):
+    """Raised when LLM operations fail."""
+    pass
+
+
+class InvalidAPIKeyError(Exception):
+    """Raised when API key is invalid or missing."""
+    pass
+
+
+class LLMClient:
+    """
+    Client for interacting with OpenAI's API.
+    
+    This class provides a foundation for LLM-based analysis operations.
+    """
+    
+    DEFAULT_MODEL = "gpt-4o-mini"
+    
+    DEFAULT_TEMPERATURE = 0.7
+    DEFAULT_MAX_TOKENS = 4000
+    DEFAULT_REQUEST_TIMEOUT_SEC = 90
+    DEFAULT_SINGLE_PROJECT_BATCH_SIZE = 10
+    DEFAULT_BATCH_HEARTBEAT_SEC = 15
+    DEFAULT_FILE_SUMMARY_TIMEOUT_SEC = 300
+    DEFAULT_MAX_FILE_SUMMARY_TOKENS = 12000
+    
+    def __init__(
+        self, 
+        api_key: Optional[str] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None
+    ):
+        """
+        Initialize the LLM client.
+        
+        Args:
+            api_key: OpenAI API key. If None, client operates in mock mode.
+            temperature: Sampling temperature (0.0-2.0). Default 0.7 (recommended).
+                        Lower = more focused/deterministic, higher = more creative/random.
+            max_tokens: Maximum tokens in response. Default 1000 (recommended).
+                       Higher values allow longer responses but cost more.
+        """
+        self.api_key = api_key
+        self.client = None
+        self.logger = logging.getLogger(__name__)
+        self._tokenizer_cache: Dict[str, Any] = {}
+        self._tokenizer_warning_emitted = False
+        
+        self.temperature = temperature if temperature is not None else self.DEFAULT_TEMPERATURE
+        self.max_tokens = max_tokens if max_tokens is not None else self.DEFAULT_MAX_TOKENS
+        self.request_timeout_sec = self._get_int_env(
+            "LLM_REQUEST_TIMEOUT_SEC",
+            self.DEFAULT_REQUEST_TIMEOUT_SEC,
+            minimum=15,
+            maximum=600,
+        )
+
+        if not 0.0 <= self.temperature <= 2.0:
+            raise ValueError("Temperature must be between 0.0 and 2.0")
+        if self.max_tokens <= 0:
+            raise ValueError("Max tokens must be positive")
+        
+        if api_key:
+            try:
+                self.client = OpenAI(api_key=api_key)
+                self.logger.info(
+                    f"LLM client initialized (model: {self.DEFAULT_MODEL}, "
+                    f"temperature: {self.temperature}, max_tokens: {self.max_tokens})"
+                )
+            except Exception as e:
+                self.logger.error(f"Failed to initialize OpenAI client: {e}")
+                raise LLMError(f"Failed to initialize LLM client: {str(e)}")
+        else:
+            self.logger.warning("LLM client initialized without API key (mock mode)")
+    
+    def set_temperature(self, temperature: float) -> None:
+        """
+        Update the temperature parameter for future API calls.
+        
+        Args:
+            temperature: New temperature value (0.0-2.0)
+                        0.0 = deterministic, 1.0 = balanced, 2.0 = very creative
+        
+        Raises:

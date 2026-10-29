@@ -1,0 +1,126 @@
+using UnityEngine;
+using System.Collections.Generic;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
+
+namespace Pathfinding {
+	using System.IO;
+	using Pathfinding.Util;
+	using Pathfinding.Serialization;
+	using Math = System.Math;
+	using System.Linq;
+
+	/// <summary>Base class for RecastGraph and NavMeshGraph</summary>
+	public abstract class NavmeshBase : NavGraph, INavmesh, INavmeshHolder, ITransformedGraph {
+#if ASTAR_RECAST_LARGER_TILES
+		// Larger tiles
+		public const int VertexIndexMask = 0xFFFFF;
+
+		public const int TileIndexMask = 0x7FF;
+		public const int TileIndexOffset = 20;
+#else
+		// Larger worlds
+		public const int VertexIndexMask = 0xFFF;
+
+		public const int TileIndexMask = 0x7FFFF;
+		public const int TileIndexOffset = 12;
+#endif
+
+		/// <summary>Size of the bounding box.</summary>
+		[JsonMember]
+		public Vector3 forcedBoundsSize = new Vector3(100, 40, 100);
+
+		/// <summary>Size of a tile in world units along the X axis</summary>
+		public abstract float TileWorldSizeX { get; }
+
+		/// <summary>Size of a tile in world units along the Z axis</summary>
+		public abstract float TileWorldSizeZ { get; }
+
+		/// <summary>
+		/// Maximum (vertical) distance between the sides of two nodes for them to be connected across a tile edge.
+		/// When tiles are connected to each other, the nodes sometimes do not line up perfectly
+		/// so some allowance must be made to allow tiles that do not match exactly to be connected with each other.
+		/// </summary>
+		protected abstract float MaxTileConnectionEdgeDistance { get; }
+
+		/// <summary>Show an outline of the polygons in the Unity Editor</summary>
+		[JsonMember]
+		public bool showMeshOutline = true;
+
+		/// <summary>Show the connections between the polygons in the Unity Editor</summary>
+		[JsonMember]
+		public bool showNodeConnections;
+
+		/// <summary>Show the surface of the navmesh</summary>
+		[JsonMember]
+		public bool showMeshSurface = true;
+
+		/// <summary>Number of tiles along the X-axis</summary>
+		public int tileXCount;
+		/// <summary>Number of tiles along the Z-axis</summary>
+		public int tileZCount;
+
+		/// <summary>
+		/// All tiles.
+		///
+		/// See: <see cref="GetTile"/>
+		/// </summary>
+		protected NavmeshTile[] tiles;
+
+		/// <summary>
+		/// Perform nearest node searches in XZ space only.
+		/// Recomended for single-layered environments. Faster but can be inaccurate esp. in multilayered contexts.
+		/// You should not use this if the graph is rotated since then the XZ plane no longer corresponds to the ground plane.
+		///
+		/// This can be important on sloped surfaces. See the image below in which the closest point for each blue point is queried for:
+		/// [Open online documentation to see images]
+		///
+		/// You can also control this using a <see cref="Pathfinding.NNConstraint.distanceXZ field on an NNConstraint"/>.
+		/// </summary>
+		[JsonMember]
+		public bool nearestSearchOnlyXZ;
+
+		/// <summary>
+		/// Should navmesh cuts affect this graph.
+		/// See: <see cref="navmeshUpdateData"/>
+		/// </summary>
+		[JsonMember]
+		public bool enableNavmeshCutting = true;
+
+		/// <summary>
+		/// Handles navmesh cutting.
+		/// See: <see cref="enableNavmeshCutting"/>
+		/// See: <see cref="Pathfinding.NavmeshUpdates"/>
+		/// </summary>
+		internal readonly NavmeshUpdates.NavmeshUpdateSettings navmeshUpdateData;
+
+		/// <summary>Currently updating tiles in a batch</summary>
+		bool batchTileUpdate;
+
+		/// <summary>List of tiles updating during batch</summary>
+		List<int> batchUpdatedTiles = new List<int>();
+
+		/// <summary>List of nodes that are going to be destroyed as part of a batch update</summary>
+		List<MeshNode> batchNodesToDestroy = new List<MeshNode>();
+
+		/// <summary>
+		/// Determines how the graph transforms graph space to world space.
+		/// See: <see cref="CalculateTransform"/>
+		/// </summary>
+		public GraphTransform transform = new GraphTransform(Matrix4x4.identity);
+
+		GraphTransform ITransformedGraph.transform { get { return transform; } }
+
+		/// <summary>\copydoc Pathfinding::NavMeshGraph::recalculateNormals</summary>
+		protected abstract bool RecalculateNormals { get; }
+
+		/// <summary>
+		/// Returns a new transform which transforms graph space to world space.
+		/// Does not update the <see cref="transform"/> field.
+		/// See: <see cref="RelocateNodes(GraphTransform)"/>
+		/// </summary>
+		public abstract GraphTransform CalculateTransform();
+
+		/// <summary>
+		/// Called when tiles have been completely recalculated.

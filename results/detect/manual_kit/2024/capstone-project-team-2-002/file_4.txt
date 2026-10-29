@@ -1,0 +1,142 @@
+import pytest
+import sys
+import os
+from flask_bcrypt import Bcrypt
+from io import BytesIO
+from flask_jwt_extended import create_access_token
+from unittest.mock import patch
+from db.db_setup import Ticket
+import json
+
+
+bcrypt = Bcrypt()
+
+# Add the project root to the system path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
+
+# Import compiles and LONGBLOB before importing models
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.dialects.mysql import LONGBLOB
+
+# Define a compiler rule to map LONGBLOB to BLOB in SQLite
+@compiles(LONGBLOB, 'sqlite')
+def compile_LONGBLOB_sqlite(type_, compiler, **kw):
+    return 'BLOB'
+
+from db.db_setup import db, User, Ticket, Document, Uploads, TeamMember, Team
+from main import app as flask_app  # Ensure this imports the Flask app correctly
+
+def login_and_get_token(test_client, email, password):
+    response = test_client.post('/api/login', json={'email': email, 'password': password})
+    assert response.status_code == 200
+    # Extract the access token from the cookies
+    access_token = response.headers['Set-Cookie'].split(';')[0].split('=')[1]
+    return access_token
+
+@pytest.fixture(scope='function')
+def test_client():
+    flask_app.config['TESTING'] = True
+    flask_app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
+    flask_app.config['UPLOAD_FOLDER'] = os.path.join(flask_app.root_path, 'uploads_test')
+    flask_app.config['JWT_SECRET_KEY'] = 'test_jwt_secret'
+
+    # Ensure the test upload folder exists
+    os.makedirs(flask_app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+    with flask_app.app_context():
+        db.create_all()
+
+        # Create a test user
+        hashed_password = bcrypt.generate_password_hash('password').decode('utf-8')
+        test_user = User(
+            email='test_user@example.com',
+            firstName='Test',
+            lastName='User',
+            password=hashed_password,
+            isAdmin=False
+        )
+        db.session.add(test_user)
+        test_user2 = User(
+            email='test_user2@example.com',
+            firstName='Test2',
+            lastName='User',
+            password=hashed_password,
+            isAdmin=False
+        )
+        
+        test_user3= User(
+            email='test_user3@example.com',
+            firstName='Test3',
+            lastName='User',
+            password=hashed_password,
+            isAdmin=False
+        )
+        
+        test_manager = User(
+            email = 'manager@mail.com',
+            firstName = 'Manager',
+            lastName = 'Manager',
+            password = hashed_password,
+            isAdmin = False,
+            isManager = True
+        )
+        
+        team_1 = Team(
+            name='Team 1',
+            manager_id=4
+        )
+        
+        team_member1 = TeamMember(
+            user_id=1,
+            team_id=1
+        )
+        team_member2 = TeamMember(
+            user_id=2,
+            team_id=1
+        )
+        team_member3 = TeamMember(
+            user_id=3,
+            team_id=2
+        )
+        team_member4 = TeamMember(
+            user_id=4,
+            team_id=1
+        )
+        document1 = Document( raw_pdf= b'1', extracted_text="a", identifier=12);
+        document2 = Document(raw_pdf= b'1', extracted_text="b", identifier=34);
+        upload1 = Uploads(file_id=1, filename="test1.pdf", user_id= 1);
+        upload2 = Uploads(file_id=2 ,filename="test2.pdf", user_id=2);
+        upload3 = Uploads(file_id=3, filename="test3.pdf", user_id=3);
+            
+        db.session.add(test_user2)
+        db.session.add(test_user3)
+        db.session.add(test_manager)
+        db.session.add(team_1)
+        db.session.add(team_member1)
+        db.session.add(team_member2)
+        db.session.add(team_member3)
+        db.session.add(team_member4)
+        db.session.add(document1)
+        db.session.add(document2)
+        db.session.add(upload1)
+        db.session.add(upload2)
+        db.session.add(upload3)
+        
+        db.session.commit()
+
+        # Create a test client
+        with flask_app.test_client() as testing_client:
+            yield testing_client
+
+        # Clean up / reset resources here
+        db.session.remove()
+        db.drop_all()
+
+def login(test_client, email, password):
+    return test_client.post('/api/login', json={'email': email, 'password': password})
+
+
+
+# Test creating a ticket with invalid file types
+def test_create_ticket_invalid_file(test_client):

@@ -1,0 +1,152 @@
+
+from __future__ import annotations
+
+import base64
+from collections import Counter, defaultdict
+import hashlib
+import hmac
+import json
+import logging
+import os
+import re
+import secrets
+import tempfile
+import zipfile
+import uuid
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional, Tuple
+from uuid import UUID as PyUUID
+
+from fastapi import Body, Depends, FastAPI, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from git import InvalidGitRepositoryError, Repo
+from pydantic import BaseModel, Field
+from sqlalchemy import bindparam, text
+from sqlalchemy.dialects.postgresql import ARRAY, UUID
+from sqlalchemy.orm import Session
+
+from src.api.ingest import assign_roles, extract_commits_from_git_zip, find_git_repo, ingest_zip_to_db, save_upload_to_temp
+from src.api.report import build_project_report
+from src.db.consents import get_snapshot_owner_user_id, is_external_services_allowed
+from src.db.session import get_db, get_engine
+from src.db.base import FileBlob, PortfolioShowcase, Project
+
+from src.db.user_config import (
+    get_user_config,
+    put_user_config,
+    merge_user_config,
+    identity_rules_for_user,
+    resolve_project_owner_user_id,
+    set_project_user_contributor_mapping,
+    clear_project_user_contributor_mapping,
+)
+from src.db.dashboard_mode import (
+    DASHBOARD_MODE_PRIVATE,
+    DASHBOARD_MODE_PUBLIC,
+    DEFAULT_PUBLIC_VISIBILITY,
+    apply_public_visibility,
+    apply_public_filters,
+    create_dashboard_publication,
+    ensure_portfolio_dashboard,
+    get_public_dashboard_by_slug,
+    normalize_public_visibility_config,
+    parse_public_filters,
+    public_filter_spec,
+    regenerate_portfolio_slug,
+    set_portfolio_dashboard_visibility,
+    set_portfolio_dashboard_mode,
+)
+
+from src.api.ranking import compute_rank_score, normalize_ranking_config, sort_projects
+
+from src.api.pdf_exporter import export_resume_item_pdf_bytes
+
+from src.api.generation import (
+    generate_portfolio_top_summaries,
+    generate_project_showcase,
+    generate_resume_item,
+    list_portfolio_showcases,
+    get_resume_item,
+)
+from src.api.portfolio_analytics import build_portfolio_analytics
+
+from src.db.deletion import (
+    delete_snapshot_and_gc,
+    delete_portfolio_showcase_and_gc,
+    delete_resume_item,
+    delete_analysis,
+    delete_project_and_gc,
+)
+
+
+app = FastAPI(title="Artifact Miner API", version="0.1.0")
+
+PROJECT_IMAGE_SUBDIR = "project_images"
+
+
+def _configure_logging() -> None:
+    level_name = str(os.getenv("ARTIFACT_MINER_LOG_LEVEL") or os.getenv("LOG_LEVEL") or "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    root_logger = logging.getLogger()
+
+    if not root_logger.handlers:
+        logging.basicConfig(
+            level=level,
+            format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        )
+    else:
+        root_logger.setLevel(level)
+
+
+_configure_logging()
+logger = logging.getLogger(__name__)
+
+
+def _project_image_root() -> str:
+    return os.getenv("ARTIFACT_MINER_BLOBSTORE", "blobstore")
+
+
+def _project_image_path(sha256: str, ext: str) -> str:
+    root = _project_image_root()
+    safe_ext = (ext or ".png").lower()
+    target_dir = os.path.join(root, PROJECT_IMAGE_SUBDIR)
+    os.makedirs(target_dir, exist_ok=True)
+    return os.path.join(target_dir, f"{sha256}{safe_ext}")
+
+
+def _resolve_project_image_path(stored_path: Optional[str]) -> Optional[str]:
+    if not stored_path:
+        return None
+
+    if os.path.exists(stored_path):
+        return stored_path
+
+    filename = os.path.basename(stored_path)
+    if not filename:
+        return None
+
+    migrated_path = os.path.join(_project_image_root(), PROJECT_IMAGE_SUBDIR, filename)
+    if os.path.exists(migrated_path):
+        return migrated_path
+
+    return None
+
+default_origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://host.docker.internal:3000",
+]
+origins_env = os.environ.get("CORS_ALLOW_ORIGINS")
+origins = [o.strip() for o in origins_env.split(",") if o.strip()] if origins_env else default_origins
+
+# CORS middleware - adjust for production as needed
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

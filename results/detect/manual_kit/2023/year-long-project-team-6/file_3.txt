@@ -1,0 +1,109 @@
+import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { useNavigate } from "react-router-dom";
+import SamplePicture from '../component/image/AvatarForProfile.png';
+import testPicture from '../component/image/profileDefault.jpg';
+import "../component/CSS/profile.css";
+
+const UserProfile = () => {
+    const [user, setUser] = useState({
+        userid: '',
+        username: '',
+        email: '',
+        user_image: '',
+        gender: '',
+        birthday: null,
+    });
+    const [isImageFullScreen, setIsImageFullScreen] = useState(false);
+    const [isHovering, setIsHovering] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [error, setError] = useState('');
+    const [userId, setId] = useState('');
+    const navigate = useNavigate();
+    const fileInputRef = useRef(null);
+    const handleMouseOver = () => setIsHovering(true);
+    const handleMouseOut = () => setIsHovering(false);
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmNewPassword, setConfirmNewPassword] = useState('');
+    const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+    const [passwError, setPasswError] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmNewPassword, setShowConfirmNewPassword] = useState(false);
+
+
+    // In order to automatically update the interface, we define a function that will be contained in the useEffect. 
+    const fetchUserProfile = () => {
+        return new Promise((resolve, reject) => {
+            const sessionUser = sessionStorage.getItem('user');
+            if (!sessionUser) {
+                navigate('/login');
+                reject();
+            } else {
+                const user = JSON.parse(sessionUser);
+                setUser(user);
+                if (user.userid) {
+                    fetch(`http://localhost:5001/get-profile/${user.userid}`)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`HTTP error! status: ${response.status}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            if (data.birthday) {
+                                data.birthday = data.birthday.split('T')[0];
+                            }
+                            if (data.user_image) {
+                                const imageUrl = `data:image/*;base64,${data.user_image}`;
+                                data.user_image = imageUrl;
+                            } else {
+                                data.user_image = testPicture;
+                            }
+                            setUser({
+                                userid: user.userid,
+                                username: data.username,
+                                email: data.email,
+                                user_image: data.user_image || SamplePicture,
+                                gender: data.gender || '',
+                                birthday: data.birthday || null,
+                            });
+                            resolve(data); // Resolve with the fetched data
+                        })
+                        .catch(error => {
+                            console.error('Error fetching posts:', error);
+                            reject(error);
+                        });
+                }
+            }
+        });
+    };
+    useEffect(() => {
+        fetchUserProfile();
+    }, [navigate]);
+    const handleAvatarClick = () => {
+        // Trigger file input when the avatar image is clicked
+        if (!isEditMode) {
+            setIsImageFullScreen(!isImageFullScreen);
+        } else {
+            fileInputRef.current.click();
+        }
+    };
+    const handleInputChange = (e) => {
+        setUser({ ...user, [e.target.name]: e.target.value });
+    };
+
+    const handleEditClick = () => {
+        setIsEditMode(true);
+    };
+
+    const handleCancelClick = () => {
+        setIsEditMode(false);
+        fetchUserProfile();
+    };
+
+
+    const handleSaveClick = () => {
+        console.log('Session User:', user);

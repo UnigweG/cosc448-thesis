@@ -1,0 +1,123 @@
+import { Text, TouchableOpacity, View } from 'react-native';
+import React, { useState } from 'react';
+import styles from '../styles/editProfileStyle';
+import LinearGradient from 'react-native-linear-gradient';
+import InputField from '../components/InputField';
+import { global } from '../common/global_styles';
+import Button from '../components/Button';
+import { SecureAPIReq } from '../common/NetworkRequest';
+import { users } from '../common/API';
+import { passwordStrength } from 'check-password-strength';
+import * as EmailValidator from 'email-validator';
+
+const EditProfile = ({
+  navigation,
+  route,
+}: {
+  navigation: any;
+  route: any;
+}) => {
+  const wiggledColor = 'gray';
+  const unWiggledColor = 'white';
+  const [oldPass, setOldPass] = useState('');
+  const [newPass, setNewPass] = useState('');
+  const [confirmPass, setConfirmPass] = useState('');
+  const [newEmail, setNewEmail] = useState('');
+  const [lastname, setLastname] = useState('');
+  const [firstname, setFirstname] = useState('');
+  const [isRightVisible, setisRightVisible] = useState(false);
+  const [isLeftVisible, setIsLeftVisible] = useState(true);
+  const [leftColor, setLeftColor] = useState(unWiggledColor);
+  const [rightColor, setRightColor] = useState(wiggledColor);
+  const [isPasswordMatch, setIsPasswordMatch] = useState(true);
+  const [isPasswordEmpty, setIsPasswordEmpty] = useState(true);
+  const [isPasswordCorrect, setIsPasswordCorrect] = useState(true);
+  const [isEmailValidFormat, setIsEmailValidFormat] = useState(true);
+  const [isInputNotEmpty, setIsInputNotEmpty] = useState(true);
+  const [showEmailInvalid, setShowEmailInvalid] = useState(false);
+  /**
+   * Handles button press event to cancel profile editing.
+   *
+   * @returns {void}
+   */
+  const handleCancelEditing = () => {
+    navigation.goBack();
+  };
+
+  /**
+   * Handles the submission of new profile information.
+   * This function logs the submission details, updates the local state with new username and email,
+   * and sends a request to update the user's profile information.
+   *
+   * @returns {void}
+   */
+  const handleNewProfileInfoSubmission = async () => {
+    console.log('new first name: ', firstname);
+    console.log('new last name: ', lastname);
+    console.log('new email: ', newEmail);
+    if (
+      firstname.length !== 0 &&
+      lastname.length !== 0 &&
+      newEmail.length !== 0
+    ) {
+      console.log('Input is not empty');
+      if (EmailValidator.validate(newEmail)) {
+        console.log('Email is valid format');
+        //check username and email input format
+        try {
+          const req: any = await SecureAPIReq.createInstance();
+          const endpoint = users;
+          const response = await req.put(endpoint, {
+            email: newEmail,
+            first_name: firstname,
+            last_name: lastname,
+          });
+          //   Check response successful
+          if (response.status === 200) {
+            console.log('request is submitted');
+            setFirstname('');
+            setLastname('');
+            setNewEmail('');
+            navigation.navigate('DoneEdit');
+          }
+        } catch (error: any) {
+          if (error.response.status === 400) {
+            console.log('400 error: ', error);
+            setShowEmailInvalid(true);
+          } else if (error.response.status === 500) {
+            console.log('Internal Server Erorr. ');
+          }
+          //red text error produced by requesting error
+          console.log(error);
+        }
+      } else {
+        setIsInputNotEmpty(true);
+        setIsEmailValidFormat(false);
+      }
+    } else {
+      setIsInputNotEmpty(false);
+    }
+  };
+
+  /**
+   * Handles the update of user password.
+   *
+   * @returns {void}
+   */
+  const handleUpdatePassword = async () => {
+    console.log('old password: ', oldPass);
+    console.log('new password: ', newPass);
+    console.log('confirm password: ', confirmPass);
+    if (newPass.length !== 0 && confirmPass.length !== 0) {
+      console.log('Input is not empty');
+      setIsPasswordEmpty(true);
+      setIsPasswordCorrect(true);
+      setIsPasswordMatch(true);
+      console.log('Password strength is: ', passwordStrength(newPass).id);
+      if (passwordStrength(newPass).id > 1) {
+        console.log('Password strength is pass level');
+        try {
+          const req: any = await SecureAPIReq.createInstance();
+          const endpoint = users;
+          const response = await req.put(endpoint, {
+            old_password: oldPass,

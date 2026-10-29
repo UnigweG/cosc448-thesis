@@ -1,0 +1,132 @@
+import os
+import unittest
+from datetime import datetime
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import IntegrityError
+from ..models.policy_check_model import (
+    Base,
+    User,
+    Teams,
+    Policy,
+    RecentlyViewed,
+    Difference,
+    Comparison,
+)
+
+# Set the DATABASE_URL environment variable for testing
+TEST_DATABASE_URL = os.getenv('DATABASE_URL', "sqlite:///:memory:")
+
+class TestPolicyChecksModels(unittest.TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        """Set up the engine and create all tables before any tests are run."""
+        cls.engine = create_engine(TEST_DATABASE_URL, echo=True)
+        Base.metadata.create_all(bind=cls.engine)
+        cls.SessionLocal = sessionmaker(bind=cls.engine)
+
+    @classmethod
+    def tearDownClass(cls):
+        """Drop all tables after all tests have been run."""
+        Base.metadata.drop_all(bind=cls.engine)
+        cls.engine.dispose()
+
+    def setUp(self):
+        """Start a new session and transaction for each test."""
+        self.connection = self.engine.connect()
+        self.transaction = self.connection.begin()
+        self.session = self.SessionLocal(bind=self.connection)
+
+    def tearDown(self):
+        """Rollback the session and close connection after each test."""
+        self.session.close()
+        self.transaction.rollback()
+        self.connection.close()
+
+    def test_create_team(self):
+        team = Teams(name='first')
+        self.session.add(team)
+        self.session.commit()
+
+        retrieved_team = self.session.query(Teams).filter_by(name='first').first()
+        self.assertIsNotNone(retrieved_team)
+        self.assertEqual(retrieved_team.name, 'first')
+
+    def test_create_user(self):
+        team = Teams(name='first')
+        self.session.add(team)
+        self.session.commit()
+
+        user = User(username='admin', firstname='John',
+                    lastname='Doe',
+                    teamId=team.id,
+                    isAdmin=True,
+                    password='admin')
+
+        self.session.add(user)
+        self.session.commit()
+
+        retrieved_user = self.session.query(User).filter_by(username='admin').first()
+        self.assertIsNotNone(retrieved_user)
+        self.assertEqual(retrieved_user.firstname, 'John')
+        self.assertEqual(retrieved_user.lastname, 'Doe')
+        self.assertEqual(retrieved_user.teamId, team.id)
+        self.assertTrue(retrieved_user.isAdmin)
+        self.assertEqual(retrieved_user.password, 'admin')
+
+    def test_user_unique_username(self):
+        team = Teams(name='test')
+        self.session.add(team)
+        self.session.commit()
+
+        user1 = User(username='admin',
+                     firstname='John',
+                     lastname='Doe',
+                     teamId=team.id,
+                     isAdmin=True,
+                     password='admin')
+
+        self.session.add(user1)
+        self.session.commit()
+
+        user2 = User(username='admin',
+                     firstname='Jane',
+                     lastname='Doe',
+                     teamId=team.id,
+                     isAdmin=False,
+                     password='admin')
+
+        self.session.add(user2)
+        with self.assertRaises(IntegrityError):
+            self.session.commit()
+
+    def test_policy(self):
+        sample_path = "path/to/file"
+        policy = Policy(path_to_policy_pdf=sample_path)
+        self.session.add(policy)
+        self.session.commit()
+
+        retrieved_policy = self.session.query(Policy).filter_by(id=1).first()
+        self.assertIsNotNone(retrieved_policy)
+        self.assertEqual(retrieved_policy.id, 1)
+        self.assertEqual(retrieved_policy.path_to_policy_pdf, sample_path)
+
+    def test_recently_viewed(self):
+        recent_view = RecentlyViewed(userId=1,
+                                     comparisonId=101,
+                                     lastViewedTimestamp=datetime.now())
+
+        self.session.add(recent_view)
+        self.session.commit()
+
+        retrieved_view = self.session.query(RecentlyViewed).filter_by(id=recent_view.id).first()
+        self.assertIsNotNone(retrieved_view)
+        self.assertEqual(retrieved_view.userId, 1)
+        self.assertEqual(retrieved_view.comparisonId, 101)
+        self.assertIsInstance(retrieved_view.lastViewedTimestamp, datetime)
+
+    def test_difference(self):
+        difference = Difference(
+            comparisonId=101,
+            differenceNumber=1,

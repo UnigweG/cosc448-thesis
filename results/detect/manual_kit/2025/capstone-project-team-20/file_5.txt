@@ -1,0 +1,117 @@
+from typing import Any, List, Optional
+
+from fastapi import APIRouter, UploadFile, File, HTTPException, status, Depends
+from fastapi.responses import FileResponse, HTMLResponse
+from pathlib import Path
+from collections import Counter
+import tempfile, shutil
+from uuid import uuid4
+from pydantic import BaseModel
+
+from src.analyzers.ProjectAnalyzer import ProjectAnalyzer
+from src.managers.ConfigManager import ConfigManager
+from src.managers.ConsentManager import ConsentManager
+from src.managers.ProjectManager import ProjectManager
+from src.managers.ReportManager import ReportManager
+from src.exporters.ReportExporter import ReportExporter
+from src.generators.PortfolioGenerator import PortfolioGenerator
+from src.ZipParser import parse_zip_to_project_folders
+from src.services.badge_wrapped_service import build_badge_progress, build_yearly_wrapped
+
+from src.api.schemas.skills import SkillsListResponse, SkillItem, SkillsUsageResponse, SkillUsageItem
+from src.api.schemas.projects import (
+    UploadProjectResponse,
+    ProjectsListResponse,
+    ProjectSummary,
+    ProjectDetailResponse,
+    ProjectDetail,
+)
+from src.api.schemas.consent import ConsentResponse, ConsentRequest
+from src.api.schemas.badges import BadgeProgressResponse, YearlyWrappedResponse
+from src.api.schemas.resume import (
+    ResumeExportRequest, ResumeExportResponse,
+    ReportsListResponse, ReportSummary, ReportDetailResponse, ReportCreateRequest
+)
+from src.api.schemas.portfolio import (
+    PortfolioDetailsGenerateRequest, PortfolioDetailsGenerateResponse,
+    PortfolioExportRequest, PortfolioExportResponse,
+    PortfolioModeUpdateRequest, PortfolioProjectUpdateRequest, PortfolioPublishResponse,
+    PortfolioActivityHeatmapRequest, PortfolioActivityHeatmapResponse, PortfolioActivityDay,
+    PortfolioActivityAggregate,
+)
+from src.api.schemas import (
+    PortfolioResponse, PortfolioUpdateRequest, PortfolioReport, PortfolioProject, PortfolioDetailsResponse
+)
+from datetime import datetime, timedelta, timezone
+
+"""For all our routes. Requirement 32, endpoints"""
+router = APIRouter()
+
+
+def _build_portfolio_project(project) -> PortfolioProject:
+    details = project.portfolio_details
+    details_payload = details.to_dict() if hasattr(details, "to_dict") else {}
+    custom = dict(getattr(project, "portfolio_customizations", {}) or {})
+
+    custom_title = (custom.get("custom_title") or "").strip()
+    custom_overview = (custom.get("custom_overview") or "").strip()
+    custom_achievements = custom.get("custom_achievements")
+    if not isinstance(custom_achievements, list):
+        custom_achievements = None
+
+    if custom_title:
+        details_payload["project_name"] = custom_title
+    if custom_overview:
+        details_payload["overview"] = custom_overview
+    if custom_achievements is not None:
+        details_payload["achievements"] = [str(x).strip() for x in custom_achievements if str(x).strip()]
+
+    return PortfolioProject(
+        project_name=project.project_name,
+        resume_score=project.resume_score,
+        summary=getattr(project, "summary", "") or "",
+        bullets=list(getattr(project, "bullets", []) or []),
+        portfolio_details=PortfolioDetailsResponse(**details_payload),
+        portfolio_customizations=custom,
+        languages=list(project.languages or []),
+        language_share=dict(project.language_share or {}),
+        frameworks=list(project.frameworks or []),
+        date_created=project.date_created,
+        last_modified=project.last_modified,
+        collaboration_status=project.collaboration_status,
+    )
+
+
+def _normalize_username_candidates(raw_values: List[str]) -> List[str]:
+    normalized = []
+    seen = set()
+    for raw in raw_values or []:
+        value = (raw or "").strip().lower()
+        if not value:
+            continue
+        if value not in seen:
+            seen.add(value)
+            normalized.append(value)
+    return normalized
+
+
+def _extract_git_username(email: str) -> str:
+    local = (email or "").split("@", 1)[0].strip().lower()
+    if "+" in local:
+        suffix = local.split("+", 1)[1].strip()
+        if suffix:
+            return suffix
+    return local
+
+
+def _author_matches_usernames(author_email: str, usernames: List[str]) -> bool:
+    if not usernames:
+        return True
+
+    email = (author_email or "").strip().lower()
+    if not email:
+        return False
+
+    local = email.split("@", 1)[0]
+    extracted_user = _extract_git_username(email)
+    for candidate in usernames:

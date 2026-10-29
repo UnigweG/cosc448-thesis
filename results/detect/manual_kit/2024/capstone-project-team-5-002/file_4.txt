@@ -1,0 +1,141 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.widgets import Button
+from datetime import datetime
+import os
+from dataclasses import dataclass
+import json
+from tkinter import *
+from tkinter import ttk
+
+# Add global list to store surface data after initial imports
+surface_list = []
+
+# Generate initial control points (4x4 grid)
+control_points = np.random.rand(4, 4, 3) * 2 - 1
+
+def bernstein(t, n, i):
+    return np.math.comb(n, i) * t**i * (1-t)**(n-i)
+
+def bezier_surface(u, v):
+    surface = np.zeros(3)
+    for i in range(4):
+        for j in range(4):
+            surface += bernstein(u, 3, i) * bernstein(v, 3, j) * control_points[i, j]
+    return surface
+
+def rotate_points(points, angles):
+    """Rotate points by given angles (in radians) around x, y, z axes
+    Positive angles give counter-clockwise rotation when looking from the positive axis towards the origin"""
+    cx, cy, cz = np.cos(angles)
+    sx, sy, sz = np.sin(angles)
+    
+    # Updated rotation matrices for proper right-hand rule convention
+    Rx = np.array([[1, 0, 0], [0, cx, -sx], [0, sx, cx]])
+    Ry = np.array([[cy, 0, -sy], [0, 1, 0], [sy, 0, cy]])  
+    Rz = np.array([[cz, -sz, 0], [sz, cz, 0], [0, 0, 1]])
+    
+    # Apply rotations in order: Z, Y, X
+    rotated = points @ Rz @ Ry @ Rx
+    return rotated
+
+def create_cube_control_points():
+    cp = np.zeros((4, 4, 3))
+    size = np.random.uniform(0.5, 2.0)
+    offset = np.random.uniform(-2, 2, 3)  
+    
+    for i in range(4):
+        for j in range(4):
+            x = (i / 3 - 0.5) * 2 * size
+            y = (j / 3 - 0.5) * 2 * size
+            if i in [0, 3] or j in [0, 3]:
+                z = size
+            else:
+                z = size * 0.8
+            cp[i,j] = [x, y, z]
+    
+    # Random rotation and translation
+    angles = np.random.uniform(0, 2*np.pi, 3)
+    cp = rotate_points(cp, angles)
+    cp += offset
+    return cp
+
+def create_torus_control_points():
+    cp = np.zeros((4, 4, 3))
+    R = np.random.uniform(1.0, 3.0)  
+    r = np.random.uniform(0.2, 0.8)  
+    offset = np.random.uniform(-2, 2, 3)
+    
+    for i in range(4):
+        for j in range(4):
+            angle1 = 2 * np.pi * j / 3
+            angle2 = 2 * np.pi * i / 3
+            cp[i,j] = [(R + r*np.cos(angle1))*np.cos(angle2),
+                      (R + r*np.cos(angle1))*np.sin(angle2),
+                      r*np.sin(angle1)]
+    
+    angles = np.random.uniform(0, 2*np.pi, 3)
+    cp = rotate_points(cp, angles)
+    cp += offset
+    return cp
+
+def create_cone_control_points():
+    cp = np.zeros((4, 4, 3))
+    height = np.random.uniform(1.0, 3.0)
+    radius = np.random.uniform(0.5, 1.5)
+    offset = np.random.uniform(-2, 2, 3)
+    
+    for i in range(4):
+        for j in range(4):
+            angle = 2 * np.pi * j / 3
+            h = (3 - i) * height/3
+            r = i * radius/3
+            cp[i,j] = [r*np.cos(angle), r*np.sin(angle), h]
+    
+    angles = np.random.uniform(0, 2*np.pi, 3)
+    cp = rotate_points(cp, angles)
+    cp += offset
+    return cp
+
+def create_wave_control_points():
+    cp = np.zeros((4, 4, 3))
+    amplitude = np.random.uniform(0.5, 2.0)
+    frequency = np.random.uniform(0.5, 2.0)
+    offset = np.random.uniform(-2, 2, 3)
+    
+    for i in range(4):
+        for j in range(4):
+            cp[i,j] = [i*0.8 - 1.2,
+                      j*0.8 - 1.2,
+                      amplitude * np.sin(frequency*i*np.pi/2)*np.cos(frequency*j*np.pi/2)]
+    
+    angles = np.random.uniform(0, 2*np.pi, 3)
+    cp = rotate_points(cp, angles)
+    cp += offset
+    return cp
+
+# Add teapot patch data
+def parse_teapot_data():
+    patches = []
+    current_patch = []
+    
+    # Get the directory of the current script
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    teapot_file = os.path.join(script_dir, 'teapot_points.txt')
+    
+    try:
+        with open(teapot_file, 'r') as f:
+            data_lines = [line.strip() for line in f if line.strip()]
+            
+            # Skip header (first two lines)
+            data_lines = data_lines[2:]
+            
+            for line in data_lines:
+                try:
+                    # Parse coordinates
+                    coords = [float(x) for x in line.split()]
+                    if len(coords) == 3:
+                        current_patch.append(coords)
+                        if len(current_patch) == 16:
+                            patches.append(np.array(current_patch))

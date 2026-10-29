@@ -1,0 +1,130 @@
+﻿using KelownaSoftware.Domain.Common.Entities;
+using KelownaSoftware.Server;
+using KelownaSoftware.Persistence;  
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Cors;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using SendGrid;
+using SendGrid.Helpers.Mail;
+using System;
+using System.IO;
+using System.Security.Cryptography;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace KelownaSoftware.Server.Areas.Controllers.Account
+{
+    [Route("api/attendee")]
+    [ApiController]
+    [EnableCors("AllowAll")]
+    public class AttendeeController : BaseController
+    {
+        private readonly ApplicationDbContext context;
+        private readonly KSDbContext KSDbContext;
+
+
+        public AttendeeController(ApplicationDbContext context, KSDbContext KSDbContext)
+        {
+            this.context = context;
+            this.KSDbContext = KSDbContext;
+        }
+
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<List<Attendee>> GetAll()
+        {
+            return await context.attendeeData.ToListAsync(); // Decryption happens automatically in the Attendee model
+        }
+
+        [HttpGet("{id:int}", Name = "GetAttendeebyId")]
+        [AllowAnonymous]
+        public async Task<ActionResult<Attendee>> GetbyId(int id)
+        {
+            var attendee = await context.attendeeData.FirstOrDefaultAsync(x => x.attendeeKey == id);
+
+            if (attendee is null)
+            {
+                return NotFound();
+            }
+
+            return attendee; // Decryption happens in the Attendee model's getter
+        }
+
+        [HttpGet("bycampaignid/{campaignID}")]
+        [AllowAnonymous]
+        public async Task<List<Attendee>> GetbyCampaignID(int campaignID)
+        {
+            return await context.attendeeData.Where(p => p.campaignId == campaignID).ToListAsync();
+        }
+
+        [HttpPost]
+        [AllowAnonymous]
+        public async Task<IActionResult> Post([FromBody] Attendee attendee)
+        {
+            if (IsDuplicateSignup(attendee))
+            {
+                return Conflict("Attendee already signed up for this campaign.");
+            }
+
+            AssignOrReuseDonorID(attendee);  
+            AssignDonationAmount(attendee); 
+            
+             try
+        {
+            var existingAttendee = await context.attendeeData.FindAsync(attendee.attendeeKey);
+            if (existingAttendee != null)
+            {
+                return Conflict("Attendee already exists.");
+            }   
+
+            // Encryption happens automatically in the Attendee model's setter
+            context.Add(attendee);
+            await context.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Conflict("Attendee record was modified by another process.");
+            }
+
+            var vendor = await KSDbContext.Users.FindAsync(attendee.vendorID);
+            if (vendor != null)
+            {
+                var currentTime = DateTime.UtcNow;
+                var timeSinceLastSignUp = (currentTime - (vendor.LastSignUpTime ?? DateTime.UtcNow)).TotalSeconds;
+
+                if (timeSinceLastSignUp <= 1800)
+                {
+                    vendor.FireStreakCount++;
+                }
+                else
+                {
+                    vendor.FireStreakCount = 1;
+                }
+
+                vendor.LastSignUpTime = currentTime;
+                vendor.FireStreakTimeLeft = 1800; // 🔥 Ensure timer resets after signup
+
+                await KSDbContext.SaveChangesAsync();
+            }
+
+            return CreatedAtRoute("GetAttendeebyId", new { id = attendee.attendeeKey }, attendee);
+        }
+
+                
+        // Ensure donorID is consistent across campaigns and accumulate donationAmount
+       private void AssignOrReuseDonorID(Attendee attendee)
+    {
+        try
+        {
+            bool nameRequired = context.Campaigns
+                .Where(c => c.id == attendee.campaignId)
+                .Select(c => c.nameBoolean)
+                .FirstOrDefault();
+
+            
+            string decryptedEmail = !string.IsNullOrEmpty(attendee.email) ? DecryptData(attendee.email) : "";
+            string decryptedFirstName = !string.IsNullOrEmpty(attendee.firstName) ? DecryptData(attendee.firstName) : "";
+            string decryptedLastName = !string.IsNullOrEmpty(attendee.lastName) ? DecryptData(attendee.lastName) : "";
+
+            var existingAttendee = context.attendeeData

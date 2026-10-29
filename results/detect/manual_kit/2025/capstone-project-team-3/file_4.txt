@@ -1,0 +1,154 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getApiBaseUrl } from "../config/api";
+import "../styles/PortfolioPage.css";
+import Chart from "chart.js/auto";
+
+/** Returns true whenever <html data-theme="dark"> is set, and re-renders on change. */
+function useIsDarkMode(): boolean {
+  const [isDark, setIsDark] = useState(
+    () => document.documentElement.getAttribute("data-theme") === "dark",
+  );
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.getAttribute("data-theme") === "dark");
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+}
+
+interface Project {
+  id: string | number;
+  name?: string;
+  title?: string;
+  score?: number;
+  rank?: number;
+  score_overridden?: boolean;
+  score_overridden_value?: number;
+  score_override_exclusions?: string[];
+  dates?: string;
+  start_date?: string;
+  end_date?: string;
+  created_at?: string;
+  last_modified?: string;
+  type?: string;
+  summary?: string;
+  thumbnail_url?: string;
+  skills?: string[];
+  technical_keywords?: string[];
+  metrics?: {
+    total_lines?: number;
+    total_commits?: number;
+    test_files_changed?: number;
+    functions?: number;
+    classes?: number;
+    components?: number;
+    completeness_score?: number;
+    word_count?: number;
+    roles?: string[];
+    development_patterns?: { project_evolution?: string[] };
+    technical_keywords?: string[];
+    complexity_analysis?: {
+      maintainability_score?: { overall_score?: number };
+    };
+    commit_patterns?: { commit_frequency?: { development_intensity?: string } };
+    contribution_activity?: { doc_type_counts?: Record<string, number> };
+  };
+}
+
+interface UserInfo {
+  name?: string;
+  email?: string;
+  links?: Array<{ label: string; url: string }>;
+  education?: string;
+  job_title?: string;
+  education_details?: string | null;
+  github_user?: string | null;
+  industry?: string | null;
+  personal_summary?: string | null;
+  profile_picture_path?: string | null;
+}
+
+interface PortfolioData {
+  user?: UserInfo;
+  overview?: {
+    total_projects?: number;
+    avg_score?: number;
+    total_skills?: number;
+    total_languages?: number;
+    total_lines?: number;
+  };
+  graphs?: {
+    language_distribution?: Record<string, number>;
+    complexity_distribution?: { distribution?: Record<string, number> };
+    score_distribution?: { distribution?: Record<string, number> };
+    monthly_activity?: Record<string, number>;
+    daily_activity?: Record<string, number>;
+    top_skills?: Record<string, number>;
+  };
+  project_type_analysis?: {
+    github?: { count?: number };
+    local?: { count?: number };
+  };
+  projects?: Project[];
+  collaboration_network?: {
+    nodes: Array<{
+      id: string;
+      name: string;
+      commits: number;
+      is_primary: boolean;
+      projects: string[];
+    }>;
+    edges: Array<{
+      source: string;
+      target: string;
+      projects: string[];
+      weight: number;
+      is_peer?: boolean;
+    }>;
+  };
+}
+
+const getDisplayScore = (project: Project): number => {
+  if (project.score_overridden && project.score_overridden_value != null)
+    return Number(project.score_overridden_value) || 0;
+  if (project.score != null) return Number(project.score) || 0;
+  return Number(project.rank) || 0;
+};
+
+const projectName = (p: Project): string =>
+  p.name || p.title || `Project ${p.id}`;
+
+const sidebarProjectName = (p: Project): string => p.name || "";
+
+const projectDates = (p: Project): string => {
+  if (p.dates) return p.dates;
+  const start = p.start_date ? new Date(p.start_date).toLocaleDateString() : "";
+  const end = p.end_date ? new Date(p.end_date).toLocaleDateString() : "";
+  return `${start}${start && end ? " - " : ""}${end}`;
+};
+
+const formatMetricName = (metricName: string): string =>
+  metricName
+    .replace(/_/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+
+const formatScorePercent = (score: number): string =>
+  `${Math.round(Math.max(0, Math.min(1, score)) * 100)}%`;
+
+interface ScoreSignal {
+  label: string;
+  value: string;
+  tone: "strong" | "moderate" | "limited";
+  explanation: string;
+}
+
+const getSignalTone = (
+  value: number,
+  strongThreshold: number,
+  moderateThreshold: number,
+): ScoreSignal["tone"] => {

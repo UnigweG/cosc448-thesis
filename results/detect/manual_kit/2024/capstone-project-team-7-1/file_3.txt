@@ -1,0 +1,113 @@
+"use client"
+
+import { Badge } from "@/app/components/shadcn/ui/badge"
+import { Button } from "@/app/components/shadcn/ui/button"
+import { CardContent, CardDescription, CardHeader, CardTitle } from "@/app/components/shadcn/ui/card"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from "@/app/components/shadcn/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/app/components/shadcn/ui/popover"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/shadcn/ui/select"
+import { Skeleton } from "@/app/components/shadcn/ui/skeleton"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/app/components/shadcn/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/app/components/shadcn/ui/tabs"
+import { Input } from "@/app/components/shadcn/ui/input"
+import { Switch } from "@/app/components/shadcn/ui/switch"
+import { Label } from "@/app/components/shadcn/ui/label"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/app/components/shadcn/ui/collapsible"
+import { Separator } from "@/app/components/shadcn/ui/separator"
+import { ScrollArea } from "@/app/components/shadcn/ui/scroll-area"
+import { 
+  AlertCircle, 
+  ArrowDownAZ, 
+  ArrowUpAZ, 
+  Calendar, 
+  ChevronDown,
+  ChevronUp,
+  CircleDollarSign, 
+  CreditCard, 
+  Download, 
+  FileJson, 
+  FileSpreadsheet, 
+  FileText, 
+  Filter, 
+  FilterX, 
+  TableProperties 
+} from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
+import { Transaction } from "@/app/contexts/TransactionContext"
+import { useTransactions } from "@/app/contexts/TransactionContext"
+import { useAccounts } from "@/app/contexts/AccountContext"
+
+// Extended Transaction interface that includes account_type property
+interface ExtendedTransaction extends Transaction {
+  account_type?: string;
+}
+
+export function TransactionSummary() {
+    // Get data and functions from context instead of props
+    const {
+        transactions: allTransactions,
+        loading, 
+        loadingMore,
+        error,
+        loadMoreTransactions,
+        formatDate,
+        formatAmount,
+        getCategoryIcon,
+        getAmountColor
+    } = useTransactions();
+    
+    // Get account data to map account_id to account names
+    const {
+        accountData,
+        formatAccountType
+    } = useAccounts();
+    
+    // Create a map of account_id to account name and type
+    const accountMap = useMemo(() => {
+        const map = new Map<string, { name: string, type: string }>();
+        if (accountData) {
+            accountData.forEach(account => {
+                map.set(account.account_id, { 
+                    name: account.name || account.mask || `Account ${account.account_id.substring(0, 4)}`, 
+                    type: account.type || "Unknown"
+                });
+            });
+        }
+        return map;
+    }, [accountData]);
+    
+    // Enhance transactions with account information
+    const enhancedTransactions = useMemo(() => {
+        if (!allTransactions) return null;
+        
+        return allTransactions.map(transaction => {
+            const accountInfo = accountMap.get(transaction.account_id);
+            return {
+                ...transaction,
+                account_name: accountInfo?.name || transaction.account_name || `Account ${transaction.account_id.substring(0, 4)}`,
+                account_type: accountInfo?.type ? formatAccountType(accountInfo.type) : undefined
+            } as ExtendedTransaction;
+        });
+    }, [allTransactions, accountMap, formatAccountType]);
+
+    // State to track how many transactions to display
+    const [displayCount, setDisplayCount] = useState(8);
+
+    // State for download dropdown
+    const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+    const [dateRange, setDateRange] = useState("last30days");
+    const [downloadFormat, setDownloadFormat] = useState("csv");
+
+    // State for table view dialog
+    const [isTableViewOpen, setIsTableViewOpen] = useState(false);
+    
+    // State for table filters
+    const [isFiltersOpen, setIsFiltersOpen] = useState(false);
+    const [filterCount, setFilterCount] = useState(0);
+    
+    // Sorting state
+    const [sortField, setSortField] = useState<string>("date");
+    const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+
+    // Filter states
+    const [categoryFilters, setCategoryFilters] = useState<{[key: string]: boolean}>({});

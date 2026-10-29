@@ -1,0 +1,143 @@
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+
+# Global variables
+superadmin_username = "superadmin"
+superadmin_pword = "bflcanada"
+
+manager_username = "manager1"
+pword = "temporaryPassword123!"
+manager_fname = "manager1"
+manager_lname = "manager1"
+manager_email = "manager1@example.com"
+manager_phone = "1123456789"
+
+employee_username = "employee1"
+employee_fname = "employee1"
+employee_lname = "employee1"
+employee_email = "employee1@example.com"
+employee_phone = "0123456789"
+employee_pword = "temporaryPassword123!"
+
+########################
+# SETUP / TEARDOWN
+########################
+
+def setup():
+    """Returns a WebDriver instance for localhost:3000."""
+    driver = webdriver.Chrome()
+    driver.get("http://localhost:3000")
+    return driver
+
+def teardown(driver):
+    """Closes the browser and quits the WebDriver."""
+    driver.quit()
+
+########################
+# TESTS
+########################
+
+def test_create_manager():
+    """Log in as superadmin, add a manager, then close the browser."""
+    driver = setup()
+
+    username = driver.find_element(By.XPATH, '//input[@id="username"]')
+    password = driver.find_element(By.XPATH, '//input[@id="password"]')
+    submit_button = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/div[2]/div/form/button')
+
+    username.send_keys(superadmin_username)
+    password.send_keys(superadmin_pword)
+    submit_button.click()
+    driver.implicitly_wait(1)
+
+    manage_manager_button = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div/div/div/div[2]/div[1]/div/div/div[2]/span'
+    )
+    manage_manager_button.click()
+    driver.implicitly_wait(1)
+
+    create_manager_button = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[2]/div/div/div/div[1]/div/button'
+    )
+    create_manager_button.click()
+    driver.implicitly_wait(1)
+
+    username_field = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[1]/div[1]/input'
+    )
+    fname = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[1]/div[2]/div[1]/input'
+    )
+    lname = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[1]/div[2]/div[2]/input'
+    )
+    phone = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[1]/div[4]/input'
+    )
+    email = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[1]/div[3]/input'
+    )
+
+    username_field.send_keys(manager_username)
+    fname.send_keys(manager_fname)
+    lname.send_keys(manager_lname)
+    phone.send_keys(manager_phone)
+    email.send_keys(manager_email)
+
+    create_manager_button = driver.find_element(
+        By.XPATH,
+        '//*[@id="root"]/div/div[3]/div/div/form/div[2]/button[2]'
+    )
+    create_manager_button.click()
+    driver.implicitly_wait(1)
+
+    teardown(driver)
+
+def test_login():
+    """Log in with correct manager username and password, then confirm log out button exists."""
+    driver = setup()
+
+    username = driver.find_element(By.XPATH, '//input[@id="username"]')
+    password = driver.find_element(By.XPATH, '//input[@id="password"]')
+    submit_button = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/div[2]/div/form/button')
+
+    username.send_keys(manager_username)
+    password.send_keys(pword)
+    submit_button.click()
+    driver.implicitly_wait(1)
+
+    logout_button = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/main/div[1]/nav/a[7]')
+    assert logout_button.text == "Log Out"
+
+    teardown(driver)
+
+def test_logout():
+    """Log in, then log out, and confirm the welcome message appears."""
+    driver = setup()
+
+    username = driver.find_element(By.XPATH, '//input[@id="username"]')
+    password = driver.find_element(By.XPATH, '//input[@id="password"]')
+    submit_button = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/div[2]/div/form/button')
+
+    username.send_keys(manager_username)
+    password.send_keys(pword)
+    submit_button.click()
+    driver.implicitly_wait(1)
+
+    logout_button = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/main/div[1]/nav/a[7]')
+    logout_button.click()
+    driver.implicitly_wait(1)
+
+    welcome_msg = driver.find_element(By.XPATH, '//*[@id="root"]/div/div/div[2]/div/h2')
+    assert welcome_msg.text == "Welcome to Insurance Policy Checker! 👋🏻"
+
+    teardown(driver)
+
+def test_login_wrong_password():

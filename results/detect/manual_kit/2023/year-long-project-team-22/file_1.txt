@@ -1,0 +1,128 @@
+import React, { useState, useEffect } from 'react';
+import { GrAdd } from "react-icons/gr";
+import './searchFriend.css';
+import styles from './VideoDashboard.css';
+import logo from './logo.svg';
+import { Link } from 'react-router-dom';
+import Dropdown from 'react-bootstrap/Dropdown';
+
+const SearchFriend = () => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [showResults, setShowResults] = useState(false);
+  const [requestSent, setRequestSent] = useState([]);
+  const token = sessionStorage.getItem("token");
+  const [disabledButtons, setDisabledButtons] = useState([]); 
+  const currentuserName = sessionStorage.getItem('userName');
+  const [userDropdownVisible, setUserDropdownVisible] = useState(false);
+  const userName = sessionStorage.getItem('userName');
+  const [avatar, setAvatar] = useState('');
+  const userId = sessionStorage.getItem('userId');
+
+  useEffect(() => {
+    fetch(`http://127.0.0.1:8888/user/getAvatar=${userId}`,{
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'token' : token
+      },
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      return response.json();
+    })
+    .then(data => {
+      if(data.data==null){
+        setAvatar("https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg");
+      }else{
+      console.log(data); 
+      let base64String=data.data;
+      let byteCharacters = atob(base64String);
+      let byteNumbers = new Array(byteCharacters.length);
+      for(let i=0; i<byteCharacters.length; i++){
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      let byteArray = new Uint8Array(byteNumbers);
+      let blob=new Blob([byteArray],{type : 'application/octet-stream'})
+      console.log(blob);
+      let blobUrl = URL.createObjectURL(blob);
+      console.log(blobUrl);
+      setAvatar(blobUrl);
+    }
+    })
+    .catch(error => {
+      console.error('Error fetching user profile:', error.message);
+    });
+  }, []); 
+
+  const toggleUserDropdown = () => {
+    setUserDropdownVisible(!userDropdownVisible);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('userName');
+    alert('You have been logged out.');
+    window.location.href = '/';
+  };
+
+  const searchUsers = () => {
+    setSearchResults([]);
+
+    if (searchTerm.trim() === '') {
+      alert("Please enter a search term");
+    } else {
+      const url = 'http://127.0.0.1:8888/user/searchFriend=' + searchTerm;
+
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': token
+        },
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to fetch data');
+        }
+        return response.json(); 
+      })
+      .then(data => {
+        console.log('Data received:', data);
+      
+        if (data.data && Array.isArray(data.data)) {
+          const updatedData = data.data.map(user => {
+            return fetch(`http://127.0.0.1:8888/user/getAvatar=${user.id}`, {
+              method: 'GET',
+              headers: {
+                'Content-Type': 'application/json',
+                'token': token
+              },
+            })
+            .then(avatarResponse => {
+              if (!avatarResponse.ok) {
+                throw new Error('Failed to fetch avatar');
+              }
+              return avatarResponse.json(); 
+            })
+            .then(avatarData => {
+              console.log('Avatar data received:', avatarData);
+              let blobUrl;
+              if(avatarData.data==null){
+              blobUrl ="https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg";
+              }else{
+              let base64String=avatarData.data;
+              let byteCharacters = atob(base64String);
+              let byteNumbers = new Array(byteCharacters.length);
+              for(let i=0; i<byteCharacters.length; i++){
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              let byteArray = new Uint8Array(byteNumbers);
+              let blob=new Blob([byteArray],{type : 'application/octet-stream'})
+              console.log(blob);
+              blobUrl = URL.createObjectURL(blob);
+              console.log(blobUrl);
+            }
+              return { ...user, avatar: blobUrl }; 
+            })

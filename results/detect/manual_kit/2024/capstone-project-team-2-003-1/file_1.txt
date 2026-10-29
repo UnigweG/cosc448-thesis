@@ -1,0 +1,147 @@
+import { NextResponse } from "next/server";
+import { Pinecone, QueryResponse } from "@pinecone-database/pinecone";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Document } from "@langchain/core/documents";
+import { BaseRetriever } from "@langchain/core/retrievers";
+import { PromptTemplate } from "@langchain/core/prompts";
+import prisma, { getUser2 } from "@/lib/db";
+import { Prisma } from '@prisma/client';
+import Papa from "papaparse";
+import fs from 'fs';
+import { analyzeAffordability } from '@/lib/services/financial/affordability';
+import { cleanMerchantName } from '../pineconeEmbedding/route';
+import { ChartConfiguration, ChartTypeRegistry } from 'chart.js';
+
+declare global {
+  interface Window {
+    fs: {
+      readFile(
+        path: string,
+        options?: { encoding?: string }
+      ): Promise<string | ArrayBuffer>;
+    };
+  }
+}
+
+const DEFAULT_PREFERRED_CURRENCY = "USD";
+
+type BudgetQueryResult = {
+  count?: [1];
+  id?: number;
+  name?: string;
+  max_amount?: number;
+  current_amount?: number;
+  // Add other possible fields here
+};
+
+type VisualizationType = 'merchant_breakdown' | 'monthly_trend' | 'category_distribution';
+
+const colorPalettes = {
+  blue: [
+    'rgba(54, 162, 235, 0.8)',
+    'rgba(54, 162, 235, 0.7)',
+    'rgba(54, 162, 235, 0.6)',
+    'rgba(54, 162, 235, 0.5)',
+    'rgba(54, 162, 235, 0.4)',
+    'rgba(54, 162, 235, 0.3)',
+  ],
+  mixed: [
+    'rgba(255, 99, 132, 0.7)',
+    'rgba(54, 162, 235, 0.7)',
+    'rgba(255, 206, 86, 0.7)',
+    'rgba(75, 192, 192, 0.7)',
+    'rgba(153, 102, 255, 0.7)',
+    'rgba(255, 159, 64, 0.7)',
+    'rgba(199, 199, 199, 0.7)',
+    'rgba(83, 102, 255, 0.7)',
+    'rgba(40, 159, 169, 0.7)',
+    'rgba(210, 105, 30, 0.7)',
+  ],
+  green: [
+    'rgba(75, 192, 192, 0.8)',
+    'rgba(75, 192, 192, 0.7)',
+    'rgba(75, 192, 192, 0.6)',
+    'rgba(75, 192, 192, 0.5)',
+    'rgba(75, 192, 192, 0.4)',
+    'rgba(75, 192, 192, 0.3)',
+  ],
+};
+
+// Validate environment variables
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} is not set in environment variables`);
+  }
+  return value;
+}
+
+// New function to fetch exchange rate using the exchange-rate API
+async function fetchExchangeRate(fromCurrency: string, toCurrency: string): Promise<number> {
+  try {
+    if (fromCurrency === toCurrency) return 1.0;
+
+    // Rather than calling our own API which requires a valid URL,
+    // directly call the external exchange rate API
+    const apiKey = process.env.KEY;
+    
+    if (!apiKey) {
+      console.warn("Exchange rate API key not found");
+      return 1.0;
+    }
+    
+    const url = `https://v6.exchangerate-api.com/v6/${apiKey}/latest/${fromCurrency}`;
+    
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data && data.conversion_rates && data.conversion_rates[toCurrency]) {
+      return data.conversion_rates[toCurrency];
+    } else {
+      console.warn(`Exchange rate not found for ${fromCurrency} to ${toCurrency}`);
+      return 1.0;
+    }
+  } catch (error) {
+    console.error(`Error fetching exchange rate from ${fromCurrency} to ${toCurrency}:`, error);
+    return 1.0; // Return 1.0 as fallback in case of error
+  }
+}
+
+function getMonthYearSortKey(monthName: string, year: string | number): number {
+  const monthOrder = ["January", "February", "March", "April", "May", "June", 
+                     "July", "August", "September", "October", "November", "December"];
+  const monthIndex = monthOrder.indexOf(monthName);
+  return (Number(year) * 12) + monthIndex;
+}
+
+// Updated currency conversion function using the API
+async function convertCurrency(
+  amount: number,
+  fromCurrency: string,
+  toCurrency: string = DEFAULT_PREFERRED_CURRENCY
+): Promise<number> {
+  if (fromCurrency === toCurrency) return amount;
+
+  try {
+    const exchangeRate = await fetchExchangeRate(fromCurrency, toCurrency);
+    return amount * exchangeRate;
+  } catch (error) {
+    console.error(`Error converting currency from ${fromCurrency} to ${toCurrency}:`, error);
+    return amount; // Return original amount if conversion fails
+  }
+}
+
+// Initialize Pinecone and Gemini clients
+let pc: Pinecone;
+let genAI: GoogleGenerativeAI;
+let validPlaidCategories: string[] = [];
+
+// Add type for the CSV row structure
+interface PlaidCategoryRow {
+  PRIMARY: string;
+  DETAILED: string;
+  DESCRIPTION: string;
+}
+
+async function initializeClients() {
+  if (!pc || !genAI) {

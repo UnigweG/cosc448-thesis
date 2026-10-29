@@ -1,0 +1,154 @@
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import {
+  Box,
+  Button,
+  ButtonGroup,
+  Flex,
+  Heading,
+  Text,
+  VStack,
+  Divider,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  Tooltip,
+} from "@chakra-ui/react";
+import { useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import {
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+} from "@chakra-ui/react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+import { CartesianGrid } from "recharts";
+import { Image, Tooltip as ChakraTooltip } from "@chakra-ui/react";
+
+const isProduction = process.env.NODE_ENV === "production";
+const COLORS = [
+  "#0088FE",
+  "#00C49F",
+  "#FFBB28",
+  "#FF8042",
+  "#AF19FF",
+  "#FF5733",
+  "#33FF57",
+  "#3357FF",
+  "#FF33A8",
+];
+
+const VisualizationModal = ({ isOpen, onClose, data }) => {
+  const { t } = useTranslation();
+  const [currentPromptSet, setCurrentPromptSet] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen) setCurrentPromptSet(0);
+  }, [isOpen]);
+
+  const surveyTitle = useMemo(() => {
+    if (data.length === 0) return "Survey Results";
+    const firstPrompt = Array.isArray(data[0].prompts)
+      ? data[0].prompts[0]
+      : data[0].prompts;
+    const match = firstPrompt?.match(/([^/]+)\.(jpg|jpeg|png|webp|gif)$/i);
+    return match ? `Survey: ${match[1]}` : "Survey Results";
+  }, [data]);
+
+  const averageData = useMemo(() => {
+    const avg = data.reduce((acc, r) => {
+      const qId = r.questionId;
+      const time = parseFloat(r.responseTime) || 0;
+      if (!acc[qId]) acc[qId] = { total: 0, count: 0 };
+      acc[qId].total += time;
+      acc[qId].count += 1;
+      return acc;
+    }, {});
+    return Object.keys(avg).map((qId) => ({
+      name: `Q${qId}`,
+      value: avg[qId].total / avg[qId].count,
+    }));
+  }, [data]);
+
+  const groupedData = useMemo(() => {
+    return data.reduce((acc, response) => {
+      const prompt = Array.isArray(response.prompts)
+        ? response.prompts
+        : [response.prompts];
+      const userAnswer = response.userAnswer || "";
+      const promptSetKey = prompt.join(",");
+      if (!acc[promptSetKey]) acc[promptSetKey] = {};
+      if (!acc[promptSetKey][userAnswer]) acc[promptSetKey][userAnswer] = 0;
+      acc[promptSetKey][userAnswer] += 1;
+      return acc;
+    }, {});
+  }, [data]);
+
+  const promptSetKeys = Object.keys(groupedData);
+  const currentPromptData = Object.entries(
+    groupedData[promptSetKeys[currentPromptSet]] || {}
+  ).map(([name, value]) => {
+    const fileName = name?.split("/")?.pop()?.replace(/\.(jpg|jpeg|png|webp)$/i, "");
+    return { name: fileName || name, value, fullPath: name };
+  });
+
+  const handleNextSet = () => {
+    setCurrentPromptSet((prev) => (prev + 1) % promptSetKeys.length);
+  };
+
+  const handlePrevSet = () => {
+    setCurrentPromptSet(
+      (prev) => (prev - 1 + promptSetKeys.length) % promptSetKeys.length
+    );
+  };
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" unmountOnExit>
+      <ModalOverlay />
+      <ModalContent p={4}>
+        <ModalHeader textAlign="center" fontSize="2xl" fontWeight="bold">
+          {surveyTitle}
+        </ModalHeader>
+
+        <ModalBody maxH="75vh" overflowY="auto">
+          <Text fontSize="xl" mb={4}>
+            Average Response Times by Question
+          </Text>
+          {averageData.length > 0 && (
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={averageData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="name"
+                  label={{ value: "Question", position: "insideBottom", offset: -5 }}
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  label={{ value: "Time (s)", angle: -90, position: "insideLeft" }}
+                  tick={{ fontSize: 12 }}
+                />
+                <RechartsTooltip
+                  formatter={(value) => [`${value.toFixed(2)}s`, "Avg Time"]}
+                />
+                <Bar dataKey="value" fill="#8884d8" barSize={40} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+
+          <Text fontSize="xl" mt={8}>

@@ -1,0 +1,135 @@
+<?php
+
+namespace Tests\Unit;
+
+use App\Http\Controllers\Auth\RegisterController;
+use App\Http\Controllers\Admin\DeskController;
+use App\Http\Controllers\Admin\BookingController;
+use App\Http\Controllers\Admin\BookingTimeStatisticsController;
+use App\Http\Controllers\Admin\BuildingController;
+use App\Http\Controllers\Admin\CampusController;
+use App\Http\Controllers\Admin\DepartmentStatisticsController;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Admin\FloorController;
+use App\Http\Controllers\Admin\PoliciesController;
+use App\Http\Controllers\Admin\ResourceController;
+use App\Http\Controllers\Admin\ResourceStatisticsController;
+use App\Http\Controllers\Admin\RoleController;
+use App\Http\Controllers\Admin\RolesStatisticsController;
+use App\Models\Bookings;
+use App\Http\Controllers\Admin\RoomController;
+use App\Http\Controllers\Admin\UserController;
+use App\Models\Buildings;
+use App\Models\Campuses;
+use App\Models\Desks;
+use App\Models\Faculty;
+use App\Models\Floors;
+use App\Models\OccupationPolicyLimit;
+use App\Models\Resources;
+use App\Models\Roles;
+use App\Models\Rooms;
+use App\Models\User;
+use App\Models\Users;
+use Carbon\Factory;
+use Illuminate\Console\Scheduling\Event;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\WithFaker;
+use Tests\TestCase;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
+use phpDocumentor\Reflection\Types\Boolean;
+use ReflectionClass;
+
+////////////////////////// Admin //////////////////////////
+use App\Http\Controllers\User\UserBookingsController;
+use App\Models\BookingHistory;
+use App\Models\Department;
+use App\Models\Resources_Desks;
+use App\Models\Resources_Rooms;
+use DateTime;
+
+class DatabaseTest extends TestCase
+{
+    use RefreshDatabase, WithFaker;
+
+    public function test_database_stores_user()
+    {
+        $user = User::factory()->create();
+
+        $this->assertDatabaseHas('users', [
+            'email' => $user->email
+        ]);
+    }
+
+    public function test_Role_Store_Function()
+    {
+        $role = $this->faker->firstName();
+        $nmb = $this->faker->randomNumber(2);
+        $max_booking_window = $this->faker->randomNumber(1);
+        $max_booking_duration = $this->faker->randomNumber(1);
+
+        $request = Request::create(route('role.store'), 'POST', [
+            'role' => $role,
+            'num_monthly_bookings' => $nmb,
+            'max_booking_window' => $max_booking_window,
+            'max_booking_duration' => $max_booking_duration,
+        ]);
+
+        $controller = new RoleController();
+        $controller->store($request);
+
+        $this->assertDatabaseHas('roles', [
+            'role' => $role,
+            'num_monthly_bookings' => $nmb,
+            'max_booking_window' => $max_booking_window,
+            'max_booking_duration' => $max_booking_duration,
+        ]);
+    }
+
+    public function test_Role_Update_Function()
+    {
+        $roleToBeUpdated = Roles::factory()->create();
+
+        $role = $this->faker->firstName();
+        $nmb = $this->faker->randomNumber(2);
+        $max_booking_window = $this->faker->randomNumber(1);
+        $max_booking_duration = $this->faker->randomNumber(1);
+
+        $request = Request::create(route('roleUpdate', $roleToBeUpdated->role_id), 'POST', [
+            'role' => $role,
+            'num_monthly_bookings' => $nmb,
+            'max_booking_window' => $max_booking_window,
+            'max_booking_duration' => $max_booking_duration,
+        ]);
+
+        $controller = new RoleController();
+        $controller->update($request, $roleToBeUpdated->role_id);
+
+        $this->assertDatabaseHas('roles', [
+            'role' => $role,
+            'num_monthly_bookings' => $nmb,
+            'max_booking_window' => $max_booking_window,
+            'max_booking_duration' => $max_booking_duration,
+        ]);
+    }
+
+    public function test_Role_Does_Delete_Function()
+    {
+        $roleToBeDeleted = Roles::factory()->create();
+        $roleToBeDeleted->role_id = 6;
+        $roleToBeDeleted->save();
+
+        $controller = new RoleController();
+        $controller->destroy($roleToBeDeleted->role_id);
+
+        $this->assertDatabaseMissing('roles', [
+            'role_id' => $roleToBeDeleted->role_id,
+        ]);
+    }
+
+    public function test_Role_Does_Not_Delete_Function() 
+    {
+        $roleToBeDeleted = Roles::factory()->create();
+        $roleToBeDeleted->role_id = 2;

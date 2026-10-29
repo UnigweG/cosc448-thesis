@@ -1,0 +1,144 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { Lexend } from "next/font/google";
+import { faCircleInfo, faArrowRight } from "@fortawesome/free-solid-svg-icons";
+import { PiFlagBannerFoldDuotone } from "react-icons/pi";
+import { useUser } from "@/contexts/UserContext";
+import { MultiStepLoader as Loader } from "@/components/multi-step-loader";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+
+const base_path = process.env.BASE_PATH!;
+
+const lexend_medium = Lexend({
+    weight: "400",
+    subsets: ["latin"],
+});
+
+interface Account {
+    id: string;
+    accountId: string;
+    availableBalance: number;
+    currentBalance: number;
+    mask: string;
+    name: string;
+    officialName: string;
+    subtype: string;
+    type: string;
+    isoCurrencyCode: string;
+}
+
+interface Transaction {
+    id: string;
+    accountId: string;
+    amount: number;
+    authorizedDate: string;
+    category: string;
+    currencyCode: string;
+    merchantLogoUrl: string;
+    merchantName: string;
+    paymentChannel: string;
+    pending: boolean;
+    subCategory: string;
+    transactionId: string;
+    transactionType: string;
+    website: string;
+}
+
+interface Milestone {
+    id: string;
+    name: string;
+    targetAmount: number;
+    currentProgress: number;
+    priority: string;
+    dueDate: Date;
+    userId: string;
+}
+
+// Utility: standard deviation.
+function standardDeviation(values: number[]): number {
+    if (values.length === 0) return 0;
+    const mean = values.reduce((a, b) => a + b, 0) / values.length;
+    const variance = values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
+    return Math.sqrt(variance);
+}
+
+/**
+ * Calculates the overall JarScore.
+ */
+function calculateJarScore(
+    accounts: Account[],
+    transactions: Transaction[],
+    milestones: Milestone[]
+): number {
+    const breakdown = getJarScoreBreakdown(accounts, transactions, milestones);
+    return breakdown.totalScore;
+}
+
+/**
+ * Returns a breakdown of the JarScore into its sub-scores.
+ */
+function getJarScoreBreakdown(
+    accounts: Account[],
+    transactions: Transaction[],
+    milestones: Milestone[]
+) {
+    const totalBalance = accounts.reduce((sum, acc) => sum + (acc.availableBalance || 0), 0);
+    const incomes = transactions.filter((txn) => txn.amount < 0).map((txn) => Math.abs(txn.amount));
+    const expenses = transactions.filter((txn) => txn.amount > 0).map((txn) => txn.amount);
+    const totalIncome = incomes.reduce((sum, inc) => sum + inc, 0);
+    const totalExpenses = expenses.reduce((sum, exp) => sum + exp, 0);
+
+    const avgIncome = totalIncome / (incomes.length || 1);
+    const avgExpenses = totalExpenses / (expenses.length || 1);
+
+    // 1. Liquidity Score (max 20)
+    const liquidityScore = Math.round(Math.min(20, (totalBalance / (avgIncome || 1)) * 20));
+
+    // 2. Savings Score (max 30)
+    const savingsScore = Math.round(
+        Math.min(30, ((totalIncome - totalExpenses) / (totalIncome || 1)) * 30)
+    );
+
+    // 3. Spending Consistency Score (max 10)
+    const expenseStd = standardDeviation(expenses);
+    let spendingConsistencyScore = Math.round(
+        Math.max(0, 10 - (expenseStd / (avgExpenses || 1)) * 10)
+    );
+
+    // 4. Income Stability Score (max 10)
+    const incomeStd = standardDeviation(incomes);
+    let incomeStabilityScore = Math.round(Math.max(0, 10 - (incomeStd / (avgIncome || 1)) * 10));
+
+    // 5. Milestone Achievement Score (max 20)
+    let milestoneScore = 0;
+    if (milestones.length > 0) {
+        const totalMilestoneProgress = milestones.reduce((sum, m) => {
+            const progressRatio =
+                m.targetAmount > 0 ? Math.min(m.currentProgress / m.targetAmount, 1) : 0;
+            return sum + progressRatio;
+        }, 0);
+        const avgMilestoneProgress = totalMilestoneProgress / milestones.length;
+        milestoneScore = Math.round(avgMilestoneProgress * 20);
+    } else {
+        spendingConsistencyScore *= 2;
+        incomeStabilityScore *= 2;
+    }
+
+    // 6. Responsible Spending Bonus (10 points if expenses <= income)
+    const responsibleSpendingBonus = Math.round(totalExpenses <= totalIncome ? 10 : 0);
+
+    const totalScore = Math.max(
+        0,
+        Math.min(
+            100,
+            liquidityScore +
+                savingsScore +
+                spendingConsistencyScore +
+                incomeStabilityScore +
+                milestoneScore +
+                responsibleSpendingBonus
+        )
+    );
+
+    return {

@@ -1,0 +1,151 @@
+"use client";
+import OccupationTags from "@/app/components/occupationTags/OccupationTags";
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import fetchUserData from "../api/fetchUserData";
+import MemberFetch from "@/app/types/MemberFetch";
+import updateProfileInfo from "../api/saveProfileData";
+import sendRequest from "../api/sendRequest";
+import acceptRequest from "../../requests/api/acceptRequest";
+import declineRequest from "../../requests/api/declineRequest";
+import cancelRequest from "../../requests/api/cancelRequest";
+import GetProfilePicture from "../api/getPFP";
+import blockUser from "../api/blockUser";
+import unblockUser from "../../requests/api/unblockUser";
+import getRandomProfilePicture from "@/app/scripts/getRandomProfilePicture";
+import "remixicon/fonts/remixicon.css";
+import Image from "next/image";
+import { useWebSocket } from "@/app/contexts/WebSocketContext";
+
+function EditProfile({ params }: { params: { slug: string } }) {
+	const {sendMessage} = useWebSocket();
+	
+
+	const router = useRouter();
+	const [currentTags, setTags] = useState([]);
+	
+
+	const [profile, setProfile] = useState({
+		fullName: "Loading",
+		userName: "Loading",
+		country: "Loading",
+		address: "Loading",
+		biography: "Loading",
+		email: "Loadig",
+		currentTags: [],
+	});
+
+	const [isUser, setIsUser] = useState(false);
+
+	const [hasRequest, setHasRequest] = useState(-1);
+	const [hasChat, setHasChat] = useState(-1);
+
+	//pfp
+	const [pfpInfo, setPfpInfo] = useState(``);
+	const [tempPfp, setTempPfp] = useState(``);
+	const [tempPfpFile, setTempPfpFile] = useState(``);
+
+	useEffect(() => {
+		sendMessage("sessionCheck");
+	}, []);
+
+	const fetchData = async () => {
+		const memberData: MemberFetch = await fetchUserData({ ...params });
+		console.log(memberData);
+
+		if (memberData.status == 202) {
+			console.log("User found, and is the logged in user.");
+			setIsUser(true);
+		} else if (memberData.status == 200) {
+			console.log("User found, but not the logged in user.");
+			setIsUser(false);
+		} else if (memberData.status == 404) {
+			console.log("User not found");
+			router.push("/404");
+			setIsUser(false);
+		} else {
+			console.log("Error");
+			setIsUser(false);
+			router.push("/404");
+		}
+
+		setHasChat(memberData.data.hasChat);
+		setHasRequest(memberData.data.hasRequest);
+
+		const pfpPath = await GetProfilePicture({
+			username: memberData.data.username,
+		});
+		setPfpInfo(pfpPath.data);
+		console.log("PFP PATH: " + pfpInfo + " " + pfpPath.data); //DEBUG LINE
+
+		setProfile({
+			fullName: memberData.data.name,
+			userName: memberData.data.username,
+			country: memberData.data.country,
+			address: memberData.data.address,
+			biography: memberData.data.bio,
+			email: memberData.data.email,
+			currentTags: memberData.data.tags || ([] as string[]), // Add a default value for tags
+		});
+
+		setTags(memberData.data.tags);
+	};
+
+
+
+	useEffect(() => {
+		fetchData();
+	}, []);
+	useEffect(() => {
+		setTempProfile({ ...profile });
+	}, [profile]);
+	useEffect(() => {
+		setTempPfp(pfpInfo);
+	}, [pfpInfo]);
+
+	console.log("pfpInfo: " + pfpInfo + "|| tempPfp: " + tempPfp); //DEBUG LINE
+
+	// Temporary state to hold changes while editing
+	const [tempProfile, setTempProfile] = useState({ ...profile });
+
+	// State to track whether we're currently editing
+	const [isEditing, setIsEditing] = useState(false);
+
+	// Handler for the Edit button
+	const handleEdit = () => {
+		setIsEditing(true);
+	};
+
+	// Handler for the Cancel button
+	const handleCancel = () => {
+		setIsEditing(false);
+		setTempProfile({ ...profile });
+		setTags(profile.currentTags);
+		setTempPfp(pfpInfo);
+		console.log("cancel changes");
+	};
+
+	function formDataAsJSON() {
+		console.log("check data: ", tempProfile);
+		console.log("PFP: ", tempPfpFile);
+		const formData = new FormData();
+		if (tempPfpFile) {
+			formData.append("pfp", tempPfpFile);
+		}
+		else {
+			formData.append("pfp", tempPfp);
+		}
+		formData.append("fullName", tempProfile.fullName);
+		formData.append("country", tempProfile.country);
+		formData.append("address", tempProfile.address);
+		formData.append("bio", tempProfile.biography);
+		formData.append("username", tempProfile.userName);
+		formData.append("email", tempProfile.email);
+		formData.append("tags", JSON.stringify(currentTags));
+		return formData;
+	}
+
+	// Handler for the Save Changes button
+	async function handleSave(e: { preventDefault: () => void }) {
+		setIsEditing(false);
+		tempProfile.currentTags = currentTags;

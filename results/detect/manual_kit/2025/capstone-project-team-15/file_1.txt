@@ -1,0 +1,128 @@
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Moon, Sun } from 'lucide-react';
+import { API_BASE_URL, authApi, dashboardApi, projectApi, resumeApi, userConfigApi } from './api';
+import AlertBanner from './AlertBanner.jsx';
+import ResumeSkillsSection from './ResumeSkillsSection';
+import TopProjectShowcase from './TopProjectShowcase';
+import ActivityHeatmap from './ActivityHeatmap';
+
+const TOKEN_STORAGE_KEY = 'artifactMiner.authToken';
+const THEME_STORAGE_KEY = 'artifactMiner.themeMode';
+const ANALYSIS_POLL_INTERVAL_MS = 5000;
+const ACTIVE_ANALYSIS_STATUSES = new Set(['pending', 'running']);
+const ANALYSIS_TYPE_LABELS = {
+  parser: 'Parser',
+  git_metrics: 'Git Metrics',
+  local_ml: 'Local ML',
+  external_llm: 'Ollama',
+};
+const COMPARISON_ATTRIBUTE_OPTIONS = [
+  { value: 'meta', label: 'Project metadata' },
+  { value: 'duration', label: 'Project duration' },
+  { value: 'contributions', label: 'Contribution totals' },
+  { value: 'languages', label: 'Languages' },
+  { value: 'frameworks', label: 'Frameworks' },
+  { value: 'skills_top', label: 'Top skills' },
+  { value: 'skills_chronological', label: 'Chronological skills' },
+  { value: 'ranking', label: 'Ranking details' },
+  { value: 'activity_counts', label: 'Activity counts' },
+  { value: 'evidence', label: 'Evidence JSON' },
+];
+
+function normalizeProjectName(filename) {
+  return filename.replace(/\.zip$/i, '');
+}
+
+function applyDocumentTheme(themeMode) {
+  const isDarkMode = themeMode === 'dark';
+  const root = document.documentElement;
+
+  root.setAttribute('data-theme-mode', isDarkMode ? 'dark' : 'light');
+  root.style.colorScheme = isDarkMode ? 'dark' : 'light';
+  root.style.background = isDarkMode
+    ? 'radial-gradient(circle at top left, #1b2233 0%, #111827 45%, #0b1323 100%)'
+    : 'radial-gradient(circle at top left, #f4f7ff 0%, #eef2ff 30%, #f7f9fc 100%)';
+}
+
+const YEAR_MIN = 1900;
+const YEAR_MAX_OFFSET_EDU = 10; // allow up to 10 years in the future for expected graduation, covers almost any realistic grad timeline
+
+function getEduYearErrors(startYear, endYear, isCurrent) {
+  const currentYear = new Date().getFullYear();
+  const maxEndYear = currentYear + YEAR_MAX_OFFSET_EDU;
+  const errors = { start_year: null, end_year: null };
+
+  if (startYear !== '' && startYear !== null && startYear !== undefined) {
+    const sy = parseInt(startYear, 10);
+    if (isNaN(sy) || sy < YEAR_MIN || sy > currentYear) {
+      errors.start_year = `Must be between ${YEAR_MIN} and ${currentYear}.`;
+    }
+  }
+
+  if (!isCurrent && endYear !== '' && endYear !== null && endYear !== undefined) {
+    const ey = parseInt(endYear, 10);
+    const sy = parseInt(startYear, 10);
+    if (isNaN(ey) || ey < YEAR_MIN || ey > maxEndYear) {
+      errors.end_year = `Must be between ${YEAR_MIN} and ${maxEndYear}.`;
+    } else if (!isNaN(sy) && ey < sy) {
+      errors.end_year = 'Cannot be before start year.';
+    }
+  }
+
+  return errors;
+}
+
+function getAwardYearError(awardedYear) {
+  const currentYear = new Date().getFullYear();
+  if (awardedYear !== '' && awardedYear !== null && awardedYear !== undefined) {
+    const y = parseInt(awardedYear, 10);
+    if (isNaN(y) || y < YEAR_MIN || y > currentYear) {
+      return `Must be between ${YEAR_MIN} and ${currentYear}.`;
+    }
+  }
+  return null;
+}
+
+function formatDate(value) {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'N/A';
+  return parsed.toLocaleDateString();
+}
+
+function formatDateTime(value) {
+  if (!value) return 'N/A';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'N/A';
+  return parsed.toLocaleString();
+}
+
+function normalizeAnalysisStatus(status) {
+  return typeof status === 'string' ? status.toLowerCase() : 'pending';
+}
+
+function normalizeMetricCount(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function toCsvList(value) {
+  if (!value) return [];
+  return String(value)
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => Boolean(entry));
+}
+
+function createDraftId() {
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatProjectImageDataUrl(mimeType, dataBase64) {
+  if (!dataBase64) return '';
+  return `data:${mimeType || 'image/png'};base64,${dataBase64}`;
+}
+
+function formatEvidenceDraftValue(value) {
+  if (value === undefined) return '';

@@ -1,0 +1,125 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import Navigation from '../components/Navigation';
+import { projectsAPI, resumeAPI, curationAPI } from '../services/api';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
+
+const PdfPreview = ({ base64Content, narrow = false }) => {
+  const [url, setUrl] = useState(null);
+  const urlRef = useRef(null);
+
+  useEffect(() => {
+    if (!base64Content) return;
+    try {
+      const binaryString = atob(base64Content);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const blob = new Blob([bytes], { type: 'application/pdf' });
+      const blobUrl = URL.createObjectURL(blob);
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      urlRef.current = blobUrl;
+      setUrl(blobUrl);
+    } catch {
+      setUrl(null);
+    }
+    return () => {
+      if (urlRef.current) URL.revokeObjectURL(urlRef.current);
+      urlRef.current = null;
+    };
+  }, [base64Content]);
+
+  if (!url) {
+    return <p style={{ color: '#737373', fontSize: '14px' }}>Unable to preview this PDF.</p>;
+  }
+
+  const iframe = (
+    <iframe
+      src={url}
+      title="PDF Preview"
+      style={{
+        width: '100%',
+        height: narrow ? 'min(400px, 52vh)' : 'min(280px, 38vh)',
+        maxHeight: narrow ? '480px' : '320px',
+        border: '1px solid #e5e7eb',
+        borderRadius: '6px',
+        display: 'block',
+        backgroundColor: '#f3f4f6',
+      }}
+    />
+  );
+
+  if (narrow) {
+    return (
+      <div
+        style={{
+          maxWidth: 'min(680px, 96%)',
+          margin: '0 auto',
+          padding: '14px',
+          backgroundColor: '#f9fafb',
+          borderRadius: '8px',
+          border: '1px solid #e5e7eb',
+        }}
+      >
+        {iframe}
+      </div>
+    );
+  }
+
+  return iframe;
+};
+
+const Resume = () => {
+  const [projects, setProjects] = useState([]);
+  const [selectedProjectIds, setSelectedProjectIds] = useState([]);
+
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+
+  const [generatedResume, setGeneratedResume] = useState(null);
+  const [resumeFormat, setResumeFormat] = useState('markdown');
+  const [includeSkills, setIncludeSkills] = useState(true);
+  const [includeProjects, setIncludeProjects] = useState(true);
+  const [storedResumes, setStoredResumes] = useState([]);
+  const [storedResumeId, setStoredResumeId] = useState('');
+  const [storedResumeTitle, setStoredResumeTitle] = useState('');
+  const [storedResumeContent, setStoredResumeContent] = useState('');
+  const [storedResumeFormat, setStoredResumeFormat] = useState('markdown');
+  const [storedResumeLoading, setStoredResumeLoading] = useState(false);
+  const [storedResumeSaving, setStoredResumeSaving] = useState(false);
+  const [deletingResumeId, setDeletingResumeId] = useState(null);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveResumeTitle, setSaveResumeTitle] = useState('');
+  const [saveResumeSaving, setSaveResumeSaving] = useState(false);
+  const [viewingResumeId, setViewingResumeId] = useState(null);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfError, setPdfError] = useState('');
+  const pdfUrlRef = useRef(null);
+
+  const formatMonthYear = (value) => {
+    // HTML <input type="month"> returns "YYYY-MM".
+    if (typeof value !== 'string') return '';
+    const m = value.match(/^(\d{4})-(\d{2})$/);
+    if (!m) return value;
+    const year = Number(m[1]);
+    const monthIdx = Number(m[2]) - 1;
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    if (monthIdx < 0 || monthIdx > 11) return value;
+    return `${monthNames[monthIdx]} ${year}`;
+  };
+
+  /** True if YYYY-MM is strictly after the current calendar month. */
+  const isFutureYearMonth = (yyyyMm) => {
+    if (typeof yyyyMm !== 'string' || !yyyyMm.trim()) return false;
+    const m = yyyyMm.match(/^(\d{4})-(\d{2})$/);
+    if (!m) return false;
+    const y = Number(m[1]);
+    const monthIndex = Number(m[2]) - 1;
+    if (monthIndex < 0 || monthIndex > 11) return false;
+    const now = new Date();
+    if (y > now.getFullYear()) return true;

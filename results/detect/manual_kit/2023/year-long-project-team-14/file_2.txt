@@ -1,0 +1,141 @@
+using UnityEngine;
+using System.Collections;
+using System.Collections.Generic;
+using Pathfinding;
+#if UNITY_5_5_OR_NEWER
+using UnityEngine.Profiling;
+#endif
+
+#if NETFX_CORE
+using Thread = Pathfinding.WindowsStore.Thread;
+#else
+using Thread = System.Threading.Thread;
+#endif
+
+[ExecuteInEditMode]
+[AddComponentMenu("Pathfinding/Pathfinder")]
+/// <summary>
+/// Core component for the A* %Pathfinding System.
+/// This class handles all of the pathfinding system, calculates all paths and stores the info.\n
+/// This class is a singleton class, meaning there should only exist at most one active instance of it in the scene.\n
+/// It might be a bit hard to use directly, usually interfacing with the pathfinding system is done through the <see cref="Pathfinding.Seeker"/> class.
+///
+/// \nosubgrouping
+/// \ingroup relevant
+/// </summary>
+[HelpURL("http://arongranberg.com/astar/docs/class_astar_path.php")]
+public class AstarPath : VersionedMonoBehaviour {
+	/// <summary>The version number for the A* %Pathfinding Project</summary>
+	public static readonly System.Version Version = new System.Version(4, 2, 17);
+
+	/// <summary>Information about where the package was downloaded</summary>
+	public enum AstarDistribution { WebsiteDownload, AssetStore, PackageManager };
+
+	/// <summary>Used by the editor to guide the user to the correct place to download updates</summary>
+	public static readonly AstarDistribution Distribution = AstarDistribution.WebsiteDownload;
+
+	/// <summary>
+	/// Which branch of the A* %Pathfinding Project is this release.
+	/// Used when checking for updates so that
+	/// users of the development versions can get notifications of development
+	/// updates.
+	/// </summary>
+	public static readonly string Branch = "master";
+
+	/// <summary>
+	/// See Pathfinding.AstarData
+	/// Deprecated:
+	/// </summary>
+	[System.Obsolete]
+	public System.Type[] graphTypes {
+		get {
+			return data.graphTypes;
+		}
+	}
+
+	/// <summary>Holds all graph data</summary>
+	[UnityEngine.Serialization.FormerlySerializedAs("astarData")]
+	public AstarData data;
+
+	/// <summary>
+	/// Holds all graph data.
+	/// Deprecated: The 'astarData' field has been renamed to 'data'
+	/// </summary>
+	[System.Obsolete("The 'astarData' field has been renamed to 'data'")]
+	public AstarData astarData { get { return data; } }
+
+	/// <summary>
+	/// Returns the active AstarPath object in the scene.
+	/// Note: This is only set if the AstarPath object has been initialized (which happens in Awake).
+	/// </summary>
+#if UNITY_4_6 || UNITY_4_3
+	public static new AstarPath active;
+#else
+	public static AstarPath active;
+#endif
+
+	/// <summary>Shortcut to Pathfinding.AstarData.graphs</summary>
+	public NavGraph[] graphs {
+		get {
+			if (data == null)
+				data = new AstarData();
+			return data.graphs;
+		}
+	}
+
+	#region InspectorDebug
+	/// <summary>
+	/// @name Inspector - Debug
+	/// @{
+	/// </summary>
+
+	/// <summary>
+	/// Visualize graphs in the scene view (editor only).
+	/// [Open online documentation to see images]
+	/// </summary>
+	public bool showNavGraphs = true;
+
+	/// <summary>
+	/// Toggle to show unwalkable nodes.
+	///
+	/// Note: Only relevant in the editor
+	///
+	/// See: <see cref="unwalkableNodeDebugSize"/>
+	/// </summary>
+	public bool showUnwalkableNodes = true;
+
+	/// <summary>
+	/// The mode to use for drawing nodes in the sceneview.
+	///
+	/// Note: Only relevant in the editor
+	///
+	/// See: Pathfinding.GraphDebugMode
+	/// </summary>
+	public GraphDebugMode debugMode;
+
+	/// <summary>
+	/// Low value to use for certain <see cref="debugMode"/> modes.
+	/// For example if <see cref="debugMode"/> is set to G, this value will determine when the node will be completely red.
+	///
+	/// Note: Only relevant in the editor
+	///
+	/// See: <see cref="debugRoof"/>
+	/// See: <see cref="debugMode"/>
+	/// </summary>
+	public float debugFloor = 0;
+
+	/// <summary>
+	/// High value to use for certain <see cref="debugMode"/> modes.
+	/// For example if <see cref="debugMode"/> is set to G, this value will determine when the node will be completely green.
+	///
+	/// For the penalty debug mode, the nodes will be colored green when they have a penalty less than <see cref="debugFloor"/> and red
+	/// when their penalty is greater or equal to this value and something between red and green otherwise.
+	///
+	/// Note: Only relevant in the editor
+	///
+	/// See: <see cref="debugFloor"/>
+	/// See: <see cref="debugMode"/>
+	/// </summary>
+	public float debugRoof = 20000;
+
+	/// <summary>

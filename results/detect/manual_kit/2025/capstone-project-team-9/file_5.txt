@@ -1,0 +1,98 @@
+from datetime import datetime
+from config.db_config import with_db_cursor, get_connection
+from analysis.project_ranking import rank_all_projects
+from analysis.ranking_storage import get_stored_ranking_by_project_id, get_stored_rankings
+from project_summarizer import ProjectSummarizer
+from parsing.file_contents_manager import get_file_contents_by_upload_id
+from portfolio.skill_mapper import SkillMapper
+from database.user_preferences import get_user_git_username
+from resume.evidence_extractor import build_evidence
+from common.logger import setup_logger
+import json
+import sys
+
+
+class ResumeManager:
+    """Manages user resume data model and storage operations."""
+    logger = setup_logger(__name__)
+    
+    @staticmethod
+    def init_resume_table():
+        try:
+            with with_db_cursor() as cursor:
+                # First, create table if it doesn't exist (with new structure)
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS generated_resumes (
+                        id SERIAL PRIMARY KEY,
+                        user_name VARCHAR(255) NOT NULL UNIQUE,
+                        resume_data JSONB NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # Migration: If old table exists with user_id, migrate to user_name
+                # This must happen before creating the index or adding constraints
+                cursor.execute("""
+                    DO $$
+                    BEGIN
+                        -- Check if user_id column exists (old schema)
+                        IF EXISTS (
+                            SELECT 1 FROM information_schema.columns 
+                            WHERE table_name='generated_resumes' AND column_name='user_id'
+                        ) THEN
+                            -- Rename user_id to user_name
+                            ALTER TABLE generated_resumes RENAME COLUMN user_id TO user_name;
+                            
+                            -- Drop old index if exists
+                            DROP INDEX IF EXISTS idx_generated_resumes_user_id;
+                        END IF;
+                    END $$;
+                """)
+                
+                # Create index on user_name (works for both new and migrated tables)
+                cursor.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_generated_resumes_user_name 
+                    ON generated_resumes(user_name);
+                """)
+                
+                # Add foreign key constraint if it doesn't exist
+                cursor.execute("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM information_schema.table_constraints 
+                            WHERE constraint_name = 'fk_user_name' AND table_name = 'generated_resumes'
+                        ) THEN
+                            ALTER TABLE generated_resumes
+                            ADD CONSTRAINT fk_user_name
+                            FOREIGN KEY (user_name)
+                            REFERENCES user_informations(user_name)
+                            ON DELETE CASCADE
+                            ON UPDATE CASCADE;
+                        END IF;
+                    END $$;
+                """)
+            
+            print("[SUCCESS] Resume table initialized successfully")
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Error initializing resume table: {e}")
+            return False
+    
+    @staticmethod
+    def init_portfolio_settings_table():
+        """Initialize the portfolio_settings table for storing visibility and component settings."""
+        try:
+            with with_db_cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS portfolio_settings (
+                        id SERIAL PRIMARY KEY,
+                        user_name VARCHAR(255) NOT NULL UNIQUE,
+                        is_public BOOLEAN DEFAULT FALSE,
+                        show_timeline BOOLEAN DEFAULT TRUE,
+                        show_heatmap BOOLEAN DEFAULT TRUE,
+                        show_top_projects BOOLEAN DEFAULT TRUE,
+                        show_skills BOOLEAN DEFAULT TRUE,
+                        show_stats BOOLEAN DEFAULT TRUE,

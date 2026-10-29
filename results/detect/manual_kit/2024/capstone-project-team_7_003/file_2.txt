@@ -1,0 +1,142 @@
+"use client";
+
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import ReactMarkdown from "react-markdown";
+import Image from "next/image";
+import remarkGfm from "remark-gfm";
+import { v4 as uuidv4 } from "uuid";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { PiThumbsUpDuotone, PiThumbsDownDuotone } from "react-icons/pi";
+import {
+    faPaperPlane,
+    faTrash,
+    faPlus,
+    faChartSimple,
+} from "@fortawesome/free-solid-svg-icons";
+import { useUser } from "@/contexts/UserContext";
+import { Lexend } from "next/font/google";
+import { MultiStepLoader as Loader } from "@/components/multi-step-loader";
+
+const base_path = process.env.BASE_PATH!;
+
+const lexend_medium = Lexend({ subsets: ["latin"], weight: "400" });
+interface Message {
+    id: string;
+    message: string;
+    sender: "user" | "bot";
+    feedback?: "positive" | "negative" | null;
+}
+
+interface Chat {
+    chatId: string;
+    title: string;
+    messages: Message[];
+}
+
+export default function Clearbot() {
+    const chatCreatedRef = useRef(false);
+
+    const { user } = useUser();
+    const [input, setInput] = useState("");
+    const [botThinking, setBotThinking] = useState(false);
+    const [chats, setChats] = useState<Chat[]>([]);
+    const [selectedChatId, setSelectedChatId] = useState<string | null>();
+    const [isLoading, setIsLoading] = useState(true);
+    const [doGenerateGraph, setDoGenerateGraph] = useState(false);
+    const loadingStates = [
+        {
+            text: "Retrieving bank account information.",
+        },
+        {
+            text: "Analyzing transactions.",
+        },
+        {
+            text: "Loading ClearBot.",
+        },
+    ];
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
+    const fetchChats = useCallback(async () => {
+        if (chatCreatedRef.current) return;
+        try {
+            const response = await fetch(`${base_path}api/clearbot/fetch-chats`);
+            if (!response.ok) throw new Error("Failed to fetch chats");
+
+            const data = await response.json();
+            if (data.chats?.length > 0) {
+                setChats(data.chats);
+            } else {
+                await createNewChat(false);
+            }
+        } catch (error) {
+            console.error("Error fetching chats:", error);
+        }
+    }, [botThinking]);
+
+    useEffect(() => {
+        setIsLoading(true);
+
+        setTimeout(() => {
+            setIsLoading(false);
+        }, 2000);
+    }, []);
+
+    useEffect(() => {
+        fetchChats();
+    }, [fetchChats]);
+
+    useEffect(() => {
+        const timeout = setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+        }, 150);
+
+        return () => clearTimeout(timeout);
+    }, [selectedChatId]);
+
+    const createNewChat = async (force = false) => {
+        const uniqueMessageId = uuidv4();
+
+        if (chatCreatedRef.current && !force) return;
+        chatCreatedRef.current = true;
+        try {
+            const response = await fetch(`${base_path}api/clearbot/create-new-chat`, {
+                method: "POST",
+                credentials: "include",
+                body: JSON.stringify({ messageId: `initial-greeting-${uniqueMessageId}` }),
+            });
+            const data = await response.json();
+            const newChat: Chat = {
+                chatId: data.chatId,
+                title: data.title,
+                messages: [],
+            };
+
+            setChats((prev) => [...prev, newChat]);
+            setSelectedChatId(newChat.chatId);
+
+            simulateBotResponse(
+                "Hello! How can I assist you today?",
+                `initial-greeting-${uniqueMessageId}`,
+                newChat.chatId
+            );
+        } catch (error) {
+            console.error("Error creating a new chat:", error);
+        }
+    };
+
+    const deleteChat = async (chatId: string) => {
+        try {
+            await fetch(`${base_path}api/clearbot/delete-chat`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ chatId }),
+            });
+
+            setChats((prev) => prev.filter((chat) => chat.chatId !== chatId));
+
+            if (selectedChatId === chatId) {
+                setSelectedChatId(chats.length > 1 ? chats[0].chatId : null);
+            }
+        } catch (error) {

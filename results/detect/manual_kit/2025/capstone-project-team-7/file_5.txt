@@ -1,0 +1,132 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Section,
+  SectionActions,
+  SectionBody,
+  SectionDescription,
+  SectionHeader,
+  SectionHeading,
+  SectionInset,
+  SectionTitle,
+} from "@/components/ui/section";
+import { DocumentAnalysisTab } from "@/components/project/document-analysis-tab";
+import { OverviewTab } from "@/components/project/overview-tab";
+import { LanguagesTab } from "@/components/project/languages-tab";
+import { SkillsTab } from "@/components/project/skills-tab";
+import { ProgressTab } from "@/components/project/progress-tab";
+import { ContributionsTab } from "@/components/project/contributions-tab";
+import { ToolsMainTab } from "@/components/project/tools-main-tab";
+import { PdfAnalysisTab } from "@/components/project/pdf-analysis-tab";
+import { getStoredToken } from "@/lib/auth";
+import { useAuth } from "@/hooks/use-auth";
+import { consent as consentApi, secrets as secretsApi } from "@/lib/api";
+import {CodeAnalysisTab} from "@/components/project/code-analysis-tab";
+import { GitAnalysisTab } from "@/components/project/git-analysis-tab";
+import { DuplicateFinderTab } from "@/components/project/duplicate-finder-tab";
+import {
+  getProjects,
+  getProjectById,
+  getProjectSkillTimeline,
+  generateProjectSkillSummary,
+  exportProjectHtml,
+  updateProjectOverrides,
+  getAvailableRoles,
+  getSkillGaps,
+} from "@/lib/api/projects";
+import {
+  detectLanguageMetric,
+  normalizeLanguageStats,
+  type NormalizedLanguageStat,
+  type LanguageMetric,
+} from "@/lib/language-stats";
+import type {
+  ProjectDetail,
+  ProjectScanData,
+  ProjectSkillCategoryItem,
+  ProjectSkillsAnalysis,
+  SkillEvidenceItem,
+  SkillAdoptionEntry,
+  SkillProgressPeriod,
+  SkillProgressSummary,
+  RoleProfile,
+  SkillGapAnalysis,
+  SkillProgressionMap,
+} from "@/types/project";
+import { getCategoryLabel, buildEvidenceMap } from "@/lib/skills-utils";
+import {
+  isPlainObject,
+  formatDurationSeconds,
+  formatBytes,
+  formatCount,
+} from "@/lib/format-utils";
+import {
+  MediaAnalysisTab,
+} from "@/components/project/media-analysis-tab";
+import { resolveMediaAnalysis } from "@/lib/project-media-analysis";
+import {
+  projectPageSelectors,
+  useProjectPageStore,
+  type MainTabValue,
+  type OverviewTabValue,
+  type ToolsTabValue,
+} from "@/lib/stores/project-page-store";
+import {
+  LayoutDashboard,
+  Award,
+  BookOpen,
+  Wrench,
+  BarChart3,
+  Users,
+  FileText,
+  Film,
+  FileImage,
+  GitBranch,
+  Copy,
+  FileCode2,
+  Sparkles,
+} from "lucide-react";
+import { FileTreeView } from "@/components/project/file-tree-view";
+import { SearchFilterTab } from "@/components/project/search-filter-tab";
+import type { FileEntry } from "@/lib/file-tree";
+import { LoadingState } from "@/components/ui/loading-state";
+
+const mainTabs = [
+  { value: "overview", label: "Overview & Analysis", icon: LayoutDashboard },
+  { value: "skills", label: "Skills & Progress", icon: Award },
+  { value: "content", label: "Content Analysis", icon: BookOpen },
+  { value: "ai-analysis", label: "AI Analysis", icon: Sparkles },
+  { value: "tools", label: "Tools & Export", icon: Wrench },
+] as const;
+
+// Sub-tabs for Overview & Analysis section
+const overviewSubTabs = [
+  { value: "overview-main", label: "Overview", icon: LayoutDashboard },
+  { value: "languages", label: "Languages", icon: BarChart3 },
+  { value: "git-analysis", label: "Git Analysis", icon: GitBranch },
+  { value: "code-analysis", label: "Code Analysis", icon: FileCode2 },
+] as const;
+
+// Sub-tabs for Skills & Progress section
+const skillsSubTabs = [
+  { value: "skills-main", label: "Skills", icon: Award },
+  { value: "progress", label: "Progress", icon: LayoutDashboard },
+  { value: "contributions", label: "Contributions", icon: Users },
+] as const;
+
+// Sub-tabs for Content Analysis section
+const contentSubTabs = [
+  { value: "documents", label: "Documents", icon: FileText },
+  { value: "media", label: "Media", icon: Film },
+  { value: "pdfs", label: "PDFs", icon: FileImage },
+] as const;
+
+const toolsSubTabs = [
+  { value: "tools-main", label: "Overview", icon: Wrench },
+  { value: "file-browser", label: "Files Explorer", icon: FileText },

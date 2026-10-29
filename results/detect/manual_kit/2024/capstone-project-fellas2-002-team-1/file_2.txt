@@ -1,0 +1,110 @@
+"use client";
+
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { getSession } from "next-auth/react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
+import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, BarChart, Bar, PieChart, Pie, Cell } from "recharts"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import Navbar from "@/components/ui/navbar";
+import LoadingJar from "@/components/ui/loading-jar";
+import { AppSidebar } from "@/components/Sidebar";
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { fetchUserTransactions, Transaction } from "@/services/fetchTransactions";
+import { generateChatResponse } from "@/services/openaiService";
+import { marked } from "marked";
+import { Switch } from "@/components/ui/switch";
+import PlaidLink from "@/components/plaidLink";
+import { handlePlaidLinkSuccess } from "@/services/plaidSuccessService";
+import { getAccounts } from "@/services/accountService";
+import { LoadingSpinner } from "@/components/ui/loadingSpinner";
+import { motion } from "motion/react";
+import { useTheme } from "next-themes";
+import { getUnreadAlerts, checkBudgetAlerts } from "@/services/alertsService";
+import { uploadReceipt } from "@/services/receiptService";
+import ReceiptUploadDialog from "@/components/ui/receipt-upload-dialogue";
+import { DataProvider } from "@/components/data/dataProvider";
+import InsightModal from "@/components/dashboard-modal";
+import BudgetModal from "@/components/budget-modal";
+import { getSuggestedQuery } from "@testing-library/react";
+import { Mic } from "lucide-react"
+
+declare global {
+  interface Window {
+    SpeechRecognition: any 
+    webkitSpeechRecognition: any 
+  }
+}
+
+function generateSuggestedQueries() {
+
+  // If updating, remember to make the same update in classifyIntent.ts in backend
+  const allQueries = [
+    "Show me my total spending last month", // works
+    "What are my top spending categories?", // work
+    "What was my last transaction?", // work
+    "What recurring expenses do I have?", // doesn't work
+    "Which purchase was the largest this month?", // doesn't work
+  ];
+
+  const shuffled = allQueries.sort(() => 0.5 - Math.random());
+  return shuffled.slice(0, 3);
+}
+
+type ChatMessage = {
+  role: "user" | "assistant" | "system";
+  content: string;
+};
+
+type Alert = {
+  id: string;
+  title: string;
+  description: string;
+};
+
+type ChartData = {
+  type: "line" | "bar" | "pie"
+  title: string
+  data: any[]
+  labels?: string[]
+  categories?: string[]
+}
+
+const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL
+  ? process.env.NEXT_PUBLIC_BACKEND_URL
+  : process.env.NODE_ENV === "production"
+    ? "https://capstone-project-production-6a59.up.railway.app"
+    : "https://localhost:3001"
+
+const chartConfig = {
+  desktop: {
+    label: "Transaction",
+    color: "hsl(var(--chart-1))",
+  },
+} satisfies ChartConfig;
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d', '#a4de6c']
+
+export default function InterfacePage() {
+  const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [loading, setLoading] = useState(true);
+  const [userInput, setUserInput] = useState("");
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [fetchingResponse, setFetchingResponse] = useState(false);
+  const messageEndRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [aiMode, setAiMode] = useState<"openai" | "xai">("openai");
+  const [isPlaidConnected, setIsPlaidConnected] = useState(false);
+  const [verifyingPlaid, setVerifyingPlaid] = useState(false);
+  const [suggestedQueries, setSuggestedQueries] = useState<string[]>([]);
+  const [notifications, setNotifications] = useState<Alert[]>([]);
+  const chatSessionRef = useRef(0);
+  const [receiptUploadError, setReceiptUploadError] = useState<string | null>(null);

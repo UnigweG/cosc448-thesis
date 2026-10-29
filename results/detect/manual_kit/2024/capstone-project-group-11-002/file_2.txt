@@ -1,0 +1,144 @@
+import React, { useContext, useState, useEffect, useMemo } from 'react';
+import styles from './AllTicketsManager.module.css';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faHouseUser,
+  faUser,
+  faCog,
+  faSignOutAlt,
+  faSearch,
+  faBell,
+  faTicket,
+  faAddressCard,
+  faChartLine,
+  faSort,
+  faFilter
+} from '@fortawesome/free-solid-svg-icons';
+import { Link, useNavigate } from 'react-router-dom';
+import { UserContext } from '../../services/UserContext';
+import ticketService from '../../services/ticketService';
+import { useTranslation } from 'react-i18next';
+import appSettingsService from '../../services/appSetting';
+import NotificationIcon from '../NotificationIcon/NotificationIcon';
+
+const AllTicketsManager = () => {
+  const { t } = useTranslation();
+  const { user } = useContext(UserContext);
+  const navigate = useNavigate();
+
+  // ----------------------------
+  // Tab & Search
+  // ----------------------------
+  const [selectedTab, setSelectedTab] = useState('Draft');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [tickets, setTickets] = useState([]);
+
+  // ----------------------------
+  // Priority Editing (Dropdown)
+  // ----------------------------
+  const [editingTicketId, setEditingTicketId] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+
+  // ----------------------------
+  // Sorting States
+  // ----------------------------
+  const [sortColumn, setSortColumn] = useState(null);
+  const [sortDirection, setSortDirection] = useState(null);
+  const [sortDropdownOpenColumn, setSortDropdownOpenColumn] = useState(null);
+  const [sortDropdownPosition, setSortDropdownPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  // ----------------------------
+  // Priority Filter States
+  // ----------------------------
+  const [priorityFilter, setPriorityFilter] = useState('All');
+  const [showPriorityFilter, setShowPriorityFilter] = useState(false);
+  const [priorityFilterPosition, setPriorityFilterPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  // ----------------------------
+  // Broker Filter States
+  // ----------------------------
+  const [brokerFilter, setBrokerFilter] = useState('All');
+  const [showBrokerFilter, setShowBrokerFilter] = useState(false);
+  const [brokerFilterPosition, setBrokerFilterPosition] = useState({
+    top: 0,
+    left: 0,
+  });
+
+  // Compute unique broker options from tickets (include "All")
+  const brokerOptions = useMemo(() => {
+    const brokers = new Set(tickets.map(ticket => ticket.broker));
+    return ['All', ...Array.from(brokers)];
+  }, [tickets]);
+
+  // Fetch Manager Tickets
+  useEffect(() => {
+    if (user) {
+      ticketService
+        .fetchManagerTickets(user.id)
+        .then(data => {
+          const formattedData = data.map(ticket => ({
+            id: ticket.id,
+            company: ticket.customerName,
+            broker: ticket.broker || 'N/A',
+            priority: ticket.priority,
+            status: ticket.status,
+            lastUpdated: ticket.issueDate
+              ? new Date(ticket.issueDate).toLocaleDateString()
+              : 'N/A',
+          }));
+          setTickets(formattedData);
+        })
+        .catch(error => {
+          console.error("Failed to load manager's tickets", error);
+        });
+    }
+  }, [user]);
+
+  // Logout
+  const handleLogout = () => {
+    localStorage.clear();
+    appSettingsService.applySettings({
+      theme: 'light',
+      language: 'english',
+      emailNotifications: true,
+      timeFormat: '12-hour',
+    });
+    navigate('/');
+  };
+
+  // Tab click
+  const handleTabClick = tab => {
+    setSelectedTab(tab);
+  };
+
+  // Row click
+  const handleRowClick = ticketId => {
+    navigate(`/ticketManager/${ticketId}`);
+  };
+
+  // Priority dropdown toggle
+  const togglePriorityDropdown = (event, ticketId) => {
+    event.stopPropagation(); // Prevent row onClick
+    const rect = event.target.getBoundingClientRect();
+    setDropdownPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+    });
+    setEditingTicketId(ticketId === editingTicketId ? null : ticketId);
+  };
+
+  // Priority update
+  const handlePriorityChange = async (ticketId, newPriority) => {
+    try {
+      await ticketService.updateTicketPriority(ticketId, newPriority);
+      setTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === ticketId ? { ...ticket, priority: newPriority } : ticket
+        )
+      );

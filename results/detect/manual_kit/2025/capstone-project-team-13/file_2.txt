@@ -1,0 +1,117 @@
+import { Joyride } from 'react-joyride';
+// Joyride walkthrough steps for Portfolio page
+const walkthroughSteps = [
+  {
+    target: 'body',
+    placement: 'center',
+    title: 'Welcome to Your Portfolio!',
+    content: 'This page showcases all your projects, skills, and evidence. Let’s take a quick tour!',
+    disableBeacon: true,
+  },
+  {
+    target: '.port-hero',
+    title: 'Portfolio Header',
+    content: 'Here you can edit your portfolio\s title, change portfolio visibility, and access your web showcase. To generate a portfolio, simply upload projects and click "Regenerate".',
+    spotlightPadding: 6,
+  },
+  {
+    target: '.port-stat-row',
+    title: 'Portfolio Stats',
+    content: 'See a summary of your projects, code, files, and skills.',
+    spotlightPadding: 6,
+  },
+  {
+    target: '.port-sort-row',
+    title: 'Sort & Layout',
+    content: 'Sort your projects and switch between list or grid layouts.',
+    spotlightPadding: 6,
+  },
+  {
+    target: '.port-viz-card-sec',
+    title: 'Skills Timeline & Activity Heatmap',
+    content: 'See when you used different skills and view your project activity over time.',
+    spotlightPadding: 6,
+  },
+];
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { apiFetch, projectName } from "../apiClient";
+import SkillsTimeline from "./SkillsTimeline";
+import ActivityHeatmap from "./ActivityHeatmap";
+import {
+  typeColor, thumbUrl, educationEntryTypeOf, experienceTypeOf,
+} from "./PortfolioShared";
+import "./Portfolio.css";
+
+const API_BASE = "http://127.0.0.1:8000";
+
+const STAT_ICONS = { Projects: "📁", "Lines of Code": "💻", Files: "🗂️", "Word Count": "📝", Skills: "⚡" };
+
+const SORT_OPTIONS = [
+  { value: "importance", label: "Importance" },
+  { value: "rank",       label: "User Rank" },
+  { value: "date",       label: "Date" },
+  { value: "name",       label: "Name" },
+];
+
+const NAV_ITEMS = [
+  { id: "about",      label: "About Me" },
+  { id: "projects",   label: "Projects" },
+  { id: "skills",     label: "Skills & Stats" },
+  { id: "experience", label: "Experience" },
+  { id: "education",  label: "Education" },
+  { id: "contact",    label: "Contact" },
+];
+
+const DEFAULT_HERO_TITLE = "Master Portfolio";
+const DEFAULT_HERO_SUB   = "All projects · evidences · ranked";
+const DEFAULT_CONTACT = {
+  email: "",
+  phone: "",
+  location: "",
+  website: "",
+  linkedin: "",
+  github: "",
+  availability: "",
+  intro: "",
+  customPresences: [],
+};
+
+function normalizeContactInfo(raw) {
+  const contact = { ...DEFAULT_CONTACT, ...(raw || {}) };
+  contact.customPresences = Array.isArray(contact.customPresences)
+    ? contact.customPresences.map((item, idx) => ({
+        id: item?.id || `presence-${Date.now()}-${idx}`,
+        label: item?.label || "",
+        url: item?.url || "",
+      }))
+    : [];
+  return contact;
+}
+
+
+export default function Portfolio() {
+  const [portfolio, setPortfolio] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const [includeHidden, setIncludeHidden] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [rankInput, setRankInput] = useState({});
+  const [sortBy, setSortBy] = useState("importance");
+  const [authed, setAuthed] = useState(null);
+  const [showEmojis, setShowEmojis] = useState(() => localStorage.getItem("dash_show_emojis") !== "false");
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem("portfolio_mode") || "private");
+  const [search, setSearch] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [layout, setLayout] = useState(() => localStorage.getItem("portfolio_layout") || "list");
+  const [heroTitle, setHeroTitle] = useState(() => localStorage.getItem("portfolio_hero_title") || "");
+  const [heroSub, setHeroSub] = useState(() => localStorage.getItem("portfolio_hero_sub") || "");
+  const [editingHero, setEditingHero] = useState(null); // "title" | "sub" | null
+  const [heroDraft, setHeroDraft] = useState("");
+  const [showTimeline, setShowTimeline] = useState(true);
+  const [showHeatmap, setShowHeatmap] = useState(true);
+  const [portfolioPublic, setPortfolioPublic] = useState(false);
+  const [activeSection, setActiveSection] = useState("about");
+  const [aboutBio, setAboutBio] = useState("");

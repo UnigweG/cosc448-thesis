@@ -1,0 +1,90 @@
+'use client';
+
+import React, { useState, useEffect, ChangeEvent, useRef, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { FaPlusCircle, FaFilePdf } from 'react-icons/fa';
+import { useTranslation } from 'react-i18next';
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Upload, FolderOpen, X } from "lucide-react";
+import DocumentSelector from "../../components/DocumentSelector";
+import { ServerDocument } from "../../components/DocumentSelector";
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+import { useAdminStatus } from "../../components/useAdminStatus"; // added
+import ChatBubble from '../../components/ChatBubble';
+
+
+const TicketPage: React.FC = () => {
+  const router = useRouter();
+  const { id } = useParams();
+  const isEditMode = id && id[0] !== 'new';
+  const { t } = useTranslation();
+  const { isManager } = useAdminStatus(); // added
+
+  // Common states (for both create and edit)
+  const [ticketName, setTicketName] = useState(' ');
+  const [clientName, setClientName] = useState(' ');
+  const [status, setStatus] = useState<'Open' | 'In Progress' | 'Missing Document' | 'Closed' | 'Processed'>('Open');
+  const [pdfFile1, setPdfFile1] = useState<File | null>(null);
+  const [pdfFile2, setPdfFile2] = useState<File | null>(null);
+  const [pdfPreview1, setPdfPreview1] = useState<string | null>(null);
+  const [pdfPreview2, setPdfPreview2] = useState<string | null>(null);
+  const [showPDF1, setShowPDF1] = useState(false);
+  const [showPDF2, setShowPDF2] = useState(false);
+  const [pdf1Name, setPdf1Name] = useState<string | null>(null);
+  const [pdf2Name, setPdf2Name] = useState<string | null>(null);
+
+  // Create-only states for progress and document selection
+  const [showLoading, setShowLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressStatus, setProgressStatus] = useState(t('Not Started'));
+  const [progressFailure, setProgressFailure] = useState(false);
+  const [isDocumentSelectorOpen, setIsDocumentSelectorOpen] = useState(false);
+  const [pdfNumber, setPdfNumber] = useState<1 | 2>(1);
+
+  const fileInputRef1 = useRef<HTMLInputElement>(null);
+  const fileInputRef2 = useRef<HTMLInputElement>(null);
+  const [ticketId, setTicketId] = useState<number | null>(null);
+  const createdDefaultRef = useRef(false);
+  const [isProcessed, setIsProcessed] = useState(true);
+
+  const [originalTicket, setOriginalTicket] = useState({ ticketName: '', clientName: '', status: '' });
+  const [showSideBySideOverlay, setShowSideBySideOverlay] = useState(false);
+  const iframe1Ref = useRef<HTMLIFrameElement>(null);
+  const iframe2Ref = useRef<HTMLIFrameElement>(null);
+  const [comments, setComments] = useState<any[]>([]);
+  const [userName, setUserName] = useState('');
+
+  // Add new state for reassign UI
+  const [showReassignForm, setShowReassignForm] = useState(false);
+  const [teamMembers, setTeamMembers] = useState<Array<{user_id: number; firstName: string; lastName: string}>>([]);
+  const [selectedMember, setSelectedMember] = useState<number | "">("");
+  const [currentOwner, setCurrentOwner] = useState<{firstName: string, lastName: string} | null>(null);
+  // Add this with other state declarations
+  const [isDraftSaving, setIsDraftSaving] = useState(false);
+  // When creating a new ticket, pdf preview is generated from selected files.
+  // Add state to track confirmation dialog visibility
+  const [showConfirmOverlay, setShowConfirmOverlay] = useState(false);
+
+  const [commentText, setCommentText] = useState('');
+
+
+  // Only create a default ticket if not in edit mode:
+  useEffect(() => {
+    if (isEditMode) return; // Don't create a new ticket if editing.
+    if (createdDefaultRef.current) return;
+    createdDefaultRef.current = true;
+    const createDefaultTicket = async () => {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_DB_URL}/ticketsNoPDF`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: ' ', clientName: ' ', status: 'Open' }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTicketId(data.ticket_id || data.id);
+        } else {

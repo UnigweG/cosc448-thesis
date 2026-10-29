@@ -1,0 +1,95 @@
+"""
+Unit tests for Resume_Generator_API.py
+
+Uses FastAPI's TestClient to simulate HTTP calls without running a real server.
+All external dependencies (RenderCVDocument, runtimeAppContext) are mocked.
+"""
+
+import unittest
+import tempfile
+from unittest.mock import patch, MagicMock
+from pathlib import Path
+from fastapi.testclient import TestClient
+
+from src.API.general_API import app
+
+DOC_PATCH = "src.API.Resume_Generator_API.RenderCVDocument"
+CTX_PATCH = "src.API.Resume_Generator_API.runtimeAppContext"
+AI_PATCH = "src.API.Resume_Generator_API.GenerateResumeAI_Ver2"
+
+SAMPLE_DB_RECORD = {
+    "hierarchy": {"name": "WarframeFinderStreamlit", "type": "DIR", "children": []},
+    "resume_item": {
+        "project_name": "WarframeFinderStreamlit",
+        "summary": "Built WarframeFinderStreamlit with Python; framework Streamlit, leveraging Git-backed collaboration.",
+        "highlights": [
+            "Implemented core functionality using Python; framework Streamlit.",
+            "Demonstrated skills: Data Analysis, Data Visualization, Python, and Streamlit.",
+            "Managed version control workflows in Git."
+        ],
+        "project_type": "individual",
+        "detection_mode": "git",
+        "languages": ["Python"],
+        "frameworks": ["Streamlit"],
+        "skills": ["Data Analysis", "Data Visualization", "Python", "Streamlit"],
+        "framework_sources": {"Streamlit": ["requirements.txt"]}
+    },
+    "project_root": "D:\\Python Project\\WarframeFinderStreamlit",
+    "project_type": {"mode": "git", "project_type": "individual"},
+    "duration_estimate": "754 days, 13:17:35.854911"
+}
+
+
+class _BaseResumeTest(unittest.TestCase):
+    """Shared setup: patches RenderCVDocument and creates a TestClient."""
+
+    def setUp(self):
+        self.client = TestClient(app)
+        patcher = patch(DOC_PATCH)
+        self.mock_doc_cls = patcher.start()
+        self.mock_doc = MagicMock()
+        self.mock_doc_cls.return_value = self.mock_doc
+        self.addCleanup(patcher.stop)
+
+    def _set_not_found(self):
+        """Configure mock so _load_resume raises 404."""
+        self.mock_doc.load.side_effect = FileNotFoundError
+
+
+class TestResumeFullWorkflow(_BaseResumeTest):
+    """End-to-end test covering generate -> get -> edit -> render -> delete."""
+
+    @patch("src.API.Resume_Generator_API.shutil")
+    def test_full_lifecycle(self, _mock_shutil):
+        """Exercises every endpoint in the typical user workflow."""
+        # 1. Generate resume
+        self.mock_doc.generate.return_value = "Generated"
+        resp = self.client.post("/resume/generate", json={"name": "John"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertIn("resume_id", data)
+        self.assertEqual(data["status"], "Resume created successfully")
+        self.assertRegex(data["resume_id"], r"^John_[a-f0-9]{8}_\(\d{4}_\d{2}_\d{2}_\d{4}\)$")
+        resume_id = data["resume_id"]
+
+        # 2. Get resume — verify all expected sections are present
+        resp = self.client.get(f"/resume/{resume_id}")
+        self.assertEqual(resp.status_code, 200)
+        for key in ["name", "contact", "theme", "summary", "experience",
+                     "education", "projects", "skills", "awards", "connections"]:
+            self.assertIn(key, resp.json())
+
+        # 3. Edit resume — batch edit across all section types
+        self.mock_doc.modify_experience.return_value = "Successfully modified position"
+        self.mock_doc.modify_education.return_value = "Successfully modified area"
+        self.mock_doc.modify_project.return_value = "Successfully modified project"
+        self.mock_doc.modify_skill.return_value = "Successfully modified skill"
+        self.mock_doc.modify_award.return_value = "Successfully modified date"
+        self.mock_doc.update_summary.return_value = "Successfully updated summary"
+        self.mock_doc.update_theme.return_value = "Successfully updated theme"
+
+        resp = self.client.post(f"/resume/{resume_id}/edit", json={"edits": [
+            {"section": "experience", "item_name": "Google", "field": "position", "new_value": "Lead"},
+            {"section": "education", "item_name": "UBC", "field": "area", "new_value": "CS"},
+            {"section": "projects", "item_name": "App", "field": "summary", "new_value": "New summary"},
+            {"section": "skills", "item_name": "Python", "field": "", "new_value": "Python 3.12"},

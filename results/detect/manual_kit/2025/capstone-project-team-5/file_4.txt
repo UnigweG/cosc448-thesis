@@ -1,0 +1,110 @@
+import { useEffect, useRef, useState } from 'react'
+import { useApp } from '../../app/context/AppContext'
+import EmptyState from '../../components/EmptyState'
+import InlineError from '../../components/InlineError'
+import PageHeader from '../../components/PageHeader'
+import { getProjectItems } from '../../lib/projects'
+
+// ─── Persistent analysis cache ────────────────────────────────────────────────
+
+const CACHE_KEY = 'zip2job_analyses'
+function readCache() {
+  try { return JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') } catch { return {} }
+}
+function writeCache(projectId, result) {
+  try {
+    const c = readCache()
+    c[String(projectId)] = result
+    localStorage.setItem(CACHE_KEY, JSON.stringify(c))
+  } catch { /* quota exceeded */ }
+}
+function evictCache(projectId) {
+  try {
+    const c = readCache()
+    delete c[String(projectId)]
+    localStorage.setItem(CACHE_KEY, JSON.stringify(c))
+  } catch { /* ignore */ }
+}
+
+function isAnalyzed(p) {
+  return !!(p?.importance_score || p?.user_role)
+}
+
+function computeNewRankings(projects, movingId, targetRank) {
+  const ranked = projects
+    .filter((p) => p.importance_rank != null)
+    .sort((a, b) => a.importance_rank - b.importance_rank)
+
+  const wasUnranked = projects.find((p) => p.id === movingId)?.importance_rank == null
+
+  // Remove the moving project from the ranked list if it was there
+  const withoutMoving = ranked.filter((p) => p.id !== movingId)
+
+  // Clamp target to valid range (1 … length after re-insertion)
+  const maxRank = withoutMoving.length + 1
+  const clamped = Math.min(Math.max(1, targetRank), maxRank)
+
+  // Insert at target position (convert 1-based to 0-based index)
+  withoutMoving.splice(clamped - 1, 0, { id: movingId })
+
+  // Build result map for every entry whose rank changed
+  const result = new Map()
+  withoutMoving.forEach((p, idx) => {
+    const newRank = idx + 1
+    const original = projects.find((x) => x.id === p.id)
+    if (wasUnranked || original?.importance_rank !== newRank) {
+      result.set(p.id, newRank)
+    }
+  })
+  return result
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+const SORT_OPTIONS = [
+  { value: 'date',  label: 'Date' },
+  { value: 'rank',  label: 'Rank' },
+  { value: 'score', label: 'Score' },
+  { value: 'name',  label: 'Name' },
+]
+
+export default function ProjectsPage() {
+  const { apiOk, uploadHighlights, setUploadHighlights, analysisCache } = useApp()
+  const [projects, setProjects] = useState([])
+  const [error,    setError]    = useState('')
+  const [open,     setOpen]     = useState(null)
+  const [query,    setQuery]    = useState('')
+  const [sort,     setSort]     = useState('date')
+
+  useEffect(() => {
+    if (!apiOk) return
+    let cancelled = false
+    async function load() {
+      try {
+        const username = window.api.getAuthUsername()
+        const [payload, savedUploads] = await Promise.all([
+          window.api.getProjects(),
+          username ? window.api.getSavedProjects(username).catch(() => []) : Promise.resolve([]),
+        ])
+        if (cancelled) return
+
+        const savedMap = {}
+        for (const upload of (savedUploads || [])) {
+          for (const sp of (upload.projects || [])) {
+            const latest = sp.analyses?.length > 0 ? sp.analyses[sp.analyses.length - 1] : null
+            savedMap[sp.id] = {
+              importance_rank:              sp.importance_rank,
+              importance_score:             sp.importance_score,
+              user_role:                    latest?.user_role           ?? sp.user_role,
+              user_contribution_percentage: latest?.user_contribution_percentage ?? sp.user_contribution_percentage,
+              role_justification:           latest?.role_justification  ?? sp.role_justification,
+              user_role_types:              latest?.user_role_types     ?? sp.user_role_types,
+              other_languages:              sp.languages,
+              tools:                        sp.tools,
+              practices:                    sp.practices,
+              resume_bullets:               latest?.resume_bullets      ?? [],
+              ai_bullets:                   latest?.ai_bullets          ?? [],
+              ai_warning:                   latest?.ai_warning,
+              skill_timeline:               latest?.skill_timeline      ?? [],
+              score_breakdown:              latest?.score_breakdown     ?? {},
+              git:                          latest?.git,

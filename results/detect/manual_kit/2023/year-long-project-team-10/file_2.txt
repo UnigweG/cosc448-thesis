@@ -1,0 +1,151 @@
+"use client";
+import React from "react";
+import retrieveChats from "./api/retrieveChatsFromServer";
+import { get } from "http";
+import { useRef, useEffect, useState, use } from "react";
+import GetProfilePicture from "../profile/api/getPFP";
+
+import PenguinC from "@/app/images/PenguinC.jpeg";
+import ChatBubble from "../../components/conversations/ChatBubble";
+import { useWebSocket } from "../../contexts/WebSocketContext";
+import NoChatSelectedSVG from "@/public/noconversationSelected.svg";
+import NoMessagesSVG from "@/public/nomessages.svg";
+import UserConversation from "@/app/components/conversations/UserConversation";
+import ImageCard from "@/app/components/conversations/ImageCard";
+import Image from "next/image";
+import { Router } from "lucide-react";
+import {useRouter} from "next/navigation";
+
+const dotenv = require("dotenv");
+dotenv.config();
+
+export default function Chats() {
+	
+	const {userStatus, sendMessage } = useWebSocket();
+	const router = useRouter();
+	const [chatsList, setChatsList] = useState<
+		{
+			chatID: string;
+			profilePicture: string;
+			name: string;
+			username: string;
+		}[]
+	>([]);
+	const [messagesList, setMessagesList] = useState<
+		{
+			messageID: string;
+			message: string;
+			name: string;
+			fileExtension: string;
+			isYou: boolean;
+			signedURL: string;
+		}[]
+	>([]);
+	const [message, setMessage] = useState("");
+	const [file, setFile] = useState<any>(null);
+	const [shouldBlur, setShouldBlur] = useState(false);
+	const [showOptions, setShowOptions] = useState(false);
+
+	const [loggedInPfp, setLoggedInPfp] = useState(``);
+	const [chatsProfilePictures, setChatsProfilePictures] = useState(new Map());
+
+
+	// Create a WebSocket connection to the server
+
+	const ws = useRef(null);
+	const inputRef = useRef(null);
+	const uploadRef = useRef(null);
+	const chatID = useRef("");
+
+	
+
+	//  INFORMATION: QUICK NAVIGATE TO INPUT
+
+	useEffect(() => {
+		const handleKeyDownConv = (event: any) => {
+			if (event.code === "KeyK") {
+				event.preventDefault();
+				inputRef.current?.focus();
+			}
+		};
+
+		window.addEventListener("keydown", handleKeyDownConv);
+
+		return () => {
+			window.removeEventListener("keydown", handleKeyDownConv);
+		};
+	}, []);
+
+	//  INFORMATION: WEBSOCKETS
+
+	useEffect(() => {
+		ws.current = new WebSocket(`ws://${process.env.NEXT_PUBLIC_DNS}:7979`);
+		ws.current.onopen = () => {
+			console.log("WebSocket connection opened");
+		};
+		ws.current.onmessage = (event: any) => {
+			const response = JSON.parse(event.data);
+			console.log("Message from server: ", response);
+			if (response.broadcast) {
+				if (response.chatID == chatID.current)
+					getMessages(chatID.current);
+			} else {
+				switch (response.action) {
+					case "retrieveMessages":
+						switch(response.status)
+						{
+							case 200:
+								response.chatMessages.sort((a: any, b: any) =>
+								a.messageID > b.messageID ? 1 : -1
+								);
+								setMessagesList(response.chatMessages);
+								break;
+							case 404:
+								setMessagesList([]);
+								break;
+							case 500:
+								alert("Error in fetching messages. Please try again later.");
+								setMessagesList([]);
+								break;
+						}
+						break;
+					case "insertMessage":
+						switch(response.status)
+						{
+							case 201:
+								console.log("Message sent successfully!");
+								break;
+							case 401:
+								console.log("Unauthorized: Sending message to a chat logged in user is not a part of.");
+								alert("Unauthorized to send message to this chat.");
+								break;
+							case 500:
+								console.log("Error in sending message.");
+								alert("Error in sending message. Please try again later.");
+								break;
+						}
+						break;
+					case "deleteMessage":
+						switch(response.status)
+						{
+							case 201:
+								console.log("Message deleted successfully!");
+								break;
+							case 401:
+								console.log("Unauthorized: Deleting message logged in user is not a part of.");
+								alert("Unauthorized to delete a message in this chat.");
+								break;
+							case 403:
+								console.log("Forbidden: Deleting message that is not sent by the logged in user.");
+								alert("Forbidden to delete this message, as it is not sent by you.");
+								break;
+							case 500:
+								console.log("Error in deleting message.");
+								alert("Error in deleting message. Please try again later.");
+								break;
+						}
+						break;
+					case "editMessage":
+						switch(response.status)
+						{
+							case 201:

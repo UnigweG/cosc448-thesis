@@ -1,0 +1,213 @@
+function sepBy(pattern, separator) {
+  return seq(pattern, repeat(seq(separator, pattern)))
+}
+
+function nonempty(pattern1, pattern2) {
+  return choice(
+    seq(pattern1, optional(pattern2)),
+    pattern2
+  )
+}
+
+module.exports = grammar({
+  name: 'COBOL',
+  word: $ => $._WORD,
+  externals: $ => [
+    $._WHITE_SPACES,
+    $._LINE_PREFIX_COMMENT,
+    $._LINE_SUFFIX_COMMENT,
+    $._LINE_COMMENT,
+    $.comment_entry,
+    $._multiline_string,
+  ],
+
+  extras: $ => [
+    $._WHITE_SPACES,
+    $._LINE_PREFIX_COMMENT,
+    $._LINE_SUFFIX_COMMENT,
+    $._LINE_COMMENT,
+    $._LINE_COMMENT_ALIAS,
+    $.copy_statement,
+    $.comment,
+  ],
+
+  rules: {
+    start: $ => repeat(
+      choice(
+        $.program_definition,
+        //optional($.function_definition) //todo
+      )
+    ),
+
+    _LINE_COMMENT_ALIAS: $ => alias($._LINE_COMMENT, $.comment),
+
+    comment: $ => /\*>[^\n]*/,
+
+    program_definition: $ => prec.right(seq(
+      $.identification_division,
+      optional($.environment_division),
+      optional($.data_division),
+      optional($.procedure_division), //todo
+      repeat($.end_program), //todo
+      //optional($.LINE_PREFIX_COMMENT),
+    )),
+
+    identification_division: $ => seq(
+      $._IDENTIFICATION, $._DIVISION, '.',
+      optional(
+        seq($._PROGRAM_ID, '.',
+          $.program_name,
+          optional(choice(
+            $.as_literal,
+            $.is_initial,
+            $.is_common)),
+          '.')),
+      repeat(choice(
+        $.author_section,
+        $.installation_section,
+        $.date_written_section,
+        $.date_compiled_section,
+        $.security_section)),
+    ),
+
+    program_name: $ => choice(
+      $._WORD,
+      $._LITERAL
+    ),
+
+    as_literal: $ => seq(
+      $._AS,
+      $._LITERAL
+    ),
+
+    is_initial: $ => seq(
+      $._IS,
+      $._INITIAL
+    ),
+
+    is_common: $ => seq(
+      $._IS,
+      $._COMMON
+    ),
+
+    author_section: $ => seq(
+      $._AUTHOR, '.',
+      field('comment', repeat1($.comment_entry)),
+    ),
+
+    installation_section: $ => seq(
+      $._INSTALLATION, '.',
+      field('comment', repeat1($.comment_entry)),
+    ),
+
+    date_written_section: $ => seq(
+      $._DATE_WRITTEN, '.',
+      field('comment', repeat1($.comment_entry)),
+    ),
+
+    date_compiled_section: $ => seq(
+      $._DATE_COMPILED, '.',
+      field('comment', repeat1($.comment_entry)),
+    ),
+
+    security_section: $ => seq(
+      $._SECURITY, '.',
+      field('comment', repeat1($.comment_entry)),
+    ),
+
+    function_definition: $ => seq(
+      $.function_division,
+      $.environment_division,
+      $.data_division,
+      $.procedure_division,
+      $.end_function
+    ),
+
+    function_division: $ => seq(
+      $._FUNCTION_ID,
+      '.',
+      $.program_name,
+      $.as_literal,
+      '.'
+    ),
+
+    end_function: $ => seq(
+      $._END_FUNCTION,
+      $.program_name,
+      '.'
+    ),
+
+    environment_division: $ => seq(
+      $._ENVIRONMENT,
+      $._DIVISION,
+      '.',
+      optional($.configuration_section),
+      optional($.input_output_section),
+    ),
+
+    configuration_section: $ => seq(
+      $._CONFIGURATION,
+      $._SECTION,
+      '.',
+      repeat($._configuration_paragraph)
+    ),
+
+    _configuration_paragraph: $ => choice(
+      $.source_computer_paragraph,
+      $.object_computer_paragraph,
+      $.special_names_paragraph,
+      $.repository_paragraph,
+    ),
+
+    source_computer_paragraph: $ => seq(
+      $._SOURCE_COMPUTER,
+      '.',
+      optional($._source_computer_entry),
+    ),
+
+    _source_computer_entry: $ => choice(
+      seq($.WORD, '.'),
+      seq($.WORD, $.with_debugging_mode, '.'),
+      seq($.with_debugging_mode, '.')
+    ),
+
+    with_debugging_mode: $ => seq(
+      optional($._WITH),
+      $._DEBUGGING,
+      $._MODE
+    ),
+
+    object_computer_paragraph: $ => seq(
+      $._OBJECT_COMPUTER,
+      '.',
+      optional($._object_computer_entry)
+    ),
+
+    _object_computer_entry: $ => choice(
+      seq($.WORD, '.'),
+      seq($.WORD, repeat1($._object_clause), '.'),
+      seq(repeat1($._object_clause), '.')
+    ),
+
+    _object_clause: $ => choice(
+      $.object_computer_memory,
+      $.object_computer_sequence,
+      $.object_computer_segment
+    ),
+
+    object_computer_memory: $ => seq(
+      $._MEMORY,
+      $._SIZE,
+      optional($._IS),
+      $.integer,
+      choice(
+        $.CHARACTERS,
+        $.WORDS
+      )
+    ),
+
+    object_computer_sequence: $ => seq(
+      optional($._PROGRAM),
+      $._coll_sequence,
+      optional($._IS),
+      $.qualified_word

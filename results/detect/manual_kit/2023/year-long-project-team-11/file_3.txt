@@ -1,0 +1,134 @@
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
+import Cookies from "js-cookie";
+import MoonLoader from "react-spinners/MoonLoader";
+import ConfirmModal from "./components/ConfirmModal";
+import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
+
+export default function Regenerate() {
+  const [outputString, setOutputString] = useState("<test></test>");
+  const [filename, setFilename] = useState("");
+  const [showForm, setShowForm] = useState(false);
+  const [showSave, setShowSave] = useState(false);
+  const [prompt, setPrompt] = useState("");
+  const [documentText, setDocumentText] = useState(null);
+  const [fontType, setFontType] = useState("Arial");
+  const [fontColor, setFontColor] = useState("black");
+  const [backgroundColor, setBackgroundColor] = useState("white");
+  const [context, setContext] = useState("");
+  const [title, setTitle] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [docs, setDocs] = useState([]);
+  const [generationType, setGenerationType] = useState("present");
+  const [questionType, setQuestionType] = useState("choice");
+  const navigate = useNavigate();
+  const csrfToken = Cookies.get("csrftoken");
+
+  const openModal = () => setShowSave(true);
+  const closeModal = () => setShowSave(false);
+
+  const location = useLocation();
+  const data = location.state;
+
+  useEffect(() => {
+    if (data) {
+      console.log(data);
+      setOutputString(data.output);
+      setFilename(data.filename);
+      let base = data.filename.substring(0, data.filename.lastIndexOf('.'));
+      let previewFilename = base + ".pdf";
+      setDocs([{ uri: `http://localhost:8000/api/files/${previewFilename}/` }]);
+      setDocumentText(data.documentText);
+      setFontType(data.fontType);
+      setFontColor(data.fontColor);
+      setBackgroundColor(data.backgroundColor);
+      setContext(data.context);
+      setGenerationType(data.type);
+      setQuestionType(data.questionType);
+    }
+  }, [data]);
+
+  useEffect(() => {
+    let base = filename.substring(0, filename.lastIndexOf('.'));
+    let previewFilename = base + ".pdf";
+    setDocs([{ uri: `http://localhost:8000/api/files/${previewFilename}/` }]);
+  }, [filename])
+
+  const handleSubmit = (e) => {
+    if (generationType === "present") {
+      handleSubmitPresentation(e);
+    }
+    if (generationType === "quiz") {
+      handleSubmitQuiz(e);
+    }
+  }
+  
+  const handleSubmitPresentation = (e) => {
+    e.preventDefault();
+
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append("originalString", outputString);
+    formData.append("prompt", prompt);
+    formData.append("filename", filename);
+    formData.append("documentText", documentText);
+    formData.append("fontType", fontType);
+    formData.append("fontColor", fontColor);
+    formData.append("backgroundColor", backgroundColor);
+    formData.append("ctx", context)
+    formData.append("username", localStorage.getItem("username"));
+
+    fetch("http://localhost:8000/api/regenerate_presentation/", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setOutputString(data.response);
+        setFilename(data.filename);
+        setDocumentText(data.file_text);
+        setFontType(data.style.fonttype);
+        setFontColor(data.style.fontcolor);
+        setBackgroundColor(data.style.bg);
+
+        setPrompt("");
+        setShowForm(false);
+      })
+      .catch((error) => {
+        console.error("Error: ", error);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      })
+  }
+
+  const handleSubmitQuiz = (e) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const formData = new FormData();
+    formData.append("documentText", documentText);
+    formData.append("prompt", prompt);
+    formData.append("filename", filename);
+    formData.append("originalString", outputString);
+    formData.append("questionType", questionType);
+    formData.append("ctx", context);
+
+    fetch("http://localhost:8000/api/regenerate_quiz/", {
+      method: "POST", 
+      headers: {
+        "X-CSRFToken": csrfToken,
+      },
+      body: formData,
+    })
+      .then((response) => response.json())
+      .then((data) => {
+        setOutputString(data.response);
+        setFilename(data.filename);
+        setDocumentText(data.file_text);
+
+        setPrompt("");

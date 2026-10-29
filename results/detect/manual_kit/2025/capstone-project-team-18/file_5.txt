@@ -1,0 +1,141 @@
+import hashlib
+import json
+import os
+import re
+from typing import Any
+
+from pydantic import BaseModel
+
+from src.core.ML.models.azure_foundry_manager import AzureFoundryManager
+from src.core.ML.models.azure_openai_runtime import azure_openai_enabled
+from src.core.ML.models.readme_analysis.permissions import ml_extraction_allowed
+from src.infrastructure.log.logging import get_logger
+
+logger = get_logger(__name__)
+
+
+def _project_summary_diagnostics_enabled() -> bool:
+    raw = os.environ.get("ARTIFACT_MINER_SUMMARY_DIAGNOSTICS", "0")
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+class ProjectSummaryOutput(BaseModel):
+    summary: str
+
+
+SUMMARY_PROMPT = """
+You write grounded project summaries from structured facts only. Return strict JSON.
+
+Task: write a project summary.
+Constraints:
+- 2 to 3 sentences.
+- Mention goal, stack (framework/language), and contribution details.
+- Keep output factual and concise.
+"""
+
+_CACHE: dict[str, str] = {}
+
+
+def _ml_required() -> bool:
+    """Return whether callers require ML-only project summaries."""
+    return os.environ.get("ARTIFACT_MINER_PROJECT_SUMMARY_REQUIRE_ML") == "1"
+
+
+def configure_project_summary_run(project_count: int):
+    """
+    Reset per-run project-summary state before portfolio generation.
+    """
+    del project_count  # Reserved for compatibility with existing call sites.
+
+
+def _env_float(name: str, default: float) -> float:
+    """Read a float env var with safe fallback."""
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return max(0.1, float(raw))
+    except (TypeError, ValueError):
+        return default
+
+
+def _facts_hash(facts: dict[str, Any]) -> str:
+    """Create stable hash for summary cache."""
+    serialized = json.dumps(facts, sort_keys=True, ensure_ascii=True)
+    return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
+
+
+def _cache_enabled() -> bool:
+    """Allow disabling cache for strict per-run ML generation checks."""
+    return os.environ.get("ARTIFACT_MINER_SUMMARY_CACHE_DISABLE", "0") != "1"
+
+
+
+
+def _normalize_summary(text: str) -> str:
+    """Normalize model output artifacts to plain summary text."""
+    cleaned = text.strip()
+    if "Summary:" in cleaned:
+        cleaned = cleaned.split("Summary:", 1)[-1].strip()
+    # Fix tokenization artifacts in percentages (e.g., "42. 86%" -> "42.86%").
+    cleaned = re.sub(r"\b(\d{1,3})\.\s+(\d{1,3})\s*%", r"\1.\2%", cleaned)
+    cleaned = re.sub(r"\b(\d{1,3})\s+%", r"\1%", cleaned)
+    return " ".join(cleaned.split())
+
+
+def _repair_tech_token_formatting(summary: str) -> str:
+    """Fix common tokenizer artifacts in technology names."""
+    if not summary:
+        return summary
+    fixed = summary
+    replacements = (
+        ("Next. js", "Next.js"),
+        ("next. js", "next.js"),
+        ("Node. js", "Node.js"),
+        ("node. js", "node.js"),
+        ("React. js", "React.js"),
+        ("react. js", "react.js"),
+    )
+    for bad, good in replacements:
+        fixed = fixed.replace(bad, good)
+    fixed = re.sub(r"\b([A-Za-z]+)\.\s+(js|ts)\b", r"\1.\2", fixed)
+    return fixed
+
+
+def _align_summary_percentages(summary: str, facts: dict[str, Any]) -> str:
+    """
+    Align percentage mentions in summary text with canonical fact values.
+
+    This preserves model wording but ensures displayed percentages are consistent
+    with stats used elsewhere (e.g., resume section).
+    """
+    if not summary:
+        return summary
+
+    updated = summary
+
+    commit_pct = _normalize_percentage(facts.get("commit_pct"))
+    if isinstance(commit_pct, (int, float)):
+        commit_str = f"{int(round(float(commit_pct)))}%"
+        updated = re.sub(
+            r"(?i)(\bcommits?\b[^.?!%]{0,20}?)(\d{1,3}(?:\.\d+)?)\s*%",
+            lambda m: f"{m.group(1)}{commit_str}",
+            updated,
+        )
+        updated = re.sub(
+            r"(?i)(\d{1,3}(?:\.\d+)?)\s*%\s*(?:of\s+)?(commits?\b)",
+            lambda m: f"{commit_str} {m.group(2)}",
+            updated,
+        )
+        updated = re.sub(
+            r"(?i)(\bcommits?\b\s*[:\-]?\s*)(\d{1,3}(?:\.\d+)?)\s*%",
+            lambda m: f"{m.group(1)}{commit_str}",
+            updated,
+        )
+
+    line_pct = _normalize_percentage(facts.get("line_pct"))
+    if isinstance(line_pct, (int, float)):
+        line_str = f"{int(round(float(line_pct)))}%"
+        updated = re.sub(
+            r"(?i)(\blines?\b[^.?!%]{0,20}?)(\d{1,3}(?:\.\d+)?)\s*%",
+            lambda m: f"{m.group(1)}{line_str}",

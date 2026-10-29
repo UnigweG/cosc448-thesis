@@ -1,0 +1,145 @@
+import re
+from collections import Counter
+from typing import Any, Dict, Optional
+
+from nltk.corpus import stopwords
+from src.analysis.text_individual.alt_analyze import analyze_linguistic_complexity
+
+# Feedback plumbing
+try:
+    from src.db.project_feedback import upsert_project_feedback  
+except Exception:
+    upsert_project_feedback = None
+
+
+def _emit_feedback(
+    feedback_ctx: Optional[Dict[str, Any]],
+    *,
+    skill_name: str,
+    file_name: str,
+    criterion_key: str,
+    criterion_label: str,
+    expected: str,
+    observed: Dict[str, Any],
+    suggestion: str,
+) -> None:
+    if not feedback_ctx:
+        return
+
+    # Preferred: caller provides a callback that writes to DB (keeps detectors decoupled).
+    cb = feedback_ctx.get("add_feedback")
+    if callable(cb):
+        cb(
+            skill_name,
+            file_name,
+            criterion_key,
+            criterion_label,
+            expected,
+            observed,
+            suggestion,
+        )
+        return
+
+    # Fallback: write directly if helper exists and ctx has conn/user/project_key.
+    if upsert_project_feedback is None:
+        return
+
+    conn = feedback_ctx.get("conn")
+    user_id = feedback_ctx.get("user_id")
+    project_key = feedback_ctx.get("project_key")
+    project_type = feedback_ctx.get("project_type") or "text"
+
+    if conn is None or user_id is None or project_key is None:
+        return
+
+    upsert_project_feedback(
+        conn=conn,
+        user_id=int(user_id),
+        project_key=int(project_key),
+        project_type=str(project_type),
+        skill_name=str(skill_name),
+        file_name=str(file_name or ""),
+        criterion_key=str(criterion_key),
+        criterion_label=str(criterion_label),
+        expected=str(expected),
+        observed=observed or {},
+        suggestion=str(suggestion),
+    )
+
+
+# ---------------------------------------------------------------------
+# 1) CLARITY
+# ---------------------------------------------------------------------
+def detect_sentence_clarity(file_text: str, file_name: str, feedback_ctx=None):
+    """
+    Checks for 5 types of writing issues:
+      1. Fragments / run-on sentences
+      2. Subject–verb agreement errors
+      3. Misplaced or dangling modifiers
+      4. Wordiness / filler words
+      5. Pronoun & homophone clarity issues
+
+    Score = (# criteria passed) / 5
+    Evidence = all sentences that violated each rule.
+    """
+    sentences = [
+        s.strip()
+        for s in re.split(r"(?<=[\.!?])\s+", file_text.strip())
+        if s.strip()
+    ]
+
+    if not sentences:
+        _emit_feedback(
+            feedback_ctx,
+            skill_name="clarity",
+            file_name=file_name,
+            criterion_key="clarity.no_sentences",
+            criterion_label="Include enough text for clarity analysis",
+            expected="At least 1 sentence",
+            observed={"sentence_count": 0},
+            suggestion="Provide more written content (at least a few sentences) to allow clarity checks.",
+        )
+        return {"score": 0, "evidence": {}}
+
+    total_criteria = 5
+    score = 5
+
+    evidence = {
+        "fragments_runons": [],
+        "subj_verb_agreement": [],
+        "misplaced_modifiers": [],
+        "wordiness": [],
+        "pronoun_homophone": [],
+    }
+
+    # --- Helper heuristic functions ---
+    def is_runon_or_fragment(s: str) -> bool:
+        words = s.split()
+        if len(words) < 4 or not re.search(r"\b(is|are|was|were|has|had|does|do|did)\b", s, re.I):
+            return True
+        if len(words) > 40 and ("," not in s and ";" not in s):
+            return True
+        return False
+
+    def has_subj_verb_error(s: str) -> bool:
+        if re.search(r"\b(people|students|data|results)\s+is\b", s, re.I):
+            return True
+        if re.search(r"\b(each|every)\s+\w+\s+are\b", s, re.I):
+            return True
+        return False
+
+    def is_misplaced_modifier(s: str) -> bool:
+        return bool(re.match(r"^(Having|Being|While)\s+\w+", s))
+
+    def is_wordy(s: str) -> bool:
+        words = s.split()
+        filler = re.search(r"\b(very|really|in addition|furthermore)\b", s, re.I)
+        return len(words) > 22 or bool(filler)
+
+    def has_pronoun_homophone_issue(s: str) -> bool:
+        if re.search(r"\b(it|this|that)\b.*\b(it|this|that)\b", s, re.I):
+            return True
+        if re.search(r"\b(their|there|they\'re)\b", s, re.I):
+            return True
+        if re.search(r"\b(its|it\'s)\b", s, re.I):
+            return True

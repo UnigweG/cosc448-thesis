@@ -1,0 +1,145 @@
+"""Project routes for the API."""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Annotated, Any
+
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
+from fastapi.responses import FileResponse
+from sqlalchemy import desc, func
+from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
+
+from capstone_project_team_5.api.dependencies import get_current_username
+from capstone_project_team_5.api.schemas.projects import (
+    DEFAULT_LIMIT,
+    MAX_LIMIT,
+    CodeAnalysisUpdateRequest,
+    PaginatedProjectsResponse,
+    PaginationMeta,
+    ProjectAnalysisResult,
+    ProjectAnalysisSkipped,
+    ProjectReRankRequest,
+    ProjectReRankResponse,
+    ProjectsAnalyzeAllResponse,
+    ProjectSummary,
+    ProjectUpdateRequest,
+    ProjectUploadAction,
+    ProjectUploadResponse,
+    SavedAnalysisSummary,
+    SavedProjectSummary,
+    SavedUploadSummary,
+    ScoreConfig,
+)
+from capstone_project_team_5.consent_tool import ConsentTool
+from capstone_project_team_5.data.db import get_session
+from capstone_project_team_5.data.models import (
+    ArtifactSource,
+    CodeAnalysis,
+    Project,
+    UploadRecord,
+    User,
+    UserCodeAnalysis,
+)
+from capstone_project_team_5.models.upload import DetectedProject, InvalidZipError
+from capstone_project_team_5.services.content_store import (
+    compute_project_file_count,
+    compute_project_fingerprint,
+    ingest_zip,
+    load_analysis_cache,
+    load_manifest,
+    materialize_project_tree,
+    write_analysis_cache,
+)
+from capstone_project_team_5.services.project_thumbnail import (
+    clear_project_thumbnail,
+    get_project_thumbnail_path,
+    get_thumbnail_media_type,
+    has_project_thumbnail,
+    set_project_thumbnail,
+)
+from capstone_project_team_5.services.skill_persistence import save_skills_to_db
+from capstone_project_team_5.services.upload import inspect_zip
+from capstone_project_team_5.services.upload_storage import get_upload_zip_path, store_upload_zip
+from capstone_project_team_5.workflows.analysis_pipeline import analyze_projects_structured
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/projects", tags=["projects"])
+
+
+_score_config: ScoreConfig = ScoreConfig()
+
+
+def _project_to_summary(project: Project) -> ProjectSummary:
+    has_thumbnail = has_project_thumbnail(project.id)
+    thumbnail_url = f"/api/projects/{project.id}/thumbnail" if has_thumbnail else None
+    return ProjectSummary(
+        id=project.id,
+        name=project.name,
+        rel_path=project.rel_path,
+        file_count=project.file_count,
+        has_git_repo=project.has_git_repo,
+        is_collaborative=project.is_collaborative,
+        is_showcase=bool(getattr(project, "is_showcase", False)),
+        thumbnail_url=thumbnail_url,
+        has_thumbnail=has_thumbnail,
+        importance_rank=project.importance_rank,
+        importance_score=project.importance_score,
+        user_role=project.user_role,
+        user_contribution_percentage=project.user_contribution_percentage,
+        role_justification=project.role_justification,
+        user_role_types=project.user_role_types,
+        created_at=project.created_at,
+        updated_at=project.updated_at,
+    )
+
+
+def _build_consent_tool(use_ai: bool) -> ConsentTool:
+    tool = ConsentTool()
+    if use_ai:
+        tool.use_external_services = True
+        tool.external_services = {"Gemini": {"allowed": True}}
+    return tool
+
+
+def _parse_project_mapping(raw_mapping: str | None) -> dict[str, int]:
+    """Parse optional project mapping from form data."""
+    if raw_mapping is None or not raw_mapping.strip():
+        return {}
+
+    try:
+        payload = json.loads(raw_mapping)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Invalid project_mapping JSON. Expected an object of {project_name: project_id}."
+            ),
+        ) from exc
+
+    if not isinstance(payload, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "Invalid project_mapping payload. Expected an object of {project_name: project_id}."
+            ),
+        )
+
+    parsed: dict[str, int] = {}

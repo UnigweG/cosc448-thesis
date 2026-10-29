@@ -1,0 +1,192 @@
+import type {
+  ChoiceBreakdown,
+  CourseExamBreakdown,
+  CourseExamBreakdownItem,
+  CourseResultReportOptions,
+  CourseResultScopeOptions,
+  CourseResultSummary,
+  CourseResultSummaryOptions,
+  CourseStudentExamResult,
+  CourseStudentResultDetail,
+  CourseStudentResultList,
+  CourseStudentResultListItem,
+  CsvPreviewReport,
+  CsvPreviewRow,
+  ExamChecksReportOptions,
+  ExamQualityHistogramBucket,
+  ExamQualityOutlier,
+  ExamQualityOutlierDirection,
+  ExamQualityPercentile,
+  ExamQualityQuartiles,
+  ExamQualityStats,
+  ExamQualityStatsOptions,
+  ExamQuestionStats,
+  ExamResultSummary,
+  ExamResultStudentsOptions,
+  ExamStudentResultDetail,
+  ExamStudentResultList,
+  ExamStudentResultListItem,
+  ExamStudentResultScoreUpdate,
+  ExamVariantComparison,
+  ImportSummary,
+  IssueSeverity,
+  IssueType,
+  ItemDifficultyClassification,
+  QuestionResultReportOptions,
+  QuestionStats,
+  ResponseIssue,
+  ResultReportFile,
+  ResultReportFormat,
+  RowStatus,
+  ScoreBand,
+  ScoreDistribution,
+  SelectedStudentCourseReportOptions,
+  SelectedStudentExamReportOptions,
+  SelectedTeamReportOptions,
+  StudentCourseReportOptions,
+  StudentAnswerItem,
+  StudentExamReportOptions,
+  StudentQuestionResult,
+  StudentQuestionStatus,
+  TeamBreakdownItem,
+  TeamReportOptions,
+  TeamTestStats,
+  VariantComparisonRow,
+  VariantFairnessFlag,
+  VariantSignificanceRead,
+} from "../types/result";
+import type {
+  DifficultyLevel,
+  OmrQuestionType,
+  QuestionType,
+} from "../types/question";
+import type { BlobDownloadFile } from "../utils/fileDownload";
+import {
+  buildApiUrl,
+  clearSessionIfUnauthorized,
+  CONNECTION_ERROR_MESSAGE,
+  getResponseDetail,
+  hasValidationDetails,
+  isSessionInvalidResponse,
+  readJson,
+  SESSION_EXPIRED_MESSAGE,
+} from "./apiClient";
+import { getStoredToken } from "./authSession";
+
+const GENERIC_ERROR_MESSAGE =
+  "Something went wrong. Please try again.";
+const VALIDATION_ERROR_MESSAGE =
+  "Please check the result upload file and try again.";
+
+const ISSUE_SEVERITIES = ["error", "warning"] as const;
+const ROW_STATUSES = ["valid", "warning", "error"] as const;
+const ISSUE_TYPES = [
+  "missing_student_number",
+  "unknown_variant",
+  "not_enrolled",
+  "duplicate_student",
+  "invalid_answer",
+  "missing_answer",
+  "unexpected_question_number",
+  "non_omr_answer",
+  "already_imported",
+  "invalid_team_number",
+  "invalid_team_test_mark",
+  "team_mark_without_team_number",
+] as const;
+
+const QUESTION_TYPES = [
+  "multiple_choice",
+  "multiple_select",
+  "true_false",
+  "short_answer",
+  "cloze",
+] as const;
+const OMR_QUESTION_TYPES = [
+  "multiple_choice",
+  "multiple_select",
+  "true_false",
+] as const;
+const DIFFICULTY_LEVELS = ["easy", "medium", "hard"] as const;
+const ITEM_DIFFICULTY_CLASSIFICATIONS = [
+  "very_easy",
+  "easy",
+  "moderate",
+  "difficult",
+  "very_difficult",
+] as const;
+const VARIANT_FAIRNESS_FLAGS = [
+  "unusually_easy",
+  "unusually_difficult",
+  "typical",
+] as const;
+const EXAM_QUALITY_OUTLIER_DIRECTIONS = ["low", "high"] as const;
+const EXAM_QUALITY_PERCENTILES = [10, 25, 50, 75, 90] as const;
+const STUDENT_QUESTION_STATUSES = [
+  "correct",
+  "incorrect",
+  "partial",
+  "manual_grading",
+  "unanswered",
+  "invalid",
+] as const;
+const RESULT_REPORT_FORMATS = ["csv", "pdf"] as const;
+
+type BackendStudentAnswerItem = {
+  question_number: number;
+  answer: string | null;
+};
+
+type BackendResponseIssue = {
+  question_number: number | null;
+  issue_type: IssueType;
+  severity: IssueSeverity;
+  message: string;
+};
+
+type BackendCsvPreviewRow = {
+  row_number: number;
+  student_number: string;
+  variant_code: string;
+  answers: BackendStudentAnswerItem[];
+  score: number | null;
+  max_score: number | null;
+  team_number: string | null;
+  team_test_mark: number | null;
+  status: RowStatus;
+  issues: BackendResponseIssue[];
+};
+
+type BackendCsvPreviewReport = {
+  total_rows: number;
+  accepted_rows: number;
+  warning_rows: number;
+  error_rows: number;
+  can_import: boolean;
+  rows: BackendCsvPreviewRow[];
+};
+
+type BackendImportSummary = {
+  imported_rows: number;
+  overwritten_rows: number;
+  skipped_rows: number;
+};
+
+type BackendExamResultSummary = {
+  exam_id: number;
+  variant_id: number | null;
+  team_number: string | null;
+  total_students: number;
+  average_score: number;
+  max_score: number;
+  min_score: number;
+  median_score: number;
+  std_dev: number | null;
+  pass_rate: number | null;
+  pass_threshold: number | null;
+};
+
+type BackendScoreBand = {
+  label: string;
+  count: number;
+  percentage: number;

@@ -1,0 +1,147 @@
+import numpy as np
+from tkinter import ttk
+from matplotlib.figure import Figure
+from matplotlib.patches import Rectangle
+from matplotlib.backends.backend_tkagg import (
+    FigureCanvasTkAgg,
+    NavigationToolbar2Tk
+)
+from nanomi_optics.engine.lens import Lens
+from nanomi_optics.engine.optimization import optimize_focal_length
+
+LAMBDA_ELECTRON = 0.0112e-6
+
+LENS_BORE = 25.4*0.1/2
+
+# diameter of condensor aperature
+CA_DIAMETER = 0.01
+
+# stores info for the anode
+ANODE = [39.1, 30, 1.5, [0.5, 0, 0.3], 'Anode']
+
+# stores info for the sample
+SAMPLE = [528.9, 1.5, -1, [1, 0.7, 0], 'Sample']
+
+# stores info for the scintillator
+SCINTILLATOR = [972.7, 1.5, 1, [0.3, 0.75, 0.75], 'Scintillator']
+
+# stores info for the condensor aperature
+CONDENSOR_APERATURE = [192.4, 1.5, 1, [0, 0, 0], 'Cond. Apert']
+
+# add color of each ray in same order as rays
+# red, green, blue, gold
+RAY_COLORS = [[1.0, 0, 0], [0.0, 1.0, 0], [0.0, 0.2, 1.0], [0.7, 0.4, 0]]
+
+# pin condenser aperture angle limited as per location and diameter
+RAYS = [
+    np.array(
+        [[1.5e-2], [(CA_DIAMETER/2 - 1.5e-2) / CONDENSOR_APERATURE[0]]]
+    ),
+    # 2nd ray, at r = 0, angle limited by CA
+    np.array(
+        [[0], [(CA_DIAMETER/2) / CONDENSOR_APERATURE[0]]]
+    ),
+    # 3rd ray, at r = tip edge, parallel to opt. axis
+    np.array(
+        [[1.5e-2], [0]]
+    ),
+    # 4th ray, at -rG, angle up to +CA edge CRAZY BEAM
+    np.array(
+        [[-1*1.5e-2], [(CA_DIAMETER/2 + 1.5e-2) / CONDENSOR_APERATURE[0]]]
+    )
+]
+
+
+# stores info for the lower lenses
+LOWER_LENSES = [
+    [551.6, 1.5, -1, [0.3, 0.75, 0.75], 'Objective'],
+    [706.4, 1.5, 1, [0.3, 0.75, 0.75], 'Intermediate'],
+    [826.9, 1.5, 1, [0.3, 0.75, 0.75], 'Projective']
+]
+
+# stores info for the upper lenses
+UPPER_LENSES = [
+    [257.03, 63.5, 1.5, [0.3, 0.9, 0.65], 'C1'],
+    [349, 1.5, 1, [0.3, 0.75, 0.75], 'C2'],
+    [517, 1.5, 1, [0.3, 0.75, 0.75], 'C3']
+]
+
+
+# frame that holds the diagram (current values are placeholders)
+class DiagramFrame(ttk.Frame):
+    """diagram frame creates and handle matplotlib plots"""
+    def __init__(self, master):
+        """intialize lenses and rays diagram
+
+        Args:
+            master (tk.Window): master window
+        """
+        super().__init__(master, borderwidth=5)
+
+        # create figure
+        self.figure = Figure(figsize=(10, 10))
+        self.axis = self.figure.add_subplot()
+        self.axis.text(
+            275, -2.1, 'X [mm]', color=[0, 0, 0], fontsize=6
+        )
+        self.axis.set_ylabel(
+            'Z [mm]', color=[0, 0, 0], fontsize=6
+        )
+
+        # put the figure in a widget on the tk window
+        self.canvas = FigureCanvasTkAgg(self.figure, master=self)
+        self.redraw()
+
+        # put the navigation toolbar in a widget on the tk window
+        toolbar = NavigationToolbar2Tk(self.canvas, self)
+        toolbar.update()
+
+        self.x_min, self. x_max, self.y_min, self.y_max = 0, 0, 0, 0
+        self.canvas.get_tk_widget().pack(side="top", fill="both", expand=True)
+
+        # initial focal distance of the lenses in [mm]
+        self.cf_u = [67.29, 22.94, 39.88]
+        self.cf_l = [19.67, 6.498, 6]
+
+        # list for active lenses
+        self.active_lu = [True, True, True]
+        self.active_ll = [True, True, True]
+
+        # sample rays variables and initialization for lower lenses
+        self.distance_from_optical = 0.00001
+        self.scattering_angle = 0
+        self.last_mag = 0
+        self.sample_rays = []
+        self.update_l_rays()
+
+        # draws anode
+        self.symmetrical_box(*ANODE)
+
+        # draws sample
+        self.sample_aperature_box(*SAMPLE)
+
+        # draws condensor aperature
+        self.sample_aperature_box(*CONDENSOR_APERATURE)
+
+        # draws scintillator
+        self.asymmetrical_box(*SCINTILLATOR)
+
+        # draw red dashed line on x-axis
+        self.axis.axhline(0, 0, 1, color='red', linestyle='--')
+
+        # list of points to plot rays
+        self.drawn_rays_c, self.drawn_rays_b = [], []
+
+        # list of lenses magnification and plots
+        self.mag_lower, self.mag_upper = [], []
+        self.mag_u_plot, self.mag_l_plot = [], []
+
+        # crossover points arrays
+        self.crossover_points_c, self.crossover_points_b = [], []
+
+        # takes in list of lens info, draws upper lenses
+        # and setup magnification plots
+        for i, row in enumerate(UPPER_LENSES):
+            # draw C1 lens
+            if i == 0:
+                self.symmetrical_box(*row)

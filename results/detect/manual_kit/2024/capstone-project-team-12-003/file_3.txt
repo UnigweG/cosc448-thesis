@@ -1,0 +1,131 @@
+// Prize Wheel Test Cases
+describe('Prize Wheel Tests', () => {
+    // Mock DOM elements
+    let wheelElement, spinButton, resultText, prizeDisplay;
+    let originalCreateElementNS;
+
+    // Mock wheel elements
+    let mockPaths = [];
+    let mockTexts = [];
+
+    beforeEach(() => {
+        // Create mock DOM elements
+        document.body.innerHTML = `
+        <svg id="wheel" width="400" height="400" viewBox="0 0 400 400"></svg>
+        <button id="spin-button">SPIN</button>
+        <div id="result"></div>
+        <div id="prize-display"></div>
+      `;
+
+        // Get references to DOM elements
+        wheelElement = document.getElementById('wheel');
+        spinButton = document.getElementById('spin-button');
+        resultText = document.getElementById('result');
+        prizeDisplay = document.getElementById('prize-display');
+
+        // Mock SVG element creation
+        mockPaths = [];
+        mockTexts = [];
+        originalCreateElementNS = document.createElementNS;
+        document.createElementNS = (namespace, tagName) => {
+            if (tagName === 'path') {
+                const mockPath = {
+                    setAttribute: jest.fn()
+                };
+                mockPaths.push(mockPath);
+                return mockPath;
+            } else if (tagName === 'text') {
+                const mockText = {
+                    setAttribute: jest.fn(),
+                    textContent: ''
+                };
+                mockTexts.push(mockText);
+                return mockText;
+            }
+            return originalCreateElementNS.call(document, namespace, tagName);
+        };
+
+        // Mock Math.random to make tests deterministic
+        jest.spyOn(Math, 'random').mockReturnValue(0.5);
+
+        // Mock setTimeout
+        jest.useFakeTimers();
+    });
+
+    afterEach(() => {
+        document.createElementNS = originalCreateElementNS;
+        jest.restoreAllMocks();
+        jest.useRealTimers();
+    });
+
+    // Test 1: Wheel initialization
+    test('should create wheel with correct number of sectors', () => {
+        // Trigger DOM content loaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Check if 5 sectors (paths) were created
+        expect(mockPaths.length).toBe(5);
+
+        // Check if 5 text elements were created
+        expect(mockTexts.length).toBe(5);
+    });
+
+    // Test 2: Sector angles and text placement
+    test('should calculate correct angles for sectors', () => {
+        // Trigger DOM content loaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Each sector should have a 72-degree angle (360/5)
+        // Check path creation with correct angles
+        expect(mockPaths[0].setAttribute.mock.calls.find(call => call[0] === 'd')[1])
+            .toContain('M 200 200');
+
+        // Text should be placed at the middle of each sector
+        mockTexts.forEach((text, index) => {
+            // Verify text content matches prize text
+            expect(text.textContent).toBe(['First Prize', 'Thank You', 'Second Prize', 'Thank You', 'Third Prize'][index]);
+        });
+    });
+
+    // Test 3: Spin functionality
+    test('should spin wheel when button is clicked', () => {
+        // Trigger DOM content loaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Click spin button
+        spinButton.click();
+
+        // Wheel should be spinning
+        expect(wheelElement.style.transform).toBeTruthy();
+
+        // Button should be disabled during spin
+        expect(spinButton.disabled).toBe(true);
+
+        // Result text should be cleared
+        expect(resultText.textContent).toBe('');
+
+        // Prize display should be hidden
+        expect(prizeDisplay.style.display).toBe('none');
+    });
+
+    // Test 4: Prize selection after spin
+    test('should select correct prize after spinning', () => {
+        // Trigger DOM content loaded
+        const event = new Event('DOMContentLoaded');
+        document.dispatchEvent(event);
+
+        // Click spin button
+        spinButton.click();
+
+        // Fast-forward timer
+        jest.advanceTimersByTime(4000);
+
+        // Result should be displayed
+        expect(resultText.textContent).toBeTruthy();
+        expect(resultText.textContent).toContain('You won:');
+
+        // Prize display should be visible
+        expect(prizeDisplay.style.display).toBe('block');

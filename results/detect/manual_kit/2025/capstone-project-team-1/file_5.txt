@@ -1,0 +1,174 @@
+import { afterEach, expect, mock, test } from "bun:test";
+import { testRender } from "@opentui/react/test-utils";
+import { act } from "react";
+import { api } from "../api/endpoints";
+import type { PipelineStatusResponse, ResumeV3Output } from "../api/types";
+import { AppProvider, useAppState } from "../context/AppContext";
+
+type AppContextHookValue = ReturnType<typeof useAppState>;
+type RenderedScreen = Awaited<ReturnType<typeof testRender>>;
+type KeyboardEventLike = { name: string };
+
+const originalGetPipelineStatus = api.getPipelineStatus;
+const originalCancelPipeline = api.cancelPipeline;
+const originalSetInterval = globalThis.setInterval;
+const originalClearInterval = globalThis.clearInterval;
+
+let keyboardHandler: ((key: KeyboardEventLike) => void) | null = null;
+
+mock.module("@opentui/react", () => ({
+	useKeyboard: (handler: (key: KeyboardEventLike) => void) => {
+		keyboardHandler = handler;
+	},
+}));
+
+const { Analysis } = await import("./Analysis");
+
+const sampleDraft: ResumeV3Output = {
+	professional_summary: "Built a migration-safe analysis flow.",
+	skills_section: "TypeScript, React, Bun",
+	developer_profile: "Engineer focused on stable frontend migrations.",
+	projects: [],
+	metadata: {
+		model_used: "llama3",
+		models_used: ["llama3"],
+		stage: "draft",
+		generation_time_seconds: 12,
+		errors: [],
+		quality_metrics: {},
+	},
+};
+
+function createHarness(props?: {
+	onNext?: (target: string) => void;
+	onComplete?: () => void;
+	onBack?: () => void;
+	analysisMode?: "phase1" | "phase3";
+}) {
+	let context: AppContextHookValue | null = null;
+
+	function Probe() {
+		context = useAppState();
+		return (
+			<Analysis
+				onNext={props?.onNext}
+				onComplete={props?.onComplete}
+				onBack={props?.onBack}
+				analysisMode={props?.analysisMode}
+			/>
+		);
+	}
+
+	return {
+		getContext() {
+			if (!context) {
+				throw new Error("Analysis probe did not mount");
+			}
+			return context;
+		},
+		node: (
+			<AppProvider>
+				<Probe />
+			</AppProvider>
+		),
+	};
+}
+
+function countOccurrences(haystack: string, needle: string) {
+	return haystack.split(needle).length - 1;
+}
+
+function repoBar(done: number, total: number, width = 14) {
+	if (total === 0) {
+		return "░".repeat(width);
+	}
+
+	const filled = Math.round((done / total) * width);
+	return "█".repeat(filled) + "░".repeat(width - filled);
+}
+
+async function flushEffects(rendered: RenderedScreen) {
+	await act(async () => {
+		await Promise.resolve();
+		await Promise.resolve();
+		await rendered.renderOnce();
+	});
+}
+
+function destroyRenderer(rendered: RenderedScreen | null) {
+	if (!rendered) {
+		return;
+	}
+
+	act(() => {
+		rendered.renderer.destroy();
+	});
+}
+
+function freezeIntervals() {
+	globalThis.setInterval = ((_: TimerHandler, __?: number) =>
+		1) as unknown as typeof setInterval;
+	globalThis.clearInterval = ((
+		_: number,
+	) => {}) as unknown as typeof clearInterval;
+}
+
+afterEach(() => {
+	api.getPipelineStatus = originalGetPipelineStatus;
+	api.cancelPipeline = originalCancelPipeline;
+	globalThis.setInterval = originalSetInterval;
+	globalThis.clearInterval = originalClearInterval;
+	keyboardHandler = null;
+});
+
+test("Analysis routes draft_ready to draft-pause and renders the draft stage UI", async () => {
+	freezeIntervals();
+	const nextTargets: string[] = [];
+	let rendered: RenderedScreen | null = null;
+
+	const draftReadyResponse: PipelineStatusResponse = {
+		status: "draft_ready",
+		stage: "DRAFT",
+		messages: [
+			"Pipeline started",
+			"Running project query for selected repositories",
+			"Running project query for selected repositories",
+			"Assembling resume...",
+		],
+		telemetry: {
+			stage: "DRAFT",
+			active_model: "llama3",
+			repos_total: 2,
+			repos_done: 2,
+			current_repo: null,
+			facts_total: 10,
+			draft_projects: 2,
+			polished_projects: 0,
+			elapsed_seconds: 18,
+			model_check_seconds: 1,
+			selected_repos: ["repo-1", "repo-2"],
+		},
+		draft: sampleDraft,
+		output: null,
+		error: null,
+	};
+
+	api.getPipelineStatus = async () => draftReadyResponse;
+
+	const harness = createHarness({
+		onNext: (target) => {
+			nextTargets.push(target);
+		},
+	});
+
+	try {
+		rendered = await testRender(harness.node, { width: 140, height: 40 });
+		act(() => {
+			const context = harness.getContext();
+			context.setPipelineJobId("job-429");
+			context.setPipelineStatus("running");
+			context.setPipelineStage("ANALYZE");
+			context.setPipelineTelemetry(draftReadyResponse.telemetry);
+			context.setPipelineMessages(draftReadyResponse.messages);
+		});
+		await flushEffects(rendered);

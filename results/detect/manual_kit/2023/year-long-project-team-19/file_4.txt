@@ -1,0 +1,95 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Mirror.RemoteCalls;
+using UnityEngine;
+
+namespace Mirror
+{
+    public enum ConnectState
+    {
+        None,
+        // connecting between Connect() and OnTransportConnected()
+        Connecting,
+        Connected,
+        // disconnecting between Disconnect() and OnTransportDisconnected()
+        Disconnecting,
+        Disconnected
+    }
+
+    /// <summary>NetworkClient with connection to server.</summary>
+    public static partial class NetworkClient
+    {
+        // time & value snapshot interpolation are separate.
+        // -> time is interpolated globally on NetworkClient / NetworkConnection
+        // -> value is interpolated per-component, i.e. NetworkTransform.
+        // however, both need to be on the same send interval.
+        //
+        // additionally, server & client need to use the same send interval.
+        // otherwise it's too easy to accidentally cause interpolation issues if
+        // a component sends with client.interval but interpolates with
+        // server.interval, etc.
+        public static int sendRate => NetworkServer.sendRate;
+        public static float sendInterval => sendRate < int.MaxValue ? 1f / sendRate : 0; // for 30 Hz, that's 33ms
+        static double lastSendTime;
+
+        // For security, it is recommended to disconnect a player if a networked
+        // action triggers an exception\nThis could prevent components being
+        // accessed in an undefined state, which may be an attack vector for
+        // exploits.
+        //
+        // However, some games may want to allow exceptions in order to not
+        // interrupt the player's experience.
+        public static bool exceptionsDisconnect = true; // security by default
+
+        // message handlers by messageId
+        internal static readonly Dictionary<ushort, NetworkMessageDelegate> handlers =
+            new Dictionary<ushort, NetworkMessageDelegate>();
+
+        /// <summary>All spawned NetworkIdentities by netId.</summary>
+        // client sees OBSERVED spawned ones.
+        public static readonly Dictionary<uint, NetworkIdentity> spawned =
+            new Dictionary<uint, NetworkIdentity>();
+
+        /// <summary>Client's NetworkConnection to server.</summary>
+        public static NetworkConnection connection { get; internal set; }
+
+        /// <summary>True if client is ready (= joined world).</summary>
+        // TODO redundant state. point it to .connection.isReady instead (& test)
+        // TODO OR remove NetworkConnection.isReady? unless it's used on server
+        //
+        // TODO maybe ClientState.Connected/Ready/AddedPlayer/etc.?
+        //      way better for security if we can check states in callbacks
+        public static bool ready;
+
+        /// <summary>NetworkIdentity of the localPlayer </summary>
+        public static NetworkIdentity localPlayer { get; internal set; }
+
+        // NetworkClient state
+        internal static ConnectState connectState = ConnectState.None;
+
+        /// <summary>active is true while a client is connecting/connected either as standalone or as host client.</summary>
+        // (= while the network is active)
+        public static bool active => connectState == ConnectState.Connecting ||
+                                     connectState == ConnectState.Connected;
+
+        /// <summary>active is true while the client is connected in host mode.</summary>
+        // naming consistent with NetworkServer.activeHost.
+        public static bool activeHost => connection is LocalConnectionToServer;
+
+        /// <summary>Check if client is connecting (before connected).</summary>
+        public static bool isConnecting => connectState == ConnectState.Connecting;
+
+        /// <summary>Check if client is connected (after connecting).</summary>
+        public static bool isConnected => connectState == ConnectState.Connected;
+
+        // OnConnected / OnDisconnected used to be NetworkMessages that were
+        // invoked. this introduced a bug where external clients could send
+        // Connected/Disconnected messages over the network causing undefined
+        // behaviour.
+        // => public so that custom NetworkManagers can hook into it
+        public static Action OnConnectedEvent;
+        public static Action OnDisconnectedEvent;
+        public static Action<TransportError, string> OnErrorEvent;
+
+        /// <summary>Registered spawnable prefabs by assetId.</summary>

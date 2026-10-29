@@ -1,0 +1,136 @@
+"""Tests for local LLM API endpoints."""
+
+import uuid
+from zipfile import ZipFile
+
+import pytest
+
+from artifactminer.api import local_llm
+
+
+@pytest.fixture(autouse=True)
+def _mock_default_local_model(monkeypatch):
+    monkeypatch.setattr(
+        local_llm,
+        "select_default_model_name",
+        lambda _models_dir: "qwen2.5-coder-3b-q4",
+    )
+
+
+def test_local_llm_router_is_registered(client):
+    """Verify the local-llm router is mounted with /local-llm/context."""
+    response = client.get("/openapi.json")
+
+    assert response.status_code == 200
+    paths = response.json()["paths"]
+    assert "/local-llm/context" in paths
+    assert "post" in paths["/local-llm/context"]
+
+
+def test_context_endpoint_exists(client):
+    """Verify POST /local-llm/context endpoint is registered."""
+    # Send invalid request to check endpoint exists (should get 422, not 404)
+    response = client.post("/local-llm/context", json={})
+    # 422 means endpoint exists but validation failed
+    # 404 would mean endpoint doesn't exist
+    assert response.status_code == 422
+
+
+def test_create_intake_with_valid_zip(client, tmp_path):
+    """Test successful intake creation with a valid ZIP containing a git repo."""
+    # Create a test ZIP with a mock git repository
+    zip_path = tmp_path / "test_repo.zip"
+    
+    with ZipFile(zip_path, 'w') as zf:
+        # Add .git directory structure
+        zf.writestr("test-repo/.git/config", "[core]\n\trepositoryformatversion = 0")
+        zf.writestr("test-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("test-repo/README.md", "# Test Repository")
+        zf.writestr("test-repo/src/main.py", "print('hello')")
+    
+    response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Verify response structure
+    assert "intake_id" in data
+    assert "zip_path" in data
+    assert "repos" in data
+    
+    # Verify intake_id is a valid UUID
+    parsed_intake_id = uuid.UUID(data["intake_id"])
+    assert str(parsed_intake_id) == data["intake_id"]
+    assert data["zip_path"] == str(zip_path)
+    
+    # Verify discovered repositories
+    assert len(data["repos"]) == 1
+    repo = data["repos"][0]
+    assert repo["id"] == "test-repo"
+    assert repo["name"] == "test-repo"
+    assert repo["rel_path"] == "test-repo"
+
+
+def test_create_intake_with_multiple_repos(client, tmp_path):
+    """Test intake creation with ZIP containing multiple repositories."""
+    zip_path = tmp_path / "multi_repo.zip"
+    
+    with ZipFile(zip_path, 'w') as zf:
+        # Add first repo
+        zf.writestr("repo-one/.git/config", "[core]")
+        zf.writestr("repo-one/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("repo-one/README.md", "# Repo One")
+        
+        # Add second repo
+        zf.writestr("repo-two/.git/config", "[core]")
+        zf.writestr("repo-two/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("repo-two/main.py", "# Repo Two")
+        
+        # Add nested repo
+        zf.writestr("projects/nested-repo/.git/config", "[core]")
+        zf.writestr("projects/nested-repo/.git/HEAD", "ref: refs/heads/main")
+        zf.writestr("projects/nested-repo/index.js", "// Nested")
+    
+    response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    
+    assert response.status_code == 200
+    data = response.json()
+    
+    # Should discover all three repos
+    assert len(data["repos"]) == 3
+    
+    # Verify repos are sorted by name
+    repo_names = [r["name"] for r in data["repos"]]
+    assert repo_names == sorted(repo_names)
+
+
+def test_create_intake_with_empty_zip(client, tmp_path):
+    """Test intake creation with ZIP containing no repositories."""
+    zip_path = tmp_path / "empty.zip"
+    
+    with ZipFile(zip_path, 'w') as zf:
+        # Add files but no .git directories
+        zf.writestr("README.md", "# No Repos")
+        zf.writestr("src/main.py", "print('test')")
+    
+    response = client.post(
+        "/local-llm/context",
+        json={"zip_path": str(zip_path)}
+    )
+    
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert "no git repositories" in detail.lower()
+
+
+def test_create_intake_missing_zip_path(client):
+    """Test validation failure when zip_path is missing."""
+    response = client.post("/local-llm/context", json={})
+    
+    assert response.status_code == 422

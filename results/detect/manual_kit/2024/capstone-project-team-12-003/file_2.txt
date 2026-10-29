@@ -1,0 +1,250 @@
+/* General */
+body {
+    font-family: 'ABeeZee', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #FFFFFF;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* Top Bar */
+.top-bar {
+    width: 98.5%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background-color: white;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0px 2px 2px rgba(0, 0, 0, 0.1);
+    position: fixed;
+}
+
+/* Back Button */
+.back-btn {
+    width: 57px;
+    height: 25px;
+    border: 1px solid #D7F4D5;
+    border-radius: 30px;
+    background-color: white;
+    font-family: 'Abhaya Libre ExtraBold';
+    font-size: 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Exit Button */
+.exit-btn {
+    font-family: 'Abhaya Libre ExtraBold';
+    font-size: 10px;
+    cursor: pointer;
+}
+
+/* Logo */
+.logo {
+    height: 65px;
+    margin: 0 auto;
+}
+
+/* Survey Container */
+.survey-container {
+    padding: 20px;
+    max-width: 1000px;
+    width: 90%;
+    margin: 80px auto 80px auto;
+    background-color: white;
+    border-radius: 10px;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Header */
+h1 {
+    font-family: 'ABeeZee', sans-serif;
+    font-size: 18px;
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+/* Sub-headers */
+h2 {
+    font-family: 'Abhaya Libre';
+    font-size: 12px;
+    color: #888;
+    margin: 20px 0;
+    text-align: center;
+}
+
+h3 {
+    font-family: 'ABeeZee', sans-serif;
+    font-size: 18px;
+    text-align: center;
+    margin-bottom: 1px;
+}
+
+h4 {
+    font-family: 'Abhaya Libre';
+    font-size: 12px;
+    color: #888;
+    margin: 20px 0;
+    text-align: right;
+}
+
+h5 {
+    font-family: 'ABeeZee', sans-serif;
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 0;
+}
+
+h6 {
+    font-family: 'Abhaya Libre';
+    font-size: 14px;
+    color: #888;
+    margin: 20px 0;
+    text-align: center;
+}
+
+/* Button Group */
+.button-group {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+/* Survey Buttons */
+.survey-btn {
+    width: 76px;
+    height: 28px;
+    border: 1px solid #D9D9D9;
+    border-radius: 5px;
+    background-color: white;
+    font-size: 10px;
+    color: #888;
+    font-family: 'Abhaya Libre';
+    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.2s, border-color 0.2s;
+}
+
+.survey-btn.active {
+    display: none;
+    /* Hide the button */
+}
+
+.survey-btn.block {
+    display: flex;
+    /* Use flexbox for centering */
+}
+
+/* zoom button */
+.survey-btn:hover {
+    transform: scale(1.05);
+    border-color: #cccccc;
+}
+
+/* click on button */
+.survey-btn.selected {
+    transform: scale(1.15);
+    border-color: #4CAF50;
+    background-color: white;
+}
+
+/* Continue as plain text and button */
+.continue-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    margin-top: 20px;
+    width: 100%;
+}
+
+.continue-text {
+    font-size: 11px;
+    color: #5c5c5c;
+    font-family: 'Abhaya Libre';
+    margin-right: 10px;
+}
+
+.arrow-btn {
+    background-color: #78B97B;
+    border: none;
+    color: white;
+    font-size: 12px;
+    border-radius: 5px;
+    padding: 4px 8px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+}
+
+.arrow-btn:hover {
+    background-color: #78B97B;
+}
+
+/* Disclaimer Text */
+.disclaimer {
+    font-size: 10px;
+    color: #888;
+    text-align: right;
+    margin-top: 20px;
+    width: 100%;
+}
+
+/* Footer */
+.footer {
+    background-color: #78b97b;
+    color: black;
+    padding: 12px 0;
+    text-align: center;
+    width: 100%;
+    position: fixed;
+    bottom: 0;
+    z-index: 1000;
+    font-size: 0.5rem;
+    box-shadow: 0px -2px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Image Quiz Styles */
+
+/* Image Container */
+.image-container {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 30px;
+    margin-top: 30px;
+}
+
+/* Images */
+.image-option {
+    width: 150px;
+    height: auto;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.3s, border-color 0.3s;
+    margin: 0 20px;
+}
+
+.image-option:hover {
+    transform: scale(1.05);
+}
+
+/* Selected Image */
+.image-option.selected {
+    transform: scale(1.1);
+    border-color: #4CAF50;
+}
+
+/* Section Divider */
+.section-divider {
+    width: 60%;
+    border: 1px solid #D9D9D9;

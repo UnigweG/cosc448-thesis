@@ -1,0 +1,148 @@
+'use client';
+import { redirect } from 'next/navigation';
+import React, { useState, useEffect } from 'react';
+import { useAdminStatus } from '../components/useAdminStatus';
+import { useTranslation } from 'react-i18next';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+
+// Define the User type
+type User = {
+  id: number;
+  firstName: string;
+  lastName: string;
+  email: string;
+  isAdmin: boolean;
+  isManager: boolean;
+};
+
+type TeamMember = {
+  user_id: number;
+  firstName: string;
+  lastName: string;
+  isManager: boolean;
+};
+
+type Team = {
+  id: number;
+  name: string;
+  manager_id: number;
+  manager?: User;
+  members: TeamMember[];
+};
+
+type NewTeam = {
+  name: string;
+  manager_id: number | null;
+  member_ids: number[];
+};
+
+export default function AdminPage() {
+  const { t } = useTranslation();
+  const [users, setUsers] = useState<User[]>([]);
+  const [managers, setManagers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showCreateTeamForm, setShowCreateTeamForm] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [createConfirmPassword, setCreateConfirmPassword] = useState('');
+  const [passwordMatch, setPasswordMatch] = useState('');
+  const { isAdmin, token, isLoading } = useAdminStatus();
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<number | null>(null);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [expandedTeams, setExpandedTeams] = useState<number[]>([]);
+  const [selectedMembers, setSelectedMembers] = useState<number[]>([]);
+  const [showAddMembers, setShowAddMembers] = useState<number[]>([]);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [memberToRemove, setMemberToRemove] = useState<{userId: number, teamId: number, name: string, teamName: string} | null>(null);
+  
+
+  const fetchTeams = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_DB_URL}/teams/all`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTeams(data);
+      }
+    } catch (error) {
+      toast.error(t('Error fetching teams'));
+    }
+  };
+
+  useEffect(() => {
+    if (!isLoading) {
+      if (!token) {
+        redirect(`${process.env.NEXT_PUBLIC_SERVER_REDIRECT_PATH}/`);
+      } else if (!isAdmin) {
+        redirect(`${process.env.NEXT_PUBLIC_SERVER_REDIRECT_PATH}/dashboard`);
+      }
+    }
+  }, [isLoading, token, isAdmin]);
+
+  const [newUser, setNewUser] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    password: '',
+    isAdmin: false,
+    isManager: false,
+  });
+
+  const [newTeam, setNewTeam] = useState<NewTeam>({
+    name: '',
+    manager_id: null,
+    member_ids: []
+  });
+
+  // Fetch users from the API
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_DB_URL}/users`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setUsers(data);
+        const managersList = data.filter((user: User) => user.isManager);
+        setManagers(managersList);
+
+      } else {
+        console.error('Error fetching users');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const validatePassword = (password: string): string[] => {
+    const errors: string[] = [];
+    if (password.length < 8) {
+      errors.push(t('Password must be at least 8 characters long'));
+    }
+    if (!/[A-Z]/.test(password)) {
+      errors.push(t('Password must contain at least one uppercase letter'));
+    }
+    if (!/[a-z]/.test(password)) {
+      errors.push(t('Password must contain at least one lowercase letter'));
+    }
+    if (!/[0-9]/.test(password)) {

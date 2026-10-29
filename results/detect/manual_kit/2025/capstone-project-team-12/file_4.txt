@@ -1,0 +1,119 @@
+import pytest
+from fastapi.testclient import TestClient
+import sys
+import os
+from unittest.mock import ANY,patch
+
+
+"""
+API Testing methodology:
+
+- This module mostly covers functional testing.
+- Most Tests are written to test both interface/endpoint availability and implemention together.
+- The tests use realistic mocks of our various backend data artifacts 
+- which are then used exhaustively trace each endpoint's returns and execution paths
+- Each major endpoint has 2 test cases, one for success scenario and another for failure
+    - Success tests have only one case the primary intended pathway
+    - Failure tests attempt elicit all failure responses from the api
+    - EXCEPT for Internal Errors, code 500 indicates issues not in endpoint but in application logic
+
+
+
+"""
+
+# path to import backend code
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from main_api import app,get_db
+
+client = TestClient(app)
+
+@pytest.fixture
+def placeholder_UUID():
+    return "00000000-0000-0000-0000-000000000000"
+
+@pytest.fixture
+def sample_analysis(placeholder_UUID):
+    return {
+            'analysis_id':placeholder_UUID,
+            'analysis_title': 'Title',
+            'topic_vector':{},
+            'resume_points':{},
+            'project_insights':{},
+            'package_insights':{},
+            'metadata_insights':{},
+            'tracked_data':{
+                'bow_cache':{}, 
+                'project_data':{}, 
+                'package_data':{},
+                'metadata_stats':{}
+                },
+            'resume_data':{},
+            'portfolio_data':{}
+        }
+    
+@pytest.fixture
+def sample_resume(placeholder_UUID):
+    return {
+            "resume_id": 1,
+            "analysis_id": placeholder_UUID,
+            "summary": "Test summary",
+            "projects": [],
+            "skills": [],
+            "languages": []
+        }
+@pytest.fixture
+def sample_portfolio(placeholder_UUID):
+    return {
+        "portfolio_id": 1,
+        "analysis_id": placeholder_UUID,
+        "projects_detail": [],
+        "skill_timeline": {},
+        "growth_metrics": {}
+    }
+
+
+
+@pytest.fixture
+def mock_backend(mocker,sample_analysis,sample_resume, sample_portfolio,placeholder_UUID):
+    """
+    Mocks all external dependencies using the pytest 'mocker' fixture.
+    """
+    # We patch the class names where they are IMPORTED in main_api
+    MockDBClass = mocker.patch("main_api.DatabaseManager")
+    MockConfigClass = mocker.patch("main_api.ConfigManager")
+    MockPipelineClass = mocker.patch("main_api.AnalysisPipeline")
+    MockLocalLLMClass = mocker.patch("main_api.LocalLLMClient")
+    MockOnlineLLMClass = mocker.patch("main_api.OnlineLLMClient")
+
+    #Get the Instances
+    db_instance = MockDBClass.return_value
+    pipeline_instance = MockPipelineClass.return_value
+    local_llm_instance = MockLocalLLMClass.return_value
+    online_llm_instance = MockOnlineLLMClass.return_value
+    config_instance = MockConfigClass.return_value
+
+    # Mock the internal db connector's update method
+    db_instance.db.execute_update.return_value = True
+    
+    def simple_query_side_effect(query, params=None):
+        if "WHERE analysis_id" in query:
+            if params and str(params[0]) == placeholder_UUID:
+                return [] 
+            return [{"project_data": {"name": "Test Project", "info": "Details"}}]
+        return [{"analysis_id": "fake-uuid-123", "project_data": {"name": "Test Project"}}]
+        
+    
+    #db_instance.db.execute_query.side_effect = simple_query_side_effect
+    db_instance.get_analysis_data.side_effect = lambda rid: None if rid == "missing-id" else sample_analysis
+    
+    db_instance.save_resume_points.return_value = True
+    
+    #mock db_manager return for return all analyses (using valid JSON strings for the parse_json_fields interceptor)
+    db_instance.get_all_analyses_summary.return_value =[
+        {'analysis_id':placeholder_UUID,'analysis_title': 'Title','metadata_insights':'{"test": "data"}','project_insights':'{"test": "data"}','file_path':'some_path'},
+        {'analysis_id':placeholder_UUID,'analysis_title': 'Title2','metadata_insights':'{"test": "data"}','project_insights':'{"test": "data"}','file_path':'some_path2'}
+    ]
+    
+    # mock db_manager returns for resume functions
+    db_instance.get_all_resumes.return_value = [sample_resume, sample_resume]
+    db_instance.get_resumes_by_analysis_id.return_value = [sample_resume]

@@ -1,0 +1,139 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Bookings;
+use App\Models\Buildings;
+use App\Models\Campuses;
+use App\Models\Desks;
+use App\Models\Floors;
+use App\Models\OccupationPolicyLimit;
+use App\Models\Rooms;
+use App\Models\User;
+use App\Models\BookingHistory;
+use App\Models\Resources;
+use App\Models\Resources_Desks;
+use App\Models\Resources_Rooms;
+use Carbon\Carbon;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+
+class ResourceSeeder extends Seeder
+{
+    /**
+     * Run the database seeds.
+     *
+     * @return void
+     */
+    public function run()
+    {
+        // Empty Tables before Seeding
+        DB::table('campuses')->truncate();
+        DB::table('buildings')->truncate();
+        DB::table('floors')->truncate();
+        DB::table('rooms')->truncate();
+        DB::table('desks')->truncate();
+        DB::table('booking_history')->truncate();
+        DB::table('policy_occupation_limit')->truncate();
+        DB::table('resources')->truncate();
+        DB::table('bookings')->truncate();
+                
+        // Create Okanagan Campus
+        $campus = new Campuses;
+        $campus->name = 'Okanagan';
+        $campus->is_closed = FALSE;
+        $campus->save();
+
+        // Create Science Building For Okanagan Campus
+        $building = new Buildings;
+        $building->campus_id = $campus->id;
+        $building->name = 'Science';
+        $building->is_closed = FALSE;
+        $building->save();
+
+        // Create 1st Floor For Science Building
+        $floor = new Floors;
+        $floor->building_id = $building->id;
+        $floor->floor_num = 1;
+        $floor->is_closed = FALSE;
+        $floor->save();
+
+        // Create SCI 110 Room For 1st Floor
+        $room = new Rooms;
+        $room->floor_id = $floor->id;
+        $room->name = "SCI 110";
+        $room->occupancy = 30;
+        $room->is_closed = False;
+        $room->save();
+
+        // Create a Desk for SCI 110 Room
+        $desk = new Desks;
+        $desk->room_id = $room->id;
+        $desk->pos_x = 100;
+        $desk->pos_y = 100;
+        $desk->is_closed = FALSE;
+        $desk->save();
+
+        // create user to book with desk
+        $user = User::factory()->create();
+        // create booking using this user
+        $booking = new Bookings;
+        $booking->user_id = $user->id;
+        $booking->desk_id = $desk->id;
+        $booking->book_time_start = Carbon::now('GMT-7');
+        $booking->book_time_end = Carbon::now('GMT-7');
+        $booking->save();
+
+        // Create a Desk for SCI 110 Room
+        $desk = new Desks;
+        $desk->room_id = $room->id;
+        $desk->pos_x = 120;
+        $desk->pos_y = 120;
+        $desk->is_closed = FALSE;
+        $desk->save();
+
+        // create booking using this user
+        $booking = new Bookings;
+        $booking->user_id = $user->id;
+        $booking->desk_id = $desk->id;
+        $booking->book_time_start = Carbon::now('GMT-7');
+        $booking->book_time_end = Carbon::now('GMT-7');
+        $booking->save();
+
+        // create booking using this user
+        $booking = new Bookings;
+        $booking->user_id = $user->id;
+        $booking->desk_id = $desk->id;
+        $booking->book_time_start = Carbon::now('GMT-7');
+        $booking->book_time_end = Carbon::now('GMT-7');
+        $booking->save();
+
+        // Create a Desk for SCI 110 Room
+        $desk = new Desks;
+        $desk->room_id = $room->id;
+        $desk->pos_x = 140;
+        $desk->pos_y = 140;
+        $desk->is_closed = FALSE;
+        $desk->save();
+
+        $booking_history = new BookingHistory;
+        $booking_history->user_id = $user->id;
+        $booking_history->desk_id = $desk->id;
+        $booking_history->book_time_start = Carbon::now('GMT-7')->subYear();
+        $booking_history->book_time_end = Carbon::now('GMT-7')->subYear();
+        $booking_history->save();
+
+        $resource = new Resources;
+        $resource->resource_type = 'Lamp';
+        $resource->icon = '<i class="bi bi-outlet"></i>';
+        $resource->colour = '#2BC232';
+        $resource->save();
+
+        //Create new Desk Resource
+        $resourceDesk = new Resources_Desks;
+        $resourceDesk -> resource_id = $resource->resource_id;
+        $resourceDesk -> desk_id = $desk->id;
+        $resourceDesk->save();
+
+        //Create new Room Resource
+        $resourceRoom = new Resources_Rooms;

@@ -1,0 +1,171 @@
+import React, { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { api } from "../api/apiClient";
+import TextBlockEditor from "../components/blocks/TextBlockEditor";
+import TextListBlockEditor from "../components/blocks/TextListBlockEditor";
+import ContributionMap from "../components/ContributionMap";
+import SkillTimelineGraph from "../components/SkillTimelineGraph";
+import { LanguageDonut } from "../components/LanguageDonut";
+
+// ---- Types ----------------------------------------------------------------
+
+type BlockMetadata = {
+  last_generated_at?: string;
+  last_user_edit_at?: string;
+};
+
+type Block = {
+  tag: string;
+  current_content: any;
+  content_type: string;
+  metadata: BlockMetadata;
+};
+
+type PortfolioSection = {
+  id: string;
+  title: string;
+  order: number;
+  block_order: string[];
+  blocks_by_tag: Record<string, Block>;
+};
+
+type PortfolioCard = {
+  project_name: string;
+  summary: string;
+  themes: string[];
+  tones: string;
+  tags: string[];
+  skills: string[];
+  frameworks: string[];
+  languages?: Record<string, number>;
+  is_showcase: boolean;
+  collaboration_role?: string;
+  title_override?: string | null;
+  summary_override?: string | null;
+  tags_override?: string[] | null;
+};
+
+type Portfolio = {
+  title: string;
+  metadata: {
+    creation_time: string;
+    last_updated_at: string;
+    project_ids_include: string[];
+  };
+  sections: PortfolioSection[];
+  project_cards: PortfolioCard[];
+};
+
+type BlockEditEntry = {
+  draft: string | string[];
+  saving: boolean;
+  error: string | null;
+};
+
+// ---- Helpers ---------------------------------------------------------------
+
+const CODING_LANGUAGE_DISPLAY: Record<string, string> = {
+  PYTHON: "Python", JAVASCRIPT: "JavaScript", TYPESCRIPT: "TypeScript",
+  JAVA: "Java", CPP: "C++", C: "C", CSHARP: "C#", PHP: "PHP",
+  RUBY: "Ruby", SWIFT: "Swift", GO: "Go", RUST: "Rust",
+  HTML: "HTML", CSS: "CSS", SQL: "SQL", SHELL: "Shell", R: "R",
+};
+
+function parseCardLanguageName(key: string): string {
+  if (key.startsWith("__enum__:")) return key.split(":").pop() ?? key;
+  const dotIdx = key.lastIndexOf(".");
+  if (dotIdx >= 0) {
+    const member = key.slice(dotIdx + 1);
+    return CODING_LANGUAGE_DISPLAY[member] ?? member;
+  }
+  return key;
+}
+
+function aggregatePortfolioLanguages(cards: PortfolioCard[]): Array<{ lang: string; ratio: number }> {
+  const totals: Record<string, number> = {};
+  for (const card of cards) {
+    if (!card.languages) continue;
+    for (const [key, ratio] of Object.entries(card.languages)) {
+      const lang = parseCardLanguageName(key);
+      totals[lang] = (totals[lang] ?? 0) + ratio;
+    }
+  }
+  return Object.entries(totals)
+    .map(([lang, ratio]) => ({ lang, ratio }))
+    .filter(({ ratio }) => ratio > 0)
+    .sort((a, b) => b.ratio - a.ratio);
+}
+
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
+}
+
+function pillStyle(color?: string) {
+  return {
+    fontSize: 11,
+    color: color ?? "var(--text-primary)",
+    border: `1px solid ${color ? color + "44" : "var(--border)"}`,
+    borderRadius: 999,
+    padding: "3px 8px",
+    whiteSpace: "nowrap" as const,
+    background: color ? color + "11" : "transparent",
+  };
+}
+
+// ---- Shared card field styles ---------------------------------------------
+
+const sectionLabel: React.CSSProperties = {
+  fontSize: 12,
+  color: "var(--text-muted)",
+  fontWeight: 600,
+  textTransform: "uppercase",
+  letterSpacing: "0.05em",
+  display: "block",
+  marginBottom: 8,
+};
+
+const fieldInput: React.CSSProperties = {
+  width: "100%",
+  padding: "8px 10px",
+  borderRadius: 8,
+  border: "1px solid var(--border)",
+  background: "var(--bg-input)",
+  color: "var(--text-primary)",
+  fontSize: 13,
+  boxSizing: "border-box",
+  outline: "none",
+};
+
+// ---- PillField sub-component -----------------------------------------------
+
+type PillFieldProps = {
+  label: string;
+  pills: string[];
+  inputValue: string;
+  pillColor: string;
+  borderColor: string;
+  bgColor: string;
+  placeholder: string;
+  onRemove: (value: string) => void;
+  onInputChange: (value: string) => void;
+  onAdd: (value: string) => void;
+};
+
+function PillField({
+  label,
+  pills,
+  inputValue,
+  pillColor,
+  borderColor,
+  bgColor,
+  placeholder,
+  onRemove,
+  onInputChange,

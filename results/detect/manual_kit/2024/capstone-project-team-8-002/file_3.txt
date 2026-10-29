@@ -1,0 +1,92 @@
+import tensorflow as tf
+from tensorflow.keras import layers
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+DATASET_PATH = os.path.join("Datasets", "dataset256x256.npy")
+image_data = np.load(DATASET_PATH) # loading the dataset
+
+BUFFER_SIZE = 1000 # number of samples loaded into memory during shuffling
+BATCH_SIZE = 64 # how many samples are processed in each forward and backward passes during training
+EPOCHS = 0 # complete passes through the entire dataset during training
+NOISE_DIM = 100 # noise the generator uses to create fake images
+CHECKPOINT_DIR = "/path/to/checkpoints" # find checkpoint to load in
+CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, "ckpt")
+EPOCH_FILE = os.path.join(CHECKPOINT_DIR, "epoch.txt") # txt with the current epoch number
+SAVE_INTERVAL = 20 # interval in which the training is saved
+
+dataset = tf.data.Dataset.from_tensor_slices(image_data) \
+    .shuffle(BUFFER_SIZE) \
+    .batch(BATCH_SIZE) \
+    .cache() \
+    .prefetch(tf.data.experimental.AUTOTUNE) # dataset fo tensorflow
+
+# the generator model creates a 128x128 RBG image with the noise vector
+# each layer is supposed to learn how to fill in details during upsampling.
+def makeGenerator():
+    model = tf.keras.Sequential([
+        # create a stack of layers where each layers output is used by tyhe next layer
+        layers.Dense(8 * 8 * 1024, use_bias=False, input_shape=(NOISE_DIM,)), # fully connected layer projected into a 3d tensor
+        layers.BatchNormalization(), # normalize activations during training to help stabilize
+        layers.ReLU(), # adds non linearity so the model can learn complex mappings
+        layers.Reshape((8, 8, 1024)), # reshape the dense layer into the feature map
+
+        # upsampling layer to grow the image to high resolution, with kernel size 5,5, double spatial dimensions with strides 2,2
+        layers.Conv2DTranspose(512, (5, 5), strides=(2, 2), padding='same', use_bias=False),
+        layers.BatchNormalization(),
+        layers.ReLU(),
+
+        layers.Conv2DTranspose(256, (5, 5), strides=(2, 2), padding='same', use_bias=False),
+        layers.BatchNormalization(),
+        layers.ReLU(),
+
+        # decrease the channels from 512 to 256 to 128 to work on finer details
+        layers.Conv2DTranspose(128, (5, 5), strides=(2, 2), padding='same', use_bias=False),
+        layers.BatchNormalization(),
+        layers.ReLU(),
+
+        layers.Conv2DTranspose(64, (5, 5), strides=(2, 2), padding='same', use_bias=False),
+        layers.BatchNormalization(),
+        layers.ReLU(),
+
+        # final upsamplin with output matching the input data format [-1,1]
+        layers.Conv2DTranspose(3, (5, 5), strides=(2, 2), padding='same', use_bias=False, activation='tanh')
+    ])
+    return model
+
+# this will blur the inputs to the discriminator making it 'less confident'
+# supposed to help against mode collapse I have been struggling with
+class noise_for_discriminator(tf.keras.Layer): # make custom layer
+  def __init__(self, stddev=0.1): # define the noise and how strong it is
+    super().__init__() # call constructor
+    self.noise=tf.keras.layers.GaussianNoise(stddev) # built in gaussiannoise layer
+
+  def call(self,x,training=False):
+    return self.noise(x,training=training) # only add noise when it train
+
+# discriminator model takes a 128x128 RGB image (real or fake) determines if it is fake or real
+# the discriminator should be hard to fool which will help the generator with generating better images
+def makeDiscriminator():
+    model = tf.keras.Sequential([
+        noise_for_discriminator(0.1),
+
+        layers.Conv2D(32, (5, 5), strides=(2, 2), padding='same', input_shape=(256, 256, 3)),
+        layers.LeakyReLU(alpha=0.2), # allow a small gradient flow
+        layers.Dropout(0.3),
+
+        # filter image with 64 5,5 kernels, downsampling from 128x128 to 64x64
+        layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same'),
+        layers.LeakyReLU(alpha=0.2), # allow a small gradient flow
+        layers.Dropout(0.3), # rendomly zeros out 30% of activations to help with overfitting
+
+        # keep downsampling and learning the features of images
+        layers.Conv2D(128, (5, 5), strides=(2, 2), padding='same'),
+        layers.LeakyReLU(alpha=0.2),
+        layers.Dropout(0.3),
+
+        layers.Conv2D(256, (5, 5), strides=(2, 2), padding='same'),
+        layers.LeakyReLU(alpha=0.2),
+        layers.Dropout(0.3),
+
+        layers.Conv2D(512, (5, 5), strides=(2, 2), padding='same'),

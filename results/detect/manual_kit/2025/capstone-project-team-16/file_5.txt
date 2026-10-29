@@ -1,0 +1,135 @@
+import os
+import shutil
+from datetime import datetime
+
+from db import delete_full_scan_by_id, get_full_scan_by_id, list_full_scans, update_full_scan
+from file_parser import get_input_file_path
+from permission_manager import get_yes_no
+from resume_generator import generate_resume, generate_contributor_portfolio, edit_contributor_descriptions
+from portfolio_generator import manage_portfolio_showcase, generate_and_save_portfolio
+from services.scan_service import analyze_scan, merge_scans
+from datetime import datetime
+
+
+from print_utils import (
+    print_repo_summary,
+    print_project_rankings,
+    print_chronological_projects,
+    print_skills_timeline,
+    print_resume_summaries,
+    print_contributor_stats,
+    is_noise,
+    print_scan_list,
+    format_timestamp
+)
+
+
+# --------------------------------------------------------
+# MAIN SCAN MANAGER
+# --------------------------------------------------------
+
+def scan_manager():
+    """
+    Provides a loop for viewing, generating portfolios, and deleting past scans.
+    Provides a loop for viewing, generating portfolios, and deleting past scans.
+
+    """
+    while True:
+        choice = _print_menu(
+            "SCAN MANAGER",
+            [
+                ("0", "Return to home screen"),
+                ("1", "View stored project analyses"),
+                ("2", "Update an existing scan"),
+                ("3", "Generate Resume/Portfolio"),
+                ("4", "Delete stored scans"),
+                ("5", "Customize (ranking/chronology/skills/showcase)")
+            ],
+            prompt="Choose an option (0–5): ",
+        )
+
+        if choice == "1":
+            view_full_scan_details()
+        elif choice == "2":
+            update_scan_workflow()
+        elif choice == "3":
+            generate_portfolio_menu()
+        elif choice == "4":
+            delete_full_scan()
+        elif choice == "5":
+            customize_scan_output()
+        elif choice == "0":
+            break
+        else:
+            print(_center_text("Invalid input. Try again."))
+
+
+# --------------------------------------------------------
+# VIEW SCAN DETAILS
+# --------------------------------------------------------
+
+"""
+    Lists all saved scans, allows the user to select one, and prints a detailed report.
+    The report includes project rankings, timelines, skills, and contributor stats.
+"""
+
+def view_full_scan_details():
+    scans = list_full_scans()
+    if not scans:
+        print(_center_text("No scans found."))
+        return
+
+    # 1. List available scans (lightweight metadata only)
+    print()
+    print(_center_text("Select a scan to view:"))
+    print_scan_list(scans)
+
+    choice = input(_center_text("Enter number (0 to cancel): ")).strip()
+    if not choice.isdigit() or int(choice) == 0:
+        print(_center_text("Canceled."))
+        return
+
+    idx = int(choice) - 1
+    if idx < 0 or idx >= len(scans):
+        print(_center_text("Invalid selection."))
+        return
+
+    # 2. Fetch the full heavy JSON data for the selected scan
+    scan = get_full_scan_by_id(scans[idx]["summary_id"])
+    if not scan:
+        print(_center_text("Error: Could not retrieve scan data."))
+        return
+
+    data = scan["scan_data"]
+    _apply_customizations_to_project_summaries(data)
+
+        # Extract specific sections from the JSON blob
+
+    project_summaries = data.get("project_summaries", [])
+    resume_summaries = data.get("resume_summaries", [])
+    skills_chronological = data.get("skills_chronological", [])
+    projects_chronological = data.get("projects_chronological", [])
+
+    # 3. Display the report sections using helper functions
+    _print_header("FULL SCAN DETAILS")
+    print(f"Timestamp: {format_timestamp(scan['timestamp'])}")
+    print(f"Mode: {scan['analysis_mode']}")
+    print("=" * 28)
+
+        # Print various sections of the report
+
+    print_project_rankings(project_summaries)
+
+    projects_chronological = []
+    for p in project_summaries:
+    # first_modified / last_modified might be datetime or string 
+        first = str(p.get("first_modified", ""))[:10]
+        last = str(p.get("last_modified", ""))[:10]
+        projects_chronological.append({"name": p.get("project", "Unknown"), "first_used": first, "last_used": last})
+
+    projects_chronological.sort(key=lambda x: x["first_used"])
+
+    print_chronological_projects(projects_chronological)
+    print_skills_timeline(skills_chronological)
+    print_resume_summaries(resume_summaries)
+    print_contributor_stats(project_summaries)

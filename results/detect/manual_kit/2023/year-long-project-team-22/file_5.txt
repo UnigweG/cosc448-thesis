@@ -1,0 +1,136 @@
+import React, { useState, useEffect } from 'react';
+import { GrAdd } from "react-icons/gr";
+import './AddFriendForm.css';
+import logo from './logo.svg';
+import { Link } from 'react-router-dom';
+import Dropdown from 'react-bootstrap/Dropdown';
+
+const AddingFriend = () => {
+  const [friendRequests, setFriendRequests] = useState([]);
+  const token = sessionStorage.getItem("token");
+  const [userDropdownVisible, setUserDropdownVisible] = useState(false);
+  const userName = sessionStorage.getItem('userName');
+  const [avatar, setAvatar] = useState('');
+  const userId = sessionStorage.getItem('userId');
+
+  useEffect(() => {
+    fetch(`http://127.0.0.1:8888/user/getAvatar=${userId}`,{
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'token' : token
+      },
+    })
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Failed to fetch user profile');
+      }
+      return response.json();
+    })
+    .then(data => {
+      console.log(data); 
+      if(data.data==null){
+        setAvatar("https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg");
+      }else{
+      let base64String=data.data;
+      let byteCharacters = atob(base64String);
+      let byteNumbers = new Array(byteCharacters.length);
+      for(let i=0; i<byteCharacters.length; i++){
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      let byteArray = new Uint8Array(byteNumbers);
+      let blob=new Blob([byteArray],{type : 'application/octet-stream'})
+      console.log(blob);
+      let blobUrl = URL.createObjectURL(blob);
+      setAvatar(blobUrl);
+    }
+      
+    })
+    .catch(error => {
+      console.error('Error fetching user profile:', error.message);
+    });
+
+    const getFriendRequests = () => {
+      fetch('http://127.0.0.1:8888/user/getFriendRequest', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'token': token
+        },
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log('Data received:', data);
+
+        if (data.data && Array.isArray(data.data)) {
+          const requestsWithAvatars = data.data.map(async request => {
+            try {
+              const avatarResponse = await fetch(`http://127.0.0.1:8888/user/getAvatar=${request.id}`, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'token': token
+                },
+              });
+              const avatarData = await avatarResponse.json();
+              let blobUrl;
+              if(avatarData.data==null){
+                blobUrl='https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg'
+              }else{
+              const base64String = avatarData.data;
+              blobUrl = `data:image/jpeg;base64,${base64String}`;
+            }
+              return { ...request, avatar: blobUrl };
+            } catch (error) {
+              console.error('Error fetching avatar:', error);
+              return { ...request, avatar: 'https://as1.ftcdn.net/v2/jpg/03/53/11/00/1000_F_353110097_nbpmfn9iHlxef4EDIhXB1tdTD0lcWhG9.jpg' };
+            }
+          });
+          Promise.all(requestsWithAvatars).then(completedRequests => {
+            setFriendRequests(completedRequests);
+          });
+        } else {
+          console.log('Data.array is not available or not an array.');
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+      });
+    };
+  
+    getFriendRequests();
+  }, []);
+
+  const toggleUserDropdown = () => {
+    setUserDropdownVisible(!userDropdownVisible);
+  };
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('userName');
+    alert('You have been logged out.');
+    window.location.href = '/';
+  };
+
+  const acceptFriendRequest = (id, userName) => {
+    fetch('http://127.0.0.1:8888/user/addFriend', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'token': token
+      },
+      body: JSON.stringify({
+        userName: userName, 
+        id: id
+      })
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Data received:', data);
+      if (data.success) {
+        setFriendRequests(prevRequests => prevRequests.filter(request => request.id !== id));
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
+    window.location.reload();

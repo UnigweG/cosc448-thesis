@@ -1,0 +1,117 @@
+from typing import Any, Dict, List
+import pytest
+from datetime import datetime
+from imports_extractor import ImportsExtractor
+
+
+def create_mock_project_with_imports(
+    repo_name: str = "TestRepo",
+    commits: List[Dict[str, Any]] = None,
+    status: str = "success"
+) -> Dict[str, Any]:
+    """helper to create mock project data with import information"""
+    if commits is None:
+        commits = []
+    
+    return {
+        'status': status,
+        'repository_name': repo_name,
+        'user_commits': commits,
+        'error_message': 'Test error' if status != 'success' else None
+    }
+
+
+class TestImportsExtractor:
+    
+    def test_initialization(self):
+        """Test that ImportsExtractor initializes with noise filter"""
+        extractor = ImportsExtractor()
+        assert 'utils' in extractor.likely_noise
+        assert 'components' in extractor.likely_noise
+        assert len(extractor.likely_noise) > 0
+    
+    # Python Import Tests
+    
+    def test_extract_python_imports_basic(self):
+        """Test basic Python import extraction"""
+        extractor = ImportsExtractor()
+        code = "import os\nimport sys\nfrom datetime import datetime"
+        imports = extractor.extract_python_imports(code)
+        assert 'os' in imports
+        assert 'sys' in imports
+        assert 'datetime' in imports
+    
+    def test_extract_python_imports_nested_packages(self):
+        """Test Python imports with nested packages"""
+        extractor = ImportsExtractor()
+        code = "from os.path import join\nimport numpy.random"
+        imports = extractor.extract_python_imports(code)
+        assert 'os' in imports
+        assert 'numpy' in imports
+    
+    def test_extract_python_imports_with_aliases(self):
+        """Test Python imports with aliases"""
+        extractor = ImportsExtractor()
+        code = "import numpy as np\nfrom pandas import DataFrame as df"
+        imports = extractor.extract_python_imports(code)
+        assert 'numpy' in imports
+        assert 'pandas' in imports
+    
+    def test_extract_python_imports_syntax_error_fallback(self):
+        """Test Python import extraction falls back to regex on syntax error"""
+        extractor = ImportsExtractor()
+        code = "import os\nthis is invalid python syntax\nimport sys"
+        imports = extractor.extract_python_imports(code)
+        # Should still extract what it can via regex fallback
+        assert 'os' in imports
+        assert 'sys' in imports
+    
+    def test_extract_python_imports_empty_code(self):
+        """Test Python import extraction with empty code"""
+        extractor = ImportsExtractor()
+        imports = extractor.extract_python_imports("")
+        assert len(imports) == 0
+    
+    # JavaScript/TypeScript Import Tests
+    
+    def test_extract_js_imports_es6(self):
+        """Test ES6 import extraction"""
+        extractor = ImportsExtractor()
+        code = "import React from 'react';\nimport { useState } from 'react';"
+        imports = extractor.extract_js_imports(code)
+        assert 'react' in imports
+    
+    def test_extract_js_imports_require(self):
+        """Test CommonJS require extraction"""
+        extractor = ImportsExtractor()
+        code = "const express = require('express');\nconst fs = require('fs');"
+        imports = extractor.extract_js_imports(code)
+        assert 'express' in imports
+        assert 'fs' in imports
+    
+    def test_extract_js_imports_scoped_packages(self):
+        """Test scoped package import extraction"""
+        extractor = ImportsExtractor()
+        code = "import { Component } from '@angular/core';"
+        imports = extractor.extract_js_imports(code)
+        assert 'angular' in imports
+    
+    def test_extract_js_imports_ignores_relative(self):
+        """Test that relative imports are ignored"""
+        extractor = ImportsExtractor()
+        code = "import MyComponent from './components/MyComponent';\nimport utils from '../utils';"
+        imports = extractor.extract_js_imports(code)
+        assert len(imports) == 0
+    
+    def test_extract_js_imports_nested_paths(self):
+        """Test nested package paths"""
+        extractor = ImportsExtractor()
+        code = "import lodash from 'lodash/fp';"
+        imports = extractor.extract_js_imports(code)
+        assert 'lodash' in imports
+    
+    # Java Import Tests
+    
+    def test_extract_java_imports_basic(self):
+        """Test basic Java import extraction"""
+        extractor = ImportsExtractor()

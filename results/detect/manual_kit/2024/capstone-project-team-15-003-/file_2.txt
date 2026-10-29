@@ -1,0 +1,148 @@
+import { Component, OnInit, AfterViewInit, OnDestroy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
+
+interface Charity {
+  charityId: number;
+  name: string;
+  description: string;
+  website: string;
+  dateCreated: string;
+}
+
+@Component({
+  selector: 'app-event-creation',
+  templateUrl: './event-creation.component.html',
+  styleUrls: ['./event-creation.component.css']
+})
+export class EventCreationComponent implements OnInit, AfterViewInit, OnDestroy {
+  event = {
+    title: '',
+    description: '',
+    location: '',
+    latitude: 0,
+    longitude: 0,
+    startTime: '',
+    endTime: '',
+    donationGoal: 0,
+    signUpGoal: 0, 
+    donationPerSignup: 0, 
+    initialPledgeAmount: 0, 
+    createdBy: '',
+    dateCreated: new Date().toISOString(),
+    charityId: null as number | null,
+    companyLogoUrl: '',    
+    charityLogoUrl: '',      
+    primaryColor: '',        
+    secondaryColor: '',
+    currency: 'USD' // Default currency
+  };
+
+  allowEdit = {
+    title: true,
+    description: true,
+    location: true,
+    startTime: true,
+    endTime: true,
+    donationGoal: true,
+    donationPerSignup: true,
+    initialPledgeAmount: true,
+    charity: true,
+    colors: true,
+    image: true 
+  };
+  
+
+  allCharities: Charity[] = [];
+  randomCharities: Charity[] = [];
+  selectedCharity: Charity | null = null;
+  usingCustomCharity = false;
+  customCharityName = '';
+  customCharityUrl = '';
+  customCharityDescription = '';
+  submitting = false;
+  customizing = false;
+  primaryColor: string = '#ffffff';
+  secondaryColor: string = '#ffffff';
+  companyLogo: File | null = null;
+  charityLogo: File | null = null;
+  companyLogoPreview: string | ArrayBuffer | null = null;
+  charityLogoPreview: string | ArrayBuffer | null = null;
+  map: any;
+  marker: any;
+  mapInitialized = false;
+  locationSelected = false;
+  locationLoading = false;
+
+  availableCurrencies = [
+    { code: 'USD', symbol: '$', name: 'US Dollar' },
+    { code: 'EUR', symbol: '€', name: 'Euro' },
+    { code: 'GBP', symbol: '£', name: 'British Pound' },
+    { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar' },
+    { code: 'AUD', symbol: 'A$', name: 'Australian Dollar' },
+    { code: 'JPY', symbol: '¥', name: 'Japanese Yen' },
+    { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+    { code: 'CNY', symbol: '¥', name: 'Chinese Yuan' }
+  ];
+
+  getCurrencySymbol(): string {
+    const currency = this.availableCurrencies.find(c => c.code === this.event.currency);
+    return currency ? currency.symbol : '$';
+  }
+
+  availableTemplates: any[] = [];
+  selectedTemplateId: number | null = null;
+
+  constructor(private http: HttpClient, private router: Router) {}
+
+  ngOnInit(): void {
+    // Initialize currency to USD if not set
+    if (!this.event.currency) {
+      this.event.currency = 'USD';
+    }
+    const vendorEmail = localStorage.getItem('email') || 'Unknown';
+    this.event.createdBy = vendorEmail;
+    this.loadCharities();
+    this.loadAvailableTemplates();
+  }
+
+  loadAvailableTemplates(): void {
+    const userEmail = localStorage.getItem('email') ?? '';
+  
+    this.http.get<{ parentVendorId: string }>(`http://localhost:8080/api/vendor/parent/${userEmail}`)
+      .subscribe({
+        next: (response) => {
+          const parentEmail = response.parentVendorId;
+  
+          // If parentVendorId is '-1', they are a parent vendor – use their own email
+          const templateOwnerEmail = parentEmail === '-1' ? userEmail : parentEmail;
+  
+          this.http.get<any[]>(`http://localhost:8080/api/template/by-vendor/${templateOwnerEmail}`)
+            .subscribe({
+              next: (templates) => {
+                this.availableTemplates = templates;
+              },
+              error: (err) => {
+                console.error('Error loading templates for vendor:', err);
+              }
+            });
+        },
+        error: (err) => {
+          console.error('Error fetching parent vendor info:', err);
+        }
+      });
+  }
+
+  onTemplateSelected(templateId: number): void {
+    if (!templateId) return;
+  
+    const id = templateId; 
+    if (isNaN(id)) return;
+  
+    this.http.get<any>(`http://localhost:8080/api/template/${id}`).subscribe({
+      next: (template) => {
+        this.selectedTemplateId = id;
+  
+        // Autofill fields from template
+        this.event.title = template.title || '';
+        this.event.description = template.description || '';

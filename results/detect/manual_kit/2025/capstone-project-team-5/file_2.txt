@@ -1,0 +1,160 @@
+"""Portfolio editing routes for the API."""
+
+# ruff: noqa: E501
+
+from __future__ import annotations
+
+import datetime
+import html as _hl
+import json
+import re as _re
+import uuid
+
+from fastapi import APIRouter, HTTPException, Response, status
+from fastapi.responses import HTMLResponse
+from sqlalchemy.orm import Session
+
+from capstone_project_team_5.api.schemas.portfolio import (
+    PortfolioAddItemRequest,
+    PortfolioCreateRequest,
+    PortfolioEditRequest,
+    PortfolioItemResponse,
+    PortfolioItemUpdateRequest,
+    PortfolioReorderRequest,
+    PortfolioResponse,
+    PortfolioShareResponse,
+    PortfolioTextBlockRequest,
+    PortfolioUpdateRequest,
+)
+from capstone_project_team_5.data.db import get_session
+from capstone_project_team_5.data.models import (
+    CodeAnalysis,
+    Portfolio,
+    PortfolioItem,
+    Project,
+    ProjectSkill,
+    Skill,
+    User,
+)
+from capstone_project_team_5.services.project_thumbnail import has_project_thumbnail
+
+router = APIRouter(prefix="/portfolio", tags=["portfolio"])
+
+
+def _extract_markdown(content: str) -> str:
+    """Extract markdown text from stored portfolio content."""
+    try:
+        decoded = json.loads(content)
+    except Exception:
+        decoded = content
+
+    if isinstance(decoded, dict):
+        markdown = decoded.get("markdown")
+        if isinstance(markdown, str) and markdown.strip():
+            return markdown
+        return ""
+
+    if isinstance(decoded, str) and decoded.strip():
+        return decoded
+
+    return ""
+
+
+def _aggregate_commit_frequency(project_ids: list[int], session: Session) -> dict[str, int]:
+    """Aggregate commit_frequency across project IDs from their latest analyses.
+
+    Returns a ``{YYYY-MM-DD: count}`` mapping with all available dates.
+    """
+    if not project_ids:
+        return {}
+
+    analyses = (
+        session.query(CodeAnalysis)
+        .filter(CodeAnalysis.project_id.in_(project_ids))
+        .order_by(CodeAnalysis.project_id, CodeAnalysis.id.desc())
+        .all()
+    )
+
+    seen: set[int] = set()
+    freq: dict[str, int] = {}
+    for analysis in analyses:
+        if analysis.project_id in seen:
+            continue
+        seen.add(analysis.project_id)
+        try:
+            metrics = json.loads(analysis.metrics_json or "{}")
+        except (json.JSONDecodeError, TypeError):
+            continue
+        cf = metrics.get("git", {}).get("commit_frequency", {})
+        if not isinstance(cf, dict):
+            continue
+        for date_str, count in cf.items():
+            if isinstance(count, int) and count > 0 and len(date_str) == 10:
+                freq[date_str] = freq.get(date_str, 0) + count
+    return freq
+
+
+def _render_heatmap_html(freq: dict[str, int]) -> str:
+    """Return self-contained HTML/CSS for a GitHub-style contribution heatmap."""
+    today = datetime.date.today()
+
+    # Determine the start date: earliest commit or 364 days ago, whichever is older
+    if freq:
+        earliest = min(freq.keys())
+        earliest_date = datetime.date.fromisoformat(earliest)
+        default_start = today - datetime.timedelta(days=364)
+        start = min(earliest_date, default_start)
+    else:
+        start = today - datetime.timedelta(days=364)
+    # Roll back to the previous Sunday
+    start -= datetime.timedelta(days=start.weekday() + 1 if start.weekday() != 6 else 0)
+
+    total = sum(freq.values())
+    months = [
+        "Jan",
+        "Feb",
+        "Mar",
+        "Apr",
+        "May",
+        "Jun",
+        "Jul",
+        "Aug",
+        "Sep",
+        "Oct",
+        "Nov",
+        "Dec",
+    ]
+
+    def _level_color(count: int) -> str:
+        if count == 0:
+            return "#1e2229"
+        if count == 1:
+            return "rgba(99,102,241,0.28)"
+        if count == 2:
+            return "rgba(99,102,241,0.52)"
+        if count == 3:
+            return "rgba(99,102,241,0.76)"
+        return "var(--accent)"
+
+    # Build weeks grid
+    weeks: list[list[str | None]] = []
+    cur = start
+    while cur <= today:
+        week: list[str | None] = []
+        for _ in range(7):
+            week.append(cur.isoformat() if cur <= today else None)
+            cur += datetime.timedelta(days=1)
+        weeks.append(week)
+
+    cell = 9
+    gap = 2
+    step = cell + gap
+
+    # Month labels
+    month_labels: list[tuple[int, str]] = []
+    last_month = -1
+    for wi, week in enumerate(weeks):
+        first = next((d for d in week if d), None)
+        if not first:
+            continue
+        m = int(first[5:7]) - 1

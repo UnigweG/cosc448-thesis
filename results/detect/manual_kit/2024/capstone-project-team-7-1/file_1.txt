@@ -1,0 +1,109 @@
+"use client"
+
+import React, { useState, useContext, useEffect } from "react"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/components/shadcn/ui/tabs"
+import { Input } from "@/app/components/shadcn/ui/input"
+import { Label } from "@/app/components/shadcn/ui/label"
+import { Button } from "@/app/components/shadcn/ui/button"
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/app/components/shadcn/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/app/components/shadcn/ui/select"
+import { Switch } from "@/app/components/shadcn/ui/switch"
+import { AlertTriangle } from "lucide-react"
+import { ThemeContext } from "@/app/contexts/ThemeContext"
+import { CurrencyContext } from "@/app/contexts/CurrencyContext"
+import { Avatar, AvatarImage, AvatarFallback } from "@/app/components/shadcn/ui/avatar"
+import { Badge } from "@/app/components/shadcn/ui/badge"
+import { Popover, PopoverTrigger, PopoverContent } from "@/app/components/shadcn/ui/popover"
+import { Calendar } from "@/app/components/shadcn/ui/calendar"
+import { format } from "date-fns"
+import { Check, Upload } from "lucide-react"
+import { Toggle } from "@/app/components/shadcn/ui/toggle"
+import { VscEditorLayout } from "react-icons/vsc"
+import { LuSquareSplitHorizontal } from "react-icons/lu"
+import { FileInput } from "@/app/components/support/custom/file_input"
+
+const AppSettings = () => {
+    // Profile Settings tab state
+    const [userData, setUserData] = useState({
+        username: '',
+        name: '',
+        email: '',
+        dob: '',
+        age: '',
+        avatar: '',
+        nickname: '',
+        createdAt: '',
+        lastLogin: '',
+        connectedAccounts: '',
+        creditScore: '',
+        emailVerified: false,
+    });
+    const [profileMessage, setProfileMessage] = useState('');
+    const [profileError, setProfileError] = useState('');
+
+    // App Settings tab state
+    const { darkMode, toggleDarkMode } = useContext(ThemeContext);
+    const [notifications, setNotifications] = useState(true);
+    const { currency, setCurrency } = useContext(CurrencyContext)!;
+    const [settingsMessage, setSettingsMessage] = useState('');
+    const [settingsError, setSettingsError] = useState('');
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+    const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+    const [oldPassword, setOldPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+
+    // New state for layout controls
+    const [editLayoutMode, setEditLayoutMode] = useState(false);
+    const [sideBySideView, setSideBySideView] = useState(false);
+
+    // Rename to better reflect its purpose - showing only icons in medium width range
+    const [isMediumScreen, setIsMediumScreen] = useState(false);
+    
+    // Add state to track original user data
+    const [originalUserData, setOriginalUserData] = useState({
+        username: '',
+        name: '',
+        email: '',
+        dob: '',
+        age: '',
+        avatar: '',
+        nickname: '',
+        createdAt: '',
+        lastLogin: '',
+        connectedAccounts: '',
+        creditScore: '',
+        emailVerified: false,
+    });
+
+    // Add a new state to store the actual File object
+    const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+    const handleEditLayoutToggle = (pressed: boolean) => {
+        if (pressed && sideBySideView) return;
+        setEditLayoutMode(pressed);
+        window.dispatchEvent(new CustomEvent("toggleEditLayout", { detail: { enabled: pressed } }));
+      };
+
+    // Check viewport width on component mount and resize
+    useEffect(() => {
+        const checkScreenSize = () => {
+            // Update condition to check for the 800px-1050px range
+            const width = window.innerWidth;
+            setIsMediumScreen(width >= 849 && width < 1050);
+        };
+        
+        // Initial check
+        checkScreenSize();
+        
+        // Add event listener for resize
+        window.addEventListener('resize', checkScreenSize);
+        
+        // Clean up
+        return () => window.removeEventListener('resize', checkScreenSize);
+    }, []);
+
+    // Profile form handlers
+    const handleProfileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setUserData({ ...userData, [name]: value });

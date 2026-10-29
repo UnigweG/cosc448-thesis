@@ -1,0 +1,259 @@
+ .gradient-background {
+  background: linear-gradient(83deg, var(--color1), var(--color2), var(--color3), var(--color4));
+  background-size: 240% 240%;
+  min-height: calc(100vh - var(--navbar-height));
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  animation: gradient-animation 16s ease infinite;
+  padding: 50px 0;
+  position: relative;
+}
+
+@keyframes gradient-animation {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.vertical-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 20px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 1100px;
+  padding: 2rem;
+  position: relative;
+  backdrop-filter: blur(8px);
+}
+
+/* HEADER STYLE */
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+  margin-bottom: 2rem;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
+
+.tabs-container {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.tab-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s, background-color 0.2s;
+  height: 50px;
+}
+
+.tab-button img {
+  width: 28px;
+  height: 28px;
+}
+
+.tab-button.active,
+.generate-link-btn {
+  background-color: #007bff;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.tab-button:hover {
+  background-color: rgba(30, 121, 207, 0.15);
+  transform: scale(1.03);
+}
+
+.page-title {
+  font-size: 1.8rem;
+  background: rgba(0,0,0,0);
+  font-weight: 700;
+  color: #1f2937;
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.generate-link-container {
+  display: flex;
+  justify-content: flex-end;
+  flex: 1;
+}
+
+.generate-link-btn {
+  padding: 0 1.5rem;
+  font-size: 1rem;
+  height: 50px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.generate-link-btn:hover {
+  background-color: #0069d9;
+}
+
+.card-body {
+  padding-top: 1rem;
+}
+
+/* INFO CARD */
+.convention-info-card {
+  background: rgba(255, 255, 255, 0.75);
+  padding: 1.5rem 2rem;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  margin: auto;
+  max-width: 100%;
+}
+
+.card-info-header {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  align-items: center;
+  margin-bottom: 1rem;
+  gap: 1rem;
+}
+
+.status-tags {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 9999px;
+  white-space: nowrap;
+  height: 28px;
+  line-height: 1;
+}
+
+
+.badge img {
+  width: 20px;
+  height: 20px;
+  display: inline-block;
+}
+
+.badge-blue {
+  background-color: #e0e7ff;
+  color: #1e3a8a;
+}
+
+.badge-green {
+  background-color: #d1fae5;
+  color: #065f46;
+}
+
+.badge-gray {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.badge-yellow {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.badge-red {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+ .inline-actions {
+   font-size: 0.8rem;
+   display: flex;
+   gap: 0.5rem;
+   flex-wrap: nowrap;
+   justify-content: flex-end;
+ }
+
+ .btn {
+   white-space: nowrap;
+   padding: 0.4rem 1rem;
+ }
+
+.location-info {
+  font-size: 1.1rem;
+  color: #4b5563;
+  font-weight: 500;
+  margin-bottom: 1rem;
+}
+
+.location-info span {
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.leaderboard-wrapper {
+  width: 100%;
+  max-width: 100%;
+  margin: 2rem auto 0 auto;
+  padding: 0 1rem;
+}
+
+.conditional-message {
+  background: rgba(255, 255, 255, 0.6);
+  padding: 1rem 1.25rem;
+  border-left: 4px solid #007bff;
+  border-radius: 8px;
+  color: #333;
+  font-weight: 500;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.owner-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.start-btn, .end-btn {
+  padding: 0.6rem 1.5rem;
+  font-weight: bold;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.start-btn {
+  background-color: #28a745;
+}
+
+.end-btn {
+  background-color: #dc3545;
+}
+
+.start-btn:hover {

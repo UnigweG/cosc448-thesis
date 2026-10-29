@@ -1,0 +1,162 @@
+"use client";
+
+/**
+ * Workspace route module.
+ *
+ * This file contains:
+ * - shared editor/document-preview subcomponents for resume and portfolio documents,
+ * - document lifecycle handlers (generate/load/delete/edit/render),
+ * - and authoring controls for resume and portfolio outputs.
+ */
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { GlassCard, LiquidShell } from "../../components/LiquidShell";
+import { LiquidSegmentedControl } from "../../components/LiquidPillControl";
+import {
+  addPortfolioProject,
+  addResumeEducation,
+  addResumeExperience,
+  addResumeProject,
+  deletePortfolio,
+  deleteResume,
+  editPortfolio,
+  editResume,
+  fetchPortfolio,
+  fetchProjects,
+  getPortfolioShowcaseRole,
+  fetchResume,
+  fetchResumes,
+  fetchPortfolios,
+  fetchProjectByName,
+  addResumeProjectAI,
+  addPortfolioProjectAI,
+  generatePortfolio,
+  generateResume,
+  removePortfolioProject,
+  removeResumeProject,
+  removeResumeEducation,
+  removeResumeExperience,
+  renderPortfolio,
+  renderResume,
+  setPortfolioShowcaseRole,
+  addResumeSkill,
+  appendResumeSkill,
+  removeResumeSkill,
+  addPortfolioSkill,
+  appendPortfolioSkill,
+  removePortfolioSkill,
+  fetchConfig,
+  addResumeAward,
+  removeResumeAward,
+  updateResumeSkillLevel,
+  updatePortfolioSkillLevel
+} from "../../lib/api";
+
+/**
+ * Theme identifiers supported by backend document rendering.
+ * @type {string[]}
+ */
+const THEMES = ["sb2nov", "classic", "moderncv", "engineeringresumes", "engineeringclassic"];
+/**
+ * Export formats supported by backend render endpoints.
+ * @type {string[]}
+ */
+const FORMATS = ["pdf", "html", "markdown"];
+const SELECT_PLACEHOLDER = "— select —";
+
+/**
+ * Triggers a browser download for a generated Blob.
+ *
+ * @param {Blob} blob
+ * @param {string} filename
+ * @returns {void}
+ */
+function downloadBlob(blob, filename) {
+  const href = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = href;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(href);
+}
+
+/**
+ * Normalizes date-like values into YYYY-MM format for month inputs.
+ *
+ * @param {string} input
+ * @returns {string}
+ */
+function toMonthValue(input) {
+  if (!input) return "";
+  return String(input).slice(0, 7);
+}
+
+/**
+ * Strips UUID suffix and timestamp from a document name for display.
+ * e.g. "Immanuel_Wiessler_0f777b70_(2026_03_22_1228)" → "Immanuel Wiessler"
+ *
+ * @param {string} name
+ * @returns {string}
+ */
+function displayName(name) {
+  if (!name) return "";
+  return name
+    .replace(/_[0-9a-f]{8}(?:_\(.*?\))?$/, "")
+    .replace(/_/g, " ")
+    .trim();
+}
+
+/**
+ * Creates a user-friendly default download filename.
+ *
+ * Format: <Name>_<Resume|Portfolio>_<YYYY-MM-DD_HHmm>
+ *
+ * @param {{ kind: "resume" | "portfolio", docId: string, doc: any }} args
+ * @returns {string}
+ */
+function buildDefaultDownloadName({ kind, docId, doc }) {
+  const label = kind === "resume" ? "Resume" : "Portfolio";
+  const rawName = doc?.contact?.name || docId || "Document";
+  const safeName = String(rawName)
+    .trim()
+    .replace(/\s+/g, "_")
+    .replace(/[<>:"/\\|?*]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  const baseName = safeName || "Document";
+
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mi = String(now.getMinutes()).padStart(2, "0");
+  const stamp = `${yyyy}-${mm}-${dd}_${hh}${mi}`;
+
+  return `${baseName}_${label}_${stamp}`;
+}
+
+/**
+ * Public-mode document preview section with read-only data and export actions.
+ *
+ * @param {{
+ *   doc: any,
+ *   onRender: (format: string) => void,
+ *   isActionActive: (action: string) => boolean
+ * }} props
+ * @returns {JSX.Element}
+ */
+function PublicDocumentPreview({ doc, onRender, isActionActive }) {
+  if (!doc) return <p className="muted">Load a document ID to view the document preview.</p>;
+
+  return (
+    <div className="grid two-col">
+      <GlassCard title="Contact">
+        <pre className="json-box">{JSON.stringify(doc.contact || {}, null, 2)}</pre>
+      </GlassCard>
+      <GlassCard title="Summary">
+        <p>{doc.summary || "No summary available."}</p>
+      </GlassCard>
+      <GlassCard title="Connections">
+        <pre className="json-box">{JSON.stringify(doc.connections || [], null, 2)}</pre>
+      </GlassCard>

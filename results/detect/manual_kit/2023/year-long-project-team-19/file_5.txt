@@ -1,0 +1,105 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Edgegap.Editor.Api;
+using Edgegap.Editor.Api.Models;
+using Edgegap.Editor.Api.Models.Requests;
+using Edgegap.Editor.Api.Models.Results;
+using UnityEditor;
+using UnityEditor.Build.Reporting;
+using UnityEditor.UIElements;
+using UnityEngine;
+using UnityEngine.Assertions;
+using UnityEngine.UIElements;
+using Application = UnityEngine.Application;
+
+namespace Edgegap.Editor
+{
+    /// <summary>
+    /// Editor logic event handler for "UI Builder" EdgegapWindow.uxml, superceding` EdgegapWindow.cs`.
+    /// </summary>
+    public class EdgegapWindowV2 : EditorWindow
+    {
+        #region Vars
+        public static bool IsLogLevelDebug =>
+            EdgegapWindowMetadata.LOG_LEVEL == EdgegapWindowMetadata.LogLevel.Debug;
+        private bool IsInitd;
+        private VisualTreeAsset _visualTree;
+        private bool _isApiTokenVerified; // Toggles the rest of the UI
+        private bool _isContainerRegistryReady;
+        private Sprite _appIconSpriteObj;
+        private string _appIconBase64Str;
+ #pragma warning disable CS0414 // MIRROR CHANGE: hide unused warning
+        private ApiEnvironment _apiEnvironment; // TODO: Swap out hard-coding with UI element?
+ #pragma warning restore CS0414 // END MIRROR CHANGE
+        private GetRegistryCredentialsResult _credentials;
+        private static readonly Regex _appNameAllowedCharsRegex = new Regex(@"^[a-zA-Z0-9_\-+\.]*$"); // MIRROR CHANGE: 'new()' not supported in Unity 2020
+        private GetCreateAppResult _loadedApp;
+        /// <summary>TODO: Make this a list</summary>
+        private GetDeploymentStatusResult _lastKnownDeployment;
+        private string _deploymentRequestId;
+        private string _userExternalIp;
+        private bool _isAwaitingDeploymentReadyStatus;
+        #endregion // Vars
+
+
+        #region Vars -> Interactable Elements
+        private Button _debugBtn;
+
+        /// <summary>(!) This is saved manually to EditorPrefs via Base64 instead of via UiBuilder</summary>
+        private TextField _apiTokenInput;
+
+        private Button _apiTokenVerifyBtn;
+        private Button _apiTokenGetBtn;
+        private VisualElement _postAuthContainer;
+
+        private Foldout _appInfoFoldout;
+        private Button _appLoadExistingBtn;
+        private TextField _appNameInput;
+        /// <summary>`Sprite` type</summary>
+        private ObjectField _appIconSpriteObjInput;
+        private Button _appCreateBtn;
+        private Label _appCreateResultLabel;
+
+        private Foldout _containerRegistryFoldout;
+        private TextField _containerNewTagVersionInput;
+        private TextField _containerPortNumInput;
+
+        // MIRROR CHANGE: EnumField Port type fails to resolve unless in Assembly-CSharp-Editor.dll. replace with regular Dropdown instead.
+        /// <summary>`ProtocolType` type</summary>
+        // private EnumField _containerTransportTypeEnumInput;
+        private PopupField<string> _containerTransportTypeEnumInput;
+        // END MIRROR CHANGE
+
+        private Toggle _containerUseCustomRegistryToggle;
+        private VisualElement _containerCustomRegistryWrapper;
+        private TextField _containerRegistryUrlInput;
+        private TextField _containerImageRepositoryInput;
+        private TextField _containerUsernameInput;
+        private TextField _containerTokenInput;
+        private Button _containerBuildAndPushServerBtn;
+        private Label _containerBuildAndPushResultLabel;
+
+        private Foldout _deploymentsFoldout;
+        private Button _deploymentsRefreshBtn;
+        private Button _deploymentsCreateBtn;
+        /// <summary>display:none (since it's on its own line), rather than !visible.</summary>
+        private Label _deploymentsStatusLabel;
+        private VisualElement _deploymentsServerDataContainer;
+        private Button _deploymentConnectionCopyUrlBtn;
+        private TextField _deploymentsConnectionUrlReadonlyInput;
+        private Label _deploymentsConnectionStatusLabel;
+        private Button _deploymentsConnectionStopBtn;
+
+        private Button _footerDocumentationBtn;
+        private Button _footerNeedMoreGameServersBtn;
+        #endregion // Vars
+
+        // MIRROR CHANGE
+        // get the path of this .cs file so we don't need to hardcode paths to
+        // the .uxml and .uss files:

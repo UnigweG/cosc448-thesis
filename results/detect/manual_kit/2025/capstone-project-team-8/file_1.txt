@@ -1,0 +1,162 @@
+'use client';
+
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import Header from '@/components/Header';
+import Toast from '@/components/Toast';
+import config from '@/config';
+import { getCurrentUser } from '@/utils/api';
+import {
+  getProjects,
+  getSkills,
+  generateRenderCVPdf,
+  downloadRenderCVYaml,
+  generateResume,
+  updateResume,
+  getResume,
+} from '@/utils/resumeApi';
+import { getProjectDateRange } from '@/utils/resumeCleanup';
+import { autoGenerateResume } from '@/utils/autoGenerateResume';
+import ProjectsPanel from '@/components/resume/ProjectsPanel';
+import styles from './resume-new.module.css';
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+const THEMES = [
+  { value: 'classic', label: 'Classic' },
+  { value: 'sb2nov', label: 'SB2Nov' },
+  { value: 'moderncv', label: 'ModernCV' },
+  { value: 'engineeringclassic', label: 'Engineering Classic' },
+];
+
+const EMPTY_RESUME = {
+  name: '',
+  email: '',
+  phone: '',
+  github_url: '',
+  portfolio_url: '',
+  linkedin_url: '',
+  location: '',
+  sections: {
+    summary: '',
+    education: [],
+    experience: [],
+    projects: [],
+    skills: [],
+    certifications: [],
+  },
+};
+
+function parseContent(content) {
+  if (!content) return [];
+  return content
+    .split('\n')
+    .map((l) => l.replace(/^[•\-]\s*/, '').trim())
+    .filter(Boolean);
+}
+
+function buildContent(bullets) {
+  return bullets.map((b) => `• ${b}`).join('\n');
+}
+
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function SectionHeader({ title, onAdd, addLabel = '+ Add', collapsed, onToggle }) {
+  return (
+    <div className={styles.sectionHeader}>
+      <button className={styles.collapseBtn} onClick={onToggle} type="button">
+        {collapsed ? '▶' : '▼'} <span>{title}</span>
+      </button>
+      {onAdd && (
+        <button className={styles.addBtn} onClick={onAdd} type="button">
+          {addLabel}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function BulletList({ content, onChange }) {
+  // Local state keeps empty bullets alive while the user types.
+  // parseContent (which filters empties) is only used for initialisation
+  // and for syncing when content changes from outside.
+  const parseRaw = (str) => {
+    if (!str) return [];
+    return str.split('\n').map((l) => l.replace(/^[•\-]\s*/, '').trim());
+  };
+
+  const [bullets, setBullets] = useState(() => parseRaw(content));
+  const lastEmitted = useRef(content);
+
+  // Sync inward only when the prop changed externally (not from our own emit)
+  useEffect(() => {
+    if (content !== lastEmitted.current) {
+      lastEmitted.current = content;
+      setBullets(parseRaw(content));
+    }
+  }, [content]);
+
+  const emit = (next) => {
+    const str = next.map((b) => `• ${b}`).join('\n');
+    lastEmitted.current = str;
+    onChange(str);
+  };
+
+  const updateBullet = (i, val) => {
+    const next = [...bullets];
+    next[i] = val;
+    setBullets(next);
+    emit(next);
+  };
+
+  const removeBullet = (i) => {
+    const next = bullets.filter((_, idx) => idx !== i);
+    setBullets(next);
+    emit(next);
+  };
+
+  const addBullet = () => {
+    const next = [...bullets, ''];
+    setBullets(next);
+    emit(next);
+  };
+
+  return (
+    <div className={styles.bulletList}>
+      {bullets.map((b, i) => (
+        <div key={i} className={styles.bulletRow}>
+          <span className={styles.bulletDot}>•</span>
+          <input
+            className={styles.bulletInput}
+            value={b}
+            onChange={(e) => updateBullet(i, e.target.value)}
+            placeholder="Bullet point..."
+            autoFocus={b === '' && i === bullets.length - 1}
+          />
+          <button
+            className={styles.removeBulletBtn}
+            onClick={() => removeBullet(i)}
+            type="button"
+            title="Remove bullet"
+          >
+            ×
+          </button>
+        </div>
+      ))}
+      <button className={styles.addBulletBtn} onClick={addBullet} type="button">
+        + bullet
+      </button>
+    </div>
+  );
+}
+
+function EntryCard({ item, onUpdate, onRemove, fields }) {
+  return (
+    <div className={styles.entryCard}>
+      <div className={styles.entryCardHeader}>
+        <div className={styles.entryFields}>
+          {fields.map((f) =>
+            f.type === 'select' ? (
+              <select
+                key={f.key}

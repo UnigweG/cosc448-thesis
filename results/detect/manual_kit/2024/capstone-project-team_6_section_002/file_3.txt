@@ -1,0 +1,119 @@
+'use client';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { Download, FileText, ArrowLeft, CheckCircle, Flag, Trash2 } from 'lucide-react';
+import { useToast } from "@/hooks/use-toast";
+import MyDocument, { Feedback } from "@/components/MyDocument";
+import { Difference } from "@/types/dbTypes";
+import { pdf } from '@react-pdf/renderer';
+import { useTranslation } from 'react-i18next';
+import axios from 'axios';
+import { API_URLS, ROUTES } from "@/lib/constants";
+import toastUtils from "@/lib/toast_utils";
+import HeaderMain from "@/components/headerMain"; // Add this import
+
+export default function ComparisonPage() {
+    const { t } = useTranslation();
+    const { id } = useParams<{ id: string }>();
+    const [differences, setDifferences] = useState<Difference[]>([]);
+    const [feedback, setFeedback] = useState<{ [key: number]: Feedback }>({});
+    const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+    const navigate = useNavigate();
+    const { toast } = useToast();
+
+    // Fetch differences when the component mounts or when the comparison id changes
+    const fetchDifferences = async () => {
+        try {
+            if (!id) {
+                console.error('Comparison ID is not available');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('comparisonId', id);
+
+            const response = await axios.post(API_URLS.FETCH_DIFFERENCES, formData, {
+                headers: { 'Content-Type': ROUTES.MULTIPART_FORM_DATA },
+            });
+
+            if (response.data.status === 'success') {
+                setDifferences(response.data.message);
+            } else {
+                toastUtils.showCustomErrorToast(response.data.message);
+            }
+        } catch (error) {
+            console.error('Error fetching differences:', error);
+            toastUtils.showErrorFetchingDifferencesToast();
+        }
+    };
+
+    useEffect(() => {
+        fetchDifferences();
+    }, [id, t, toast]);
+
+    const handleDownload = async () => {
+        setIsGeneratingPDF(true);
+        toastUtils.showCurrentlyGeneratingPdfToast();
+        try {
+            const filteredDifferences = differences.filter(diff => diff.comparisonId === parseInt(id!));
+            const blob = await pdf(<MyDocument differences={filteredDifferences} feedback={feedback} />).toBlob();
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = t("pdfFileName" as any);
+            link.click();
+            URL.revokeObjectURL(url);
+            toastUtils.showPdfGeneratedToast();
+        } catch (error) {
+            console.error(t("errorGeneratingPdf" as any), error);
+            toastUtils.showErrorGeneratingPdfToast();
+        } finally {
+            setIsGeneratingPDF(false);
+        }
+    };
+
+    const handleViewRawText = () => {
+        navigate(`${ROUTES.COMPARISON}${id}${ROUTES.HIGHLIGHTED}${id}`);
+    };
+
+    const handleBack = () => {
+        navigate(ROUTES.SLASH);
+    };
+
+    const handleFeedback = (differenceNumber: number, isGood: boolean | null) => {
+        setFeedback(prev => ({
+            ...prev,
+            [differenceNumber]: { ...prev[differenceNumber], isGood }
+        }));
+
+        // Determine the status for the toast
+        let status: 'good' | 'review' | 'unchecked';
+        if (isGood === true) {
+            status = 'good';
+        } else if (isGood === false) {
+            status = 'review';
+        } else {
+            status = 'unchecked';
+        }
+
+        toastUtils.showDifferenceStatusToast(differenceNumber, status);
+    };
+
+    const handleNotesChange = (differenceNumber: number, notes: string) => {
+        setFeedback(prev => ({
+            ...prev,
+            [differenceNumber]: { ...prev[differenceNumber], notes }
+        }));
+    };
+
+    const handleSubmitNotes = (differenceNumber: number) => {
+        console.log(
+            t("submittingNotes", { differenceNumber }),
+            feedback[differenceNumber]?.notes
+        );

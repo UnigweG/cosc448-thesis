@@ -1,0 +1,262 @@
+/* General Layout */
+.wholepage {
+  background-color: #121212;
+ 
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+* Inline DateTime Picker Group */
+.form-group-inline {
+  display: flex;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .form-group-inline {
+    flex-direction: column;
+  }
+}
+
+/* Individual DateTime Containers */
+.form-group-inline div {
+  flex: 1;
+  background-color: #282828;
+  border-radius: 8px;
+  padding: 1rem;
+  
+  color: #ffffff;
+}
+
+/* PREVIEW SECTION STYLING */
+.preview-card {
+  background-color: #282828;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  padding: 2em;
+  width: 100%;
+  color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  gap: 1rem;
+}
+
+.logos-container {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.logo-preview {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 50%; /* ✅ Circular logos */
+  border: 2px solid #e3e5e6;
+}
+
+.event-title-container {
+  flex-grow: 1;
+  text-align: center;
+}
+
+.event-title {
+  font-size: 1.8rem;
+  font-weight: bold;
+  margin-bottom: 0.3rem;
+}
+
+.charity-name {
+  font-size: 1.2rem;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+/* Event Details Section */
+.event-details-container {
+  width: 100%;
+  text-align: center;
+}
+
+.event-description {
+  font-size: 1rem;
+  opacity: 0.9;
+  margin-bottom: 1.5rem;
+}
+
+/* Event Info Grid */
+.event-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  text-align: left;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.event-info-grid p {
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.7rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 768px) {
+  .preview-header {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .event-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Labels */
+.form-group-inline label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #00bcd4;
+}
+
+/* Styled DateTime Inputs */
+.form-group-inline input[type="datetime-local"] {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #3a3a3a;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+/* Focus State */
+.form-group-inline input[type="datetime-local"]:focus {
+  outline: none;
+  border: 2px solid #0f46ac;
+  background-color: #484848;
+}
+.form-group-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+  width: 100%;
+}
+
+@media (max-width: 1200px) {
+  .form-group-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Individual Form Inputs */
+.form-group-grid div {
+  background-color: #282828;
+  border-radius: 8px;
+  padding: 1rem;
+  
+  color: #ffffff;
+}
+
+/* Labels */
+.form-group-grid label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: #f1f1f1;
+}
+
+/* Inputs */
+.form-group-grid input {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.form-group-grid input:focus {
+  outline: none;
+  border: 2px solid #0f46ac;
+  background-color: #484848;
+}
+
+/* Range Input Styling */
+.form-group-grid input[type="range"] {
+  width: 100%;
+  appearance: none;
+  background: #00bcd4;
+  height: 6px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.form-group-grid input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #0f46ac;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.form-group-grid input[type="range"]:focus {
+  outline: none;
+}
+
+/* Adjustments for Inline Number and Range Input */
+.form-group-grid div {
+  display: flex;
+  flex-direction: column;
+}
+
+.form-group-grid div input[type="number"] {
+  margin-top: 0.5rem;
+}
+
+/* Currency Input Styling */
+.currency-input {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.currency-symbol {
+  position: absolute;
+  left: 10px;
+  color: #ffffff;
+  font-weight: 500;
+}
+
+.currency-input input {
+  padding-left: 25px;
+}
+
+.currency-select {
+  width: 100%;
+  padding: 0.5rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 6px;
+  background-color: #3a3a3a;
+  color: #ffffff;
+  cursor: pointer;
+  appearance: none;
