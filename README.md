@@ -70,6 +70,8 @@ bash scripts/02_clone.sh
 .venv/bin/python scripts/20_file_detect.py
 .venv/bin/python scripts/21_aggregate.py
 .venv/bin/python scripts/22_verify.py
+.venv/bin/python scripts/07b_github_extra.py
+.venv/bin/python scripts/23_pr_overlap.py
 ```
 
 | Script                | What it does                                          | Output                                                                     |
@@ -89,6 +91,8 @@ bash scripts/02_clone.sh
 | `20_file_detect.py`   | File-level Binoculars (Qwen2.5-Coder pair) and DroidDetect; `--inventory` lists the candidate files first. Resumable; needs the models downloaded once | `results/detect/file_inventory.csv`, `data/detect/detect.sqlite` (git-ignored) |
 | `21_aggregate.py`     | File-level and repo-level detector tables, data dictionary, manual-check kit | `results/detect/` ([dictionary](results/detect/DATA_DICTIONARY.md)) |
 | `22_verify.py`        | Consistency checks on the detector outputs (`--rescore` re-runs the models on a few chunks) | `results/detect/verification.md` |
+| `07b_github_extra.py` | Same download as 07 for the 2022 and 2026 repos, and fetches their PR heads | `data/github/<year>/`, `refs/pull/` in the clones |
+| `23_pr_overlap.py`    | PR file-overlap "style" feature, all years ([assumptions](results/pr_overlap/ASSUMPTIONS.md)) | `results/pr_overlap/` |
 
 ### Useful options
 
@@ -96,6 +100,7 @@ bash scripts/02_clone.sh
 - `03_sonar_scan.py`, `05_custom_metrics.py`, `07_github_api.py` and `08_process_metrics.py` take `--only <repo>` or `--only <org>/<repo>` to redo a single repo.
 - `07_github_api.py` skips repos it has already saved; `--refresh` downloads them again.
 - `20_file_detect.py --only <year>/<repo>` scores one repo; the run is resumable and the supervisor restarts the worker after a hang or a kill. The first run needs the Hugging Face models downloaded once (`HF_HUB_OFFLINE=1` is the default afterwards).
+- `23_pr_overlap.py --only <year>/<repo>` runs one repo and writes to `logs/pr_overlap/test/`; `--out DIR` writes elsewhere.
 
 ### Re-running
 
