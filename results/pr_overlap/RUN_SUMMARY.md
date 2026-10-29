@@ -30,7 +30,7 @@ Exact match 71.5-84.2 % by year (78.0 % pooled), within +-1 file 80.2-92.3 % (86
 
 ## Findings worth a look (descriptive; see ASSUMPTIONS.md for why none of them is evidence of AI redo)
 - Mean 28-day code overlap over PRs: 2022 0.69, 2023 0.73, 2024 0.66, 2025 0.68, 2026 0.70. The pre-AI 2022 repos are not lower.
-- Second / first half PR ratio (repo median): 1.08 (2022, 3 repos), 1.47, 1.26, 1.24, 1.40. More PRs late in the term also happens in 2022.
+- Second / first half PR ratio (repo median): 1.08 (2022, 3 repos), 1.46, 1.26, 1.24, 1.40. More PRs late in the term also happens in 2022.
 - Warm-up: PRs in the first 28 days of a repo have lower overlap (0.45-0.66) than later PRs (0.68-0.77) in every year.
 - 53-73 % of merged PRs in 2023-25 go into a non-default branch (usually `dev`); `integration_pr` release PRs (31 % of 2023's PRs) score 0.76-1.00 vs 0.65-0.70.
 
