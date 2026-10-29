@@ -9,6 +9,14 @@ pytest==9.1.1
 radon==6.0.1
 requests==2.34.2
 
+# detectors (scripts/20_file_detect.py, scripts/ai_detect/); models are downloaded once from Hugging Face,
+# then the run is offline (HF_HUB_OFFLINE=1). TODO: pin to the versions in the .venv that produced results/detect
+# (pip freeze) and record the model revisions: Qwen/Qwen2.5-Coder-1.5B, Qwen/Qwen2.5-Coder-1.5B-Instruct,
+# project-droid/DroidDetect-Large-Binary, answerdotai/ModernBERT-large (config only)
+torch
+transformers
+huggingface_hub
+
 # pinned because they affect the metrics (astroid is Pylint's parser) or to keep
 # the install reproducible
 astroid==4.0.4

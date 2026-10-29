@@ -6,7 +6,8 @@ found: a ModernBERT encoder trained on DroidCollection (over 1M samples, 43 gene
 (binary) across domains and 0.92 recall on adversarially "humanised" code. Weights are
 Apache-2.0 on Hugging Face (project-droid/DroidDetect-Base, -Large, -*-Binary, -*-Ternary).
 
-score() returns P(AI) for each text; predict_logits() the raw class logits: higher = more likely AI-generated.
+predict_logits() returns the raw class logits; P(AI) = 1 - P(HUMAN_GENERATED) is computed by the caller.
+The 0.5 cut-off on P(AI) is DroidDetect's own label and is not calibrated for student code.
 """
 import numpy as np
 
@@ -27,7 +28,7 @@ class DroidDetect:
     The checkpoint is a state dict for the TLModel head in the model card: mean-pooled
     encoder states -> Linear(768 or 1024 -> 128) -> ReLU -> Linear(128 -> classes).
     The number of classes is read from the weights, so the binary, ternary and four-class
-    releases all load. P(AI) = 1 - P(HUMAN_GENERATED).
+    releases all load.
     """
 
     def __init__(self, repo="project-droid/DroidDetect-Base", base=None, device=None, max_tokens=512):
@@ -44,6 +45,8 @@ class DroidDetect:
         # architecture from the base model's config only; the weights are DroidDetect's own
         self.encoder = AutoModel.from_config(AutoConfig.from_pretrained(base))
         missing, unexpected = self.encoder.load_state_dict(enc_state, strict=False)
+        if missing or unexpected:  # not fatal below 6 missing keys; printed so a run log shows which
+            print(f"DroidDetect load: missing {missing}, unexpected {unexpected}", flush=True)
         if len(missing) > 5:
             raise RuntimeError(f"encoder weights did not load ({len(missing)} missing keys)")
         hidden = state["text_projection.weight"].shape[1]
@@ -56,26 +59,6 @@ class DroidDetect:
         for m in (self.encoder, self.proj, self.cls):
             m.to(self.device).eval()
         self.max_tokens = max_tokens
-
-    def predict_proba(self, texts, batch_size=16):
-        torch = _torch()
-        out = []
-        for i in range(0, len(texts), batch_size):
-            enc = self.tok(list(texts[i:i + batch_size]), return_tensors="pt", padding=True,
-                           truncation=True, max_length=self.max_tokens).to(self.device)
-            with torch.no_grad():
-                h = self.encoder(**enc).last_hidden_state
-                # the model card mean-pools over all positions (padding included); padding
-                # within a batch would change scores, so we pool over real tokens only and
-                # recommend batch_size=1 when reproducing published numbers exactly
-                mask = enc["attention_mask"].unsqueeze(-1).float()
-                pooled = (h * mask).sum(1) / mask.sum(1)
-                probs = torch.softmax(self.cls(torch.relu(self.proj(pooled))), -1)
-            out.append(probs.cpu().numpy())
-        return np.vstack(out)
-
-    def score(self, texts, batch_size=16):
-        return 1.0 - self.predict_proba(texts, batch_size)[:, 0]
 
     def predict_logits(self, texts, batch_size=1):
         """Raw class logits (n, n_classes) and the number of real tokens per text (specials included).
