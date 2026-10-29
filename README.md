@@ -78,6 +78,8 @@ bash scripts/02_clone.sh
 | `06_build_results.py` | Merges everything into one table                      | `results/results.csv`                                                      |
 | `07_github_api.py`    | Downloads PRs, reviews and issues from the GitHub API | `data/github/<year>/`                                                      |
 | `08_process_metrics.py` | Team process metrics and AI-usage signals ([definitions](docs/process_metrics.md)) | `results/process_metrics.csv`, `results/ai_signals.csv` |
+| `07b_github_extra.py` | Same download as 07 for the 2022 and 2026 repos, and fetches their PR heads | `data/github/<year>/`, `refs/pull/` in the clones |
+| `23_pr_overlap.py`    | PR file-overlap "style" feature, all years ([assumptions](results/pr_overlap/ASSUMPTIONS.md)) | `results/pr_overlap/` |
 
 ### Useful options
 
