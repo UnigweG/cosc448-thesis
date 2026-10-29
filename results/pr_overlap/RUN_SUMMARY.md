@@ -1,6 +1,6 @@
 # PR file-overlap run summary
 
-Branch `feat/pr-overlap` (on top of `d2-v3`), local only, no push. Run 2026-10-28; the full run takes about 10 s because everything comes from local git plus the saved `prs.json`. All numbers are read from the CSVs in this folder.
+Run 2026-10-28 on branch `feat/pr-overlap` (stacked on `d2-v3`); the full run takes about 10 s because everything comes from local git plus the saved `prs.json`. All numbers are read from the CSVs in this folder.
 
 ## What ran
 - `scripts/07b_github_extra.py`: PRs and issues for the five 2022/2026 repos into `data/github/<year>/<repo>/` (plus `meta.json` with the GitHub default branch), and `refs/pull/*` fetched into their clones. 81 / 1 / 8 / 158 PRs (2022) and 228 PRs (2026), PR heads fetched for all of them. Read-only (GraphQL query, `git fetch`).

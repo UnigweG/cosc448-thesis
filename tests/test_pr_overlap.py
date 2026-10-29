@@ -65,9 +65,9 @@ def world(m, tmp_path, monkeypatch):
 def test_overlap_inside_and_outside_the_window(m):
     items = [(T0, 1, {"a.py"}), (T0 + 10 * DAY, 2, {"a.py", "b.py"}), (T0 + 40 * DAY, 3, {"a.py"})]
     r14, r28 = m.overlap(items, 14), m.overlap(items, 28)
-    assert r14[1] == (0.0, 0, 0, 0)                   # nothing before the first PR
+    assert r14[1] == (None, None, 0, 0)               # nothing before the first PR: undefined, not 0
     assert r14[2] == (0.5, 1, 1, 1)                   # a.py was touched 10 days earlier
-    assert r14[3][:2] == (0.0, 0) and r28[3][:2] == (0.0, 0)  # 30 days after #2: outside both windows
+    assert r14[3] == (None, None, 0, 0) and r28[3] == (None, None, 0, 0)  # 30 days after #2: outside both windows
     assert m.overlap(items, 45)[3] == (1.0, 1, 2, 2)
 
 
@@ -139,7 +139,7 @@ def test_bots_lockfiles_and_unmerged_prs_do_not_count(world):
     # PR 3: its code file src/a.py was touched by PR 1; the bot's PR 2 is not a reference
     assert rows[3]["ref_prs_code_14"] == 1
     assert rows[3]["overlap_share_code_14"] == 1.0 and rows[3]["overlap_share_all_14"] == 0.5
-    assert rows[1]["overlap_share_code_14"] == 0.0 and rows[1]["ref_prs_code_14"] == 0
+    assert rows[1]["overlap_share_code_14"] is None and rows[1]["ref_prs_code_14"] == 0  # no history
     assert rows[5]["ref_prs_code_28"] == 2
     assert len(val) == 6  # validation covers every PR, merged or not
 
@@ -185,3 +185,21 @@ def test_release_prs_from_a_branch_that_other_prs_target_are_flagged(world):
     rows, _, _ = run([pr(1, 0, [c1], base="dev"), pr(2, 5, [c1, c2], base="main", head="dev")])
     assert rows[1]["flags"] == "non_default_base" and rows[2]["flags"] == "integration_pr"
     assert rows[2]["overlap_share_code_14"] == 1.0  # the release PR re-contains PR 1's files
+
+
+def test_a_pr_with_no_history_is_undefined_not_zero(m):
+    out = m.overlap([(T0, 1, {"a.py"}), (T0 + 40 * DAY, 2, {"a.py"})], 28)
+    assert out[1][:2] == (None, None) and out[2][:2] == (None, None)  # PR 1 is 40 days back: outside the window
+
+
+def test_release_prs_are_not_reference_for_the_sensitivity_columns(world):
+    repo, run = world
+    c1 = repo.commit({"a.py": "1"})
+    c2 = repo.commit({"b.py": "1"})
+    c3 = repo.commit({"a.py": "2"})
+    # PR 1 (day 0) into dev; release PR 2 (day 20) re-contains a.py and b.py; PR 3 (day 30) touches a.py
+    rows, _, _ = run([pr(1, 0, [c1], base="dev"), pr(2, 20, [c1, c2], base="main", head="dev"),
+                      pr(3, 30, [c3], base="main")])
+    assert rows[3]["overlap_share_code_14"] == 1.0                       # the release PR (day 20) is in the window
+    assert rows[3]["overlap_share_code_14_excl_integration"] is None     # without it PR 3 has no history
+    assert rows[2]["overlap_share_code_14_excl_integration"] is None     # the release PR is not measured

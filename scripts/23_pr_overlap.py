@@ -145,7 +145,8 @@ def overlap(items, window_days):
     """items: [(merged_t, pr_number, set of files)] of the PRs of ONE repo and variant.
     Returns {pr_number: (share, any, n_ref_prs, n_ref_files)}. The reference set of a PR is the files
     of every other PR with merged_t in (t - W days, t); PRs with an identical merged_t are ordered
-    by number, so the lower number counts as earlier."""
+    by number, so the lower number counts as earlier. A PR with no PR in its window has no history to
+    overlap with: share and any are None (undefined), not 0."""
     items = sorted(items, key=lambda x: (x[0], x[1]))
     out = {}
     for i, (t, num, files) in enumerate(items):
@@ -154,6 +155,9 @@ def overlap(items, window_days):
             ref |= items[j][2]
             n_prs += 1
             j -= 1
+        if not n_prs:
+            out[num] = (None, None, 0, 0)
+            continue
         hit = len(files & ref)
         out[num] = (hit / len(files), int(hit > 0), n_prs, len(ref))
     return out
@@ -232,7 +236,11 @@ def measure(year, folder):
         for v in VARIANTS:
             for w in WINDOWS:
                 res = overlap([(r["_t"], r["pr_number"], r["_" + v]) for r in rows if r["_" + v]], w)
+                # sensitivity: release PRs are neither measured nor part of any reference set (they re-date old work)
+                res_ex = overlap([(r["_t"], r["pr_number"], r["_" + v]) for r in rows
+                                  if r["_" + v] and "integration_pr" not in r["flags"]], w)
                 for r in rows:
+                    r[f"overlap_share_{v}_{w}_excl_integration"] = res_ex.get(r["pr_number"], (None,))[0]
                     share, any_, n_prs, n_files = res.get(r["pr_number"], (None,) * 4)
                     r[f"overlap_share_{v}_{w}"] = share
                     r[f"overlap_any_{v}_{w}"] = any_
@@ -295,7 +303,7 @@ def repo_table(year, folder, df, weekly, excl, val):
             row[f"mean_overlap_share_{v}_{W}"] = s.mean() if len(s) else None
             row[f"mean_overlap_any_{v}_{W}"] = df[anycol].dropna().mean() if len(s) else None
             row[f"share_prs_overlap_ge_half_{v}_{W}"] = (s >= 0.5).mean() if len(s) else None
-            s2 = df.loc[~df["flags"].str.contains("integration_pr"), col].dropna()
+            s2 = df[f"{col}_excl_integration"].dropna()
             row[f"mean_overlap_share_{v}_{W}_excl_integration"] = s2.mean() if len(s2) else None
             for name, g in halves.items():
                 h = g[col].dropna()

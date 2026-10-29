@@ -58,6 +58,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--refresh", action="store_true", help="download repos already saved again")
     args = ap.parse_args()
+    failed = []
     for year, org, repo, folder in EXTRA:
         d = api.OUT / str(year) / folder
         if not (d / "issues.json").exists() or args.refresh:
@@ -69,8 +70,15 @@ def main():
             (d / "meta.json").write_text(json.dumps({"org": org, "repo": repo,
                                                      "default_branch": default_branch(org, repo)}))
             print(f"{org}/{repo}: {len(prs)} PRs, {len(issues)} issues")
-        refs = fetch_heads(year, org, repo, folder)
+        try:
+            refs = fetch_heads(year, org, repo, folder)
+        except subprocess.CalledProcessError as e:
+            failed.append(f"{year}/{folder}")
+            print(f"FAIL {year}/{folder}: git fetch exited {e.returncode}", flush=True)
+            continue
         print(f"{year}/{folder}: {refs} PR heads under refs/pull/")
+    if failed:
+        raise SystemExit(f"PR head fetch failed for: {', '.join(failed)}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,7 @@
 # PR file-overlap: findings against the TAs' observation
 
+**The tables below were produced before two changes to `23_pr_overlap.py` (a PR with no history is now undefined instead of 0; the `excl_integration` columns now also drop release PRs from the reference sets). Regenerate the CSVs and refresh every number here before using it.**
+
 Numbers are from the CSVs in this folder (`pr_level.csv`, `repo_level.csv`, `year_summary.csv`, `validation_changedfiles.csv`). Read `ASSUMPTIONS.md` for the limits. Descriptive only; no hypothesis tests were run.
 
 ## What the TAs wanted
@@ -12,11 +14,11 @@ For each merged PR, the share of its source files that other PRs merged in the p
 
 | TA claim or question | What the data shows | Verdict |
 |---|---|---|
-| Few PRs early, many later | Second / first half PR ratio (median over repos): 1.08 (2022, 3 repos), 1.46 (2023), 1.26 (2024), 1.24 (2025), 1.40 (2026). Weekly PR count rises in 73-95 % of 2023-25 repos. | **Confirmed**, but it also happens in 2022, so it is normal in this course. |
-| Later PRs touch files from earlier merged PRs | Mean 28-day code overlap per PR is 0.66-0.73 in every year; 72-82 % of PRs have at least half their files in the previous 28 days' set (see table below). | **Confirmed**: overlap is high everywhere. |
-| This overlap is higher in the AI era than before | 2022 baseline 0.69; 2023 0.73, 2024 0.66, 2025 0.68, 2026 0.70. | **Not supported**: the pre-AI repos are not lower. |
-| Overlap rises as the term goes on | Second-half mean overlap is higher than first-half in about 55 % of 2023-25 repos (median 0.71 -> 0.72, 0.63 -> 0.63, 0.63 -> 0.68). PRs in a repo's first 28 days score 0.45-0.66 vs 0.68-0.77 later, in every year including 2022. | **Weak**, and partly a warm-up artefact (little history to overlap with at the start). |
-| The extra overlap is AI redo | Overlap cannot tell redo from bug fixes, refactors, review rounds or follow-up work on the same feature. | **Cannot be answered with this feature.** It is at most an upper bound. |
+| Few PRs early, many later | Second / first half PR ratio (median over repos): 1.08 (2022, 3 repos), 1.46 (2023), 1.26 (2024), 1.24 (2025), 1.40 (2026). Weekly PR count rises in 73-95 % of 2023-25 repos. | Seen in all years, including 2022, so it is normal in this course. |
+| Later PRs touch files from earlier merged PRs | Mean 28-day code overlap per PR is 0.66-0.73 in every year; 72-82 % of PRs have at least half their files in the previous 28 days' set (see table below). | Overlap is high everywhere. Without a null baseline (placebo window, shuffled merge times) this does not show it is more than central files being touched often. |
+| This overlap is higher in the AI era than before | 2022 baseline 0.69; 2023 0.73, 2024 0.66, 2025 0.68, 2026 0.70. | No evidence of a difference at this resolution: the pre-AI repos are not lower, but 2022 rests on two repos, 2023 includes many release PRs, and no interval is given. |
+| Overlap rises as the term goes on | Second-half mean overlap is higher than first-half in about 55 % of 2023-25 repos (median 0.71 -> 0.72, 0.63 -> 0.63, 0.63 -> 0.68). PRs in a repo's first 28 days score 0.45-0.66 vs 0.68-0.77 later, in every year including 2022. | Weak, and partly a warm-up artefact (little history to overlap with at the start). |
+| The extra overlap is AI redo | Overlap cannot tell redo from bug fixes, refactors, review rounds or follow-up work on the same feature. | Cannot be answered with this feature. It is at most an upper bound. |
 
 ## Overlap by year (28-day window, `code` files)
 

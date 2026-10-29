@@ -11,7 +11,7 @@ Produced by `scripts/23_pr_overlap.py`. No GitHub logins or emails in any file. 
 Union of the files changed by the PR's non-merge commits (oids from `prs.json`, `git log --no-walk --no-merges --no-renames --name-only`). `--no-renames`: a rename counts the old and the new path. Raw = that union. `all` = raw minus lockfiles, `node_modules`/`dist`/`build`/`target`/venv/`site-packages`/`__pycache__` directories (the SonarQube scan exclusions; `build/` is kept for the one team that keeps source there), `vendor`/`bower_components`/`third_party`, `*.min.js|css`, `.d.ts`, `_pb2.py`, `.designer.cs`, `.g.dart`, `.map`, `.pyc`, `.DS_Store`, and the vendored packages of `hot-desking-deploy`. `code` = `all` restricted to the extensions of `EXT_LANG` in `20_file_detect.py` (`.py .js .jsx .ts .tsx .java .c .cc .cpp .h .hpp .cs .go .php .rb .rs .kt .swift .m .sql .html .css`). `code` is the primary variant.
 
 ## Overlap
-For a merged PR P at time t, R_W = union of the files (same variant) of all other kept PRs of the same repo with `mergedAt` in (t - W days, t), W in {14, 28}. Both ends open; PRs with an identical timestamp are ordered by PR number. `overlap_share_W = |files(P) ∩ R_W| / |files(P)|`; `overlap_any_W = 1` if the intersection is non-empty. A PR with no `code` file has no `code` overlap (empty cell, not 0), and does not enter the `code` reference sets.
+For a merged PR P at time t, R_W = union of the files (same variant) of all other kept PRs of the same repo with `mergedAt` in (t - W days, t), W in {14, 28}. Both ends open; PRs with an identical timestamp are ordered by PR number, so the lower number counts as earlier and is in the other's window (the tie is the only case where the window includes `t`). `overlap_share_W = |files(P) ∩ R_W| / |files(P)|`; `overlap_any_W = 1` if the intersection is non-empty. A PR with no `code` file has no `code` overlap (empty cell, not 0), and does not enter the `code` reference sets. **A PR with no other PR in its window has no history to overlap with: its share and `overlap_any` are empty (undefined), not 0**, and it is not counted in `n_defined_*` or in any mean.
 
 ## pr_level.csv (one row per kept merged PR; key: year, repo, pr_number)
 | column | meaning |
@@ -29,13 +29,14 @@ For a merged PR P at time t, R_W = union of the files (same variant) of all othe
 | files_complete | false if `commits_total > commits_listed` or any listed commit is missing |
 | overlap_share_{code,all}_{14,28} | share of the PR's files in the reference set |
 | overlap_any_{code,all}_{14,28} | 1 if that share > 0 |
-| ref_prs_{v}_{W} | number of other PRs in the window (0 = no history, share is then 0 by construction) |
+| overlap_share_{code,all}_{14,28}_excl_integration | the same share, with `integration_pr` PRs neither measured (empty) nor part of any reference set |
+| ref_prs_{v}_{W} | number of other PRs in the window (0 = no history, share is then empty) |
 | ref_files_{v}_{W} | size of the reference file set (use it to control for how much was there to overlap with) |
 
 ## repo_level.csv (one row per repo; key: year, repo)
 `n_merged_prs` (kept), `n_excluded_bot`, `n_excluded_bot_beyond_spec` (bots caught only by the wider pattern), `n_excluded_no_files`, `first_merged`, `last_merged`, `span_days`, `n_weeks`, `median_files_all/code`, `share_prs_no_code_files`, `share_files_incomplete`, `share_non_default_base`, `share_ai_agent_author`, `n_integration_prs`.
 Term shape: `prs_first_half` / `prs_second_half` (calendar midpoint between first and last kept merge; a PR exactly at the midpoint is in the second half), `half_ratio` = second / first (empty when the first half has no PR), `weekly_pr_count_slope` = OLS slope of weekly PR count over all weeks including empty ones (PRs per week per week, descriptive; empty below 3 weeks).
-Per variant v and window W: `n_defined_v_W` (PRs with a defined share), `mean_overlap_share_v_W`, `mean_overlap_any_v_W`, `share_prs_overlap_ge_half_v_W`, `mean_overlap_share_v_W_first_half`, `..._second_half`, and `mean_overlap_share_v_W_excl_integration` (mean without `integration_pr` PRs). Means are over PRs with a defined share. Cells are empty where nothing is defined (e.g. `database` has 1 PR).
+Per variant v and window W: `n_defined_v_W` (PRs with a defined share), `mean_overlap_share_v_W`, `mean_overlap_any_v_W`, `share_prs_overlap_ge_half_v_W`, `mean_overlap_share_v_W_first_half`, `..._second_half`, and `mean_overlap_share_v_W_excl_integration` (mean of the `*_excl_integration` column of `pr_level.csv`: release PRs are neither measured nor part of any reference set). Means are over PRs with a defined share. Cells are empty where nothing is defined (e.g. `database` has 1 PR).
 
 ## weekly.csv (key: year, repo, week_index)
 One row per ISO week from the week of the repo's first kept merge to the week of its last, empty weeks included. `n_prs`, and per variant and window `n_defined_*`, `mean_overlap_share_*`, `share_prs_overlap_ge_half_*` (share of PRs with overlap >= 0.5). Empty cells in weeks with no PR.
