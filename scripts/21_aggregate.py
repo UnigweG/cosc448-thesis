@@ -179,6 +179,29 @@ def sonar_repo_table():
     return s
 
 
+def current_scores(f, inv):
+    """Only the score rows that belong to the current inventory: a key is (year, repo, path,
+    content_hash), so a file edited since an earlier run, deleted or newly excluded would otherwise
+    keep its old row in the store and be counted twice."""
+    keys = inv.loc[inv.included == "yes", ["year", "repo", "path", "content_hash"]].drop_duplicates()
+    return f.merge(keys, on=["year", "repo", "path", "content_hash"], how="inner")
+
+
+ANNOTATIONS = ["zerogpt_ai_percent", "zerogpt_label", "gptzero_ai_probability", "gptzero_label", "notes"]
+
+
+def keep_annotations(kit, existing):
+    """Carry the hand-filled columns of an earlier manual_kit.csv over to a regenerated one (same
+    year, repo, path and kit file), so rerunning the aggregation does not wipe the manual checks."""
+    if existing is None or existing.empty:
+        return kit
+    key = ["year", "repo", "path"]
+    old = existing[key + ANNOTATIONS].drop_duplicates(key).astype({c: object for c in ANNOTATIONS})
+    kit = kit.drop(columns=ANNOTATIONS).merge(old, on=key, how="left")
+    kit[ANNOTATIONS] = kit[ANNOTATIONS].fillna("")
+    return kit
+
+
 def write_kit(f, out):
     det = _load("file_detect", "20_file_detect.py")
     kit_dir = out / "manual_kit"
@@ -202,7 +225,9 @@ def write_kit(f, out):
                          "zerogpt_ai_percent": "", "zerogpt_label": "", "gptzero_ai_probability": "",
                          "gptzero_label": "", "notes": ""})
         reader.close()
-    pd.DataFrame(rows).to_csv(kit_dir / "manual_kit.csv", index=False)
+    csv = kit_dir / "manual_kit.csv"
+    existing = pd.read_csv(csv, keep_default_na=False) if csv.exists() else None
+    keep_annotations(pd.DataFrame(rows), existing).to_csv(csv, index=False)
     return len(rows)
 
 
@@ -215,8 +240,8 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     db = sqlite3.connect(args.db)
 
-    f = pd.read_sql("SELECT * FROM files", db)
     inv = pd.read_csv(RESULTS / "detect" / "file_inventory.csv", keep_default_na=False)
+    f = current_scores(pd.read_sql("SELECT * FROM files", db), inv)
     f["bino_score_percentile"] = percentile(f.bino_score)
     f["droid_p_ai_percentile"] = percentile(f.droid_p_ai)
     sq = pd.read_csv(RESULTS / "detect" / "sonar_file_measures.csv").drop(columns=["project_key"])
