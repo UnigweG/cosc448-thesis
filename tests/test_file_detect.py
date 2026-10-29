@@ -89,3 +89,24 @@ def test_percentile_is_a_rank_from_0_to_100(agg):
     p = agg.percentile(pd.Series([3.0, 1.0, 2.0]))
     assert list(p) == [100.0, 0.0, 50.0]
     assert list(agg.percentile(pd.Series([5.0]))) == [0.0]
+
+
+def test_scores_of_edited_or_dropped_files_are_not_aggregated(agg):
+    files = pd.DataFrame({"year": 2024, "repo": "r", "path": ["a.py", "a.py", "b.py", "c.py"],
+                          "content_hash": ["old", "new", "b1", "c1"], "bino_score": [1.0, 2.0, 3.0, 4.0]})
+    inv = pd.DataFrame({"year": 2024, "repo": "r", "path": ["a.py", "b.py", "c.py"],
+                        "content_hash": ["new", "b1", "c1"], "included": ["yes", "yes", "no"]})
+    kept = agg.current_scores(files, inv)
+    # a.py keeps only its current version; c.py is now excluded
+    assert sorted(zip(kept.path, kept.content_hash)) == [("a.py", "new"), ("b.py", "b1")]
+
+
+def test_manual_check_results_survive_regenerating_the_kit(agg):
+    cols = ["year", "repo", "path", *agg.ANNOTATIONS]
+    existing = pd.DataFrame([[2024, "r", "a.py", "63", "AI", "0.9", "ai", "checked by hand"]], columns=cols)
+    kit = pd.DataFrame({"year": 2024, "repo": "r", "path": ["a.py", "b.py"], "kit_file": ["f1", "f2"],
+                        **{c: ["", ""] for c in agg.ANNOTATIONS}})
+    out = agg.keep_annotations(kit, existing).set_index("path")
+    assert out.loc["a.py", "zerogpt_label"] == "AI" and out.loc["a.py", "notes"] == "checked by hand"
+    assert out.loc["b.py", "notes"] == "" and list(out.kit_file) == ["f1", "f2"]
+    assert agg.keep_annotations(kit, None) is kit
