@@ -65,7 +65,8 @@ def main():
 
     nan = f.isna().mean().mul(100).round(2)
     out += ["## Null rate per file_level column (%)", "", "Detector columns and keys must be 0; Sonar columns are empty "
-            "for files SonarQube did not analyse (no analyser for the language, or excluded from the scan).", "",
+            "for files SonarQube did not analyse (no analyser for the language, or excluded from the scan) and, for "
+            "metrics such as cognitive complexity or duplication density, where it did not emit the metric for the file.", "",
             "| column | % empty |", "|---|---|"]
     out += [f"| {c} | {v} |" for c, v in nan.items() if v > 0] or ["| (none) | 0 |"]
     det_cols = ["bino_score", "obs_logppl", "perf_logppl", "xppl", "droid_p_ai", "droid_logit_ai", "droid_label"]

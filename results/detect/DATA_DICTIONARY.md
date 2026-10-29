@@ -6,7 +6,7 @@ Detector outputs are raw: no calibrated threshold exists for the Qwen-based Bino
 
 | column | meaning |
 |---|---|
-| `year` | Cohort year: 2022 = pre-AI baseline, 2023-2025 = AI years, 2026 = the user's capstone. |
+| `year` | Cohort year: 2022 = pre-AI baseline, 2023-2025 = AI years, 2026 = the 2026 capstone cohort (one repo). |
 | `repo` | Repository (directory under data/repos/<year>/). |
 | `path` | File path inside the repo at the scanned commit. |
 | `content_hash` | Git blob SHA of the file content (with year/repo/path it is the key). |
@@ -32,7 +32,7 @@ Detector outputs are raw: no calibrated threshold exists for the Qwen-based Bino
 | `droid_logit_human` | DroidDetect class-0 (HUMAN_GENERATED) logit, token-weighted mean over chunks. |
 | `droid_logit_ai` | DroidDetect class-1 (MACHINE_GENERATED) logit, token-weighted mean over chunks. |
 | `droid_p_ai` | DroidDetect probability(AI) (softmax of the class logits per chunk), token-weighted mean over chunks. |
-| `droid_label` | DroidDetect's own binary label for the file: MACHINE_GENERATED if droid_p_ai >= 0.5 else HUMAN_GENERATED. |
+| `droid_label` | DroidDetect's own binary label for the file: MACHINE_GENERATED if droid_p_ai >= 0.5 else HUMAN_GENERATED. Not calibrated for student code: it labels about 59% of the pre-AI 2022 files MACHINE_GENERATED, so it is not a measure of AI prevalence. |
 | `droid_ai_chunk_share` | Share of the file's chunks that DroidDetect labels MACHINE_GENERATED. |
 | `device` | Torch device used. |
 | `dtype` | Model dtype used (float16 on mps). |
@@ -120,7 +120,7 @@ Detector outputs are raw: no calibrated threshold exists for the Qwen-based Bino
 | `droid_logit_ai_std` | droid_logit_ai - standard deviation over files (unweighted, ddof=1) |
 | `droid_logit_ai_min` | droid_logit_ai - minimum over files |
 | `droid_logit_ai_max` | droid_logit_ai - maximum over files |
-| `droid_ai_file_share` | Share of scored files that DroidDetect labels MACHINE_GENERATED (droid_p_ai >= 0.5). |
+| `droid_ai_file_share` | Share of scored files that DroidDetect labels MACHINE_GENERATED (droid_p_ai >= 0.5). Not an AI prevalence: the label is uncalibrated (59% of the pre-AI 2022 files get it). |
 | `droid_ai_sloc_share` | Share of scored sloc in files labelled MACHINE_GENERATED. |
 | `droid_ai_token_share` | Share of scored Qwen tokens in files labelled MACHINE_GENERATED. |
 | `unsupported_language_file_share` | Share of scored files in MATLAB/SQL/HTML/CSS (outside the detectors' training languages). |

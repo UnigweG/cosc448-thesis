@@ -29,7 +29,7 @@ All expected repos present: **True**
 
 ## Null rate per file_level column (%)
 
-Detector columns and keys must be 0; Sonar columns are empty for files SonarQube did not analyse (no analyser for the language, or excluded from the scan).
+Detector columns and keys must be 0; Sonar columns are empty for files SonarQube did not analyse (no analyser for the language, or excluded from the scan) and, for metrics such as cognitive complexity or duplication density, where it did not emit the metric for the file.
 
 | column | % empty |
 |---|---|

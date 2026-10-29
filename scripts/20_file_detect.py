@@ -13,7 +13,7 @@ skips finished files. No threshold is applied to the Binoculars score.
     scripts/20_file_detect.py --db PATH            # use another store (smoke tests)
 
 The default mode supervises a worker process and restarts it after a hang (a file taking longer than
-the hang guard) or a crash; the file that was in flight is recorded in the failures table.
+the hang guard) or a kill signal; the file that was in flight is recorded in the failures table.
 """
 import argparse
 import gc
@@ -56,6 +56,7 @@ DROID_CONTENT_TOKENS = 510  # + [CLS] and [SEP] = the 512 DroidDetect is run at
 MIN_TAIL = 32               # a last chunk shorter than this borrows tokens from the one before it
 MIN_TOKENS = 8              # fewer Qwen tokens than this cannot be scored by Binoculars
 HANG_SECONDS = 1800         # per-file hang guard (not a time cap on the run)
+HANG_EXIT = 75              # exit code of the hang guard; the supervisor restarts on it and on signals
 HANG_PER_CHUNK = 5          # seconds allowed per chunk before the guard applies on very large files
 
 DETECT_DIR = RESULTS / "detect"
@@ -432,7 +433,7 @@ def watchdog(db_path, state):
             db.execute("UPDATE inflight SET note=?", (f"hang guard: over {int(cur['limit'])}s on this file",))
             db.commit()
             print(f"HANG GUARD: {cur['key']} over {cur['limit']}s, restarting worker", flush=True)
-            os._exit(75)
+            os._exit(HANG_EXIT)
 
 
 def worker(args):
@@ -522,6 +523,8 @@ def supervise(args):
         rc = subprocess.run(cmd).returncode
         if rc == 0:
             return
+        if rc > 0 and rc != HANG_EXIT:  # a config error or an uncaught exception would only repeat
+            raise SystemExit(f"worker exited with {rc}; not restarting")
         print(f"worker exited with {rc}; restart {restart + 1}", flush=True)
         time.sleep(5)
     raise SystemExit("too many worker restarts")
