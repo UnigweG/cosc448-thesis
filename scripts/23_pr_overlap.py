@@ -357,6 +357,33 @@ def year_summary(repo_df):
     return pd.DataFrame(rows)
 
 
+def year_comparison(pr_df, draws=2000, seed=448):
+    """Per year, variant, window and basis: the PR-pooled mean next to the median and mean over repos,
+    and a 95 % percentile interval of the pooled mean from resampling whole repos (so a year with 4
+    repos gets a wide interval). Only PRs with a defined share (some other PR in the window) count.
+    basis `all_kept` keeps release PRs, `excl_integration` removes them from measured and reference sets.
+    A year with one repo has no interval."""
+    rng = np.random.default_rng(seed)
+    rows = []
+    for v in VARIANTS:
+        for w in WINDOWS:
+            for basis, col in (("all_kept", f"overlap_share_{v}_{w}"),
+                               ("excl_integration", f"overlap_share_{v}_{w}_excl_integration")):
+                d = pr_df[["year", "repo", col]].dropna()
+                for year, g in d.groupby("year"):
+                    by = g.groupby("repo")[col].agg(["sum", "count"])
+                    row = {"year": year, "variant": v, "window_days": w, "basis": basis, "n_repos": len(by),
+                           "n_prs_defined": int(by["count"].sum()), "pooled_mean": by["sum"].sum() / by["count"].sum(),
+                           "repo_median": (by["sum"] / by["count"]).median(), "repo_mean": (by["sum"] / by["count"]).mean(),
+                           "ci95_low": None, "ci95_high": None}
+                    if len(by) > 1:
+                        idx = rng.integers(0, len(by), size=(draws, len(by)))
+                        sums, cnts = by["sum"].to_numpy()[idx].sum(1), by["count"].to_numpy()[idx].sum(1)
+                        row["ci95_low"], row["ci95_high"] = np.percentile(sums / cnts, [2.5, 97.5])
+                    rows.append(row)
+    return pd.DataFrame(rows)
+
+
 # ----------------------------------------------------------------------------- driver
 
 def all_repos():
@@ -408,6 +435,7 @@ def main():
     validation_table(val_rows).round(4).to_csv(out / "validation_changedfiles.csv", index=False)
     if not args.only:
         year_summary(repo_df).round(4).to_csv(out / "year_summary.csv", index=False)
+        year_comparison(pr_df).round(4).to_csv(out / "year_comparison.csv", index=False)
     print(f"wrote {out}: {len(pr_df)} PR rows, {len(repo_df)} repos, {len(weekly_rows)} weeks")
 
 

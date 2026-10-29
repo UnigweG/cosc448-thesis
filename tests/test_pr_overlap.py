@@ -203,3 +203,21 @@ def test_release_prs_are_not_reference_for_the_sensitivity_columns(world):
     assert rows[3]["overlap_share_code_14"] == 1.0                       # the release PR (day 20) is in the window
     assert rows[3]["overlap_share_code_14_excl_integration"] is None     # without it PR 3 has no history
     assert rows[2]["overlap_share_code_14_excl_integration"] is None     # the release PR is not measured
+
+
+def test_year_comparison_pools_prs_and_resamples_repos(m):
+    import pandas as pd
+    rows = [{"year": 2022, "repo": "a", "overlap_share_code_14": x, "overlap_share_code_28": x,
+             "overlap_share_code_14_excl_integration": x, "overlap_share_code_28_excl_integration": x,
+             "overlap_share_all_14": x, "overlap_share_all_28": x,
+             "overlap_share_all_14_excl_integration": x, "overlap_share_all_28_excl_integration": x}
+            for x in (1.0, 1.0, 1.0, None)]
+    rows += [dict(rows[0], repo="b", overlap_share_code_28=0.0)]
+    rows += [dict(rows[0], year=2026, repo="c")]
+    out = m.year_comparison(pd.DataFrame(rows), draws=200)
+    r = out.query("year == 2022 and variant == 'code' and window_days == 28 and basis == 'all_kept'").iloc[0]
+    assert r.n_repos == 2 and r.n_prs_defined == 4          # the empty share (no history) is not counted
+    assert r.pooled_mean == pytest.approx(0.75) and r.repo_median == pytest.approx(0.5)
+    assert r.ci95_low <= r.pooled_mean <= r.ci95_high
+    one = out.query("year == 2026 and variant == 'code' and window_days == 28 and basis == 'all_kept'").iloc[0]
+    assert pd.isna(one.ci95_low) and pd.isna(one.ci95_high)  # one repo: no interval
