@@ -1,0 +1,226 @@
+year,metric,n_repos_defined,n_repos,median,mean,note
+2022,n_merged_prs,4,4,30.0,52.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_excluded_bot,4,4,0.0,0.0,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_excluded_bot_beyond_spec,4,4,0.0,0.0,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_excluded_no_files,4,4,0.0,0.0,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,span_days,4,4,34.95,38.55,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_weeks,4,4,6.5,6.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,median_files_all,4,4,15.5,30.5,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,median_files_code,4,4,15.0,30.0,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_prs_no_code_files,4,4,0.2507,0.2253,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_files_incomplete,4,4,0.0,0.0357,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_non_default_base,4,4,0.0033,0.1088,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_ai_agent_author,4,4,0.0,0.0,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_integration_prs,4,4,1.0,1.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,prs_first_half,3,4,20.0,32.3333,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,prs_second_half,3,4,33.0,37.6667,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,half_ratio,3,4,1.0833,1.0444,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,weekly_pr_count_slope,3,4,0.1319,0.2924,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_defined_code_14,4,4,20.0,32.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_14,4,4,0.6299,0.4861,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_any_code_14,4,4,0.8137,0.6291,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_prs_overlap_ge_half_code_14,4,4,0.6294,0.523,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_14_excl_integration,4,4,0.2852,0.3137,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_14_first_half,3,4,0.5435,0.5583,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_14_second_half,3,4,0.81,0.7762,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_defined_code_28,4,4,20.0,32.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_28,4,4,0.6706,0.5128,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_any_code_28,4,4,0.8611,0.6585,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_prs_overlap_ge_half_code_28,4,4,0.6958,0.5562,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_28_excl_integration,4,4,0.3272,0.341,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_28_first_half,3,4,0.5501,0.606,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_code_28_second_half,3,4,0.8435,0.8062,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_defined_all_14,4,4,30.0,52.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_14,4,4,0.4621,0.4156,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_any_all_14,4,4,0.6852,0.5569,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_prs_overlap_ge_half_all_14,4,4,0.4597,0.4442,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_14_excl_integration,4,4,0.4552,0.3526,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_14_first_half,3,4,0.5274,0.5215,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_14_second_half,3,4,0.5251,0.6336,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,n_defined_all_28,4,4,30.0,52.75,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_28,4,4,0.4923,0.4307,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_any_all_28,4,4,0.704,0.5663,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,share_prs_overlap_ge_half_all_28,4,4,0.5014,0.465,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_28_excl_integration,4,4,0.4841,0.3679,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_28_first_half,3,4,0.5788,0.5419,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2022,mean_overlap_share_all_28_second_half,3,4,0.5463,0.6542,"n=4 repos; database has 1 PR and hot-desking-deploy 8, so most 2022 numbers rest on 2 repos. Descriptive only."
+2023,n_merged_prs,22,22,122.5,146.0455,
+2023,n_excluded_bot,22,22,0.0,4.9545,
+2023,n_excluded_bot_beyond_spec,22,22,0.0,0.0909,
+2023,n_excluded_no_files,22,22,0.5,0.9545,
+2023,span_days,22,22,189.3,188.1136,
+2023,n_weeks,22,22,28.0,27.8636,
+2023,median_files_all,22,22,6.5,6.8409,
+2023,median_files_code,22,22,2.0,3.0227,
+2023,share_prs_no_code_files,22,22,0.3374,0.3519,
+2023,share_files_incomplete,22,22,0.0,0.0039,
+2023,share_non_default_base,22,22,0.6257,0.4819,
+2023,share_ai_agent_author,22,22,0.0,0.0,
+2023,n_integration_prs,22,22,28.5,45.2273,
+2023,prs_first_half,22,22,47.0,59.0909,
+2023,prs_second_half,22,22,76.0,86.9545,
+2023,half_ratio,22,22,1.4648,1.6544,
+2023,weekly_pr_count_slope,22,22,0.0872,0.0801,
+2023,n_defined_code_14,22,22,85.0,91.4091,
+2023,mean_overlap_share_code_14,22,22,0.7027,0.6406,
+2023,mean_overlap_any_code_14,22,22,0.9005,0.8616,
+2023,share_prs_overlap_ge_half_code_14,22,22,0.7672,0.6847,
+2023,mean_overlap_share_code_14_excl_integration,22,22,0.6178,0.6098,
+2023,mean_overlap_share_code_14_first_half,21,22,0.6541,0.6309,
+2023,mean_overlap_share_code_14_second_half,22,22,0.6848,0.6384,
+2023,n_defined_code_28,22,22,85.0,91.4091,
+2023,mean_overlap_share_code_28,22,22,0.7422,0.7091,
+2023,mean_overlap_any_code_28,22,22,0.9319,0.8949,
+2023,share_prs_overlap_ge_half_code_28,22,22,0.8031,0.7622,
+2023,mean_overlap_share_code_28_excl_integration,22,22,0.6774,0.6863,
+2023,mean_overlap_share_code_28_first_half,21,22,0.7072,0.6843,
+2023,mean_overlap_share_code_28_second_half,22,22,0.721,0.714,
+2023,n_defined_all_14,22,22,122.5,146.0455,
+2023,mean_overlap_share_all_14,22,22,0.5781,0.5673,
+2023,mean_overlap_any_all_14,22,22,0.8571,0.8432,
+2023,share_prs_overlap_ge_half_all_14,22,22,0.5986,0.6059,
+2023,mean_overlap_share_all_14_excl_integration,22,22,0.5509,0.5404,
+2023,mean_overlap_share_all_14_first_half,22,22,0.5699,0.5449,
+2023,mean_overlap_share_all_14_second_half,22,22,0.5709,0.5768,
+2023,n_defined_all_28,22,22,122.5,146.0455,
+2023,mean_overlap_share_all_28,22,22,0.6373,0.627,
+2023,mean_overlap_any_all_28,22,22,0.9115,0.8815,
+2023,share_prs_overlap_ge_half_all_28,22,22,0.7061,0.6791,
+2023,mean_overlap_share_all_28_excl_integration,22,22,0.6077,0.6036,
+2023,mean_overlap_share_all_28_first_half,22,22,0.6032,0.5955,
+2023,mean_overlap_share_all_28_second_half,22,22,0.6395,0.6423,
+2024,n_merged_prs,26,26,161.5,156.8846,
+2024,n_excluded_bot,26,26,0.0,0.0,
+2024,n_excluded_bot_beyond_spec,26,26,0.0,0.0,
+2024,n_excluded_no_files,26,26,0.0,0.6923,
+2024,span_days,26,26,185.65,199.8885,
+2024,n_weeks,26,26,28.0,29.6154,
+2024,median_files_all,26,26,4.0,5.7115,
+2024,median_files_code,26,26,2.0,3.2885,
+2024,share_prs_no_code_files,26,26,0.3764,0.3462,
+2024,share_files_incomplete,26,26,0.0112,0.0115,
+2024,share_non_default_base,26,26,0.9221,0.6857,
+2024,share_ai_agent_author,26,26,0.0,0.0,
+2024,n_integration_prs,26,26,6.5,8.8462,
+2024,prs_first_half,26,26,64.5,73.7692,
+2024,prs_second_half,26,26,86.5,83.1154,
+2024,half_ratio,26,26,1.2575,1.3108,
+2024,weekly_pr_count_slope,26,26,0.0749,0.0574,
+2024,n_defined_code_14,26,26,104.5,101.5,
+2024,mean_overlap_share_code_14,26,26,0.5404,0.5453,
+2024,mean_overlap_any_code_14,26,26,0.8515,0.809,
+2024,share_prs_overlap_ge_half_code_14,26,26,0.5894,0.5794,
+2024,mean_overlap_share_code_14_excl_integration,26,26,0.5288,0.5412,
+2024,mean_overlap_share_code_14_first_half,26,26,0.567,0.552,
+2024,mean_overlap_share_code_14_second_half,25,26,0.5302,0.5251,
+2024,n_defined_code_28,26,26,104.5,101.5,
+2024,mean_overlap_share_code_28,26,26,0.6407,0.6399,
+2024,mean_overlap_any_code_28,26,26,0.9064,0.8801,
+2024,share_prs_overlap_ge_half_code_28,26,26,0.7051,0.6993,
+2024,mean_overlap_share_code_28_excl_integration,26,26,0.6293,0.6348,
+2024,mean_overlap_share_code_28_first_half,26,26,0.6294,0.6266,
+2024,mean_overlap_share_code_28_second_half,25,26,0.6311,0.6385,
+2024,n_defined_all_14,26,26,161.5,156.8846,
+2024,mean_overlap_share_all_14,26,26,0.4096,0.4357,
+2024,mean_overlap_any_all_14,26,26,0.6857,0.6759,
+2024,share_prs_overlap_ge_half_all_14,26,26,0.437,0.4599,
+2024,mean_overlap_share_all_14_excl_integration,26,26,0.4076,0.4317,
+2024,mean_overlap_share_all_14_first_half,26,26,0.4303,0.4335,
+2024,mean_overlap_share_all_14_second_half,26,26,0.4048,0.4105,
+2024,n_defined_all_28,26,26,161.5,156.8846,
+2024,mean_overlap_share_all_28,26,26,0.5248,0.5306,
+2024,mean_overlap_any_all_28,26,26,0.7842,0.77,
+2024,share_prs_overlap_ge_half_all_28,26,26,0.5495,0.5748,
+2024,mean_overlap_share_all_28_excl_integration,26,26,0.5269,0.5259,
+2024,mean_overlap_share_all_28_first_half,26,26,0.5128,0.5197,
+2024,mean_overlap_share_all_28_second_half,26,26,0.5379,0.5123,
+2025,n_merged_prs,20,20,276.5,263.1,
+2025,n_excluded_bot,20,20,0.0,0.0,
+2025,n_excluded_bot_beyond_spec,20,20,0.0,0.0,
+2025,n_excluded_no_files,20,20,0.0,0.2,
+2025,span_days,20,20,189.15,186.2,
+2025,n_weeks,20,20,28.0,27.9,
+2025,median_files_all,20,20,4.0,3.875,
+2025,median_files_code,20,20,2.0,2.225,
+2025,share_prs_no_code_files,20,20,0.4019,0.3437,
+2025,share_files_incomplete,20,20,0.0,0.0061,
+2025,share_non_default_base,20,20,0.6515,0.5715,
+2025,share_ai_agent_author,20,20,0.0,0.0003,
+2025,n_integration_prs,20,20,11.0,12.0,
+2025,prs_first_half,20,20,120.5,116.6,
+2025,prs_second_half,20,20,152.0,146.5,
+2025,half_ratio,20,20,1.2441,1.2967,
+2025,weekly_pr_count_slope,20,20,0.1797,0.1878,
+2025,n_defined_code_14,20,20,174.5,166.8,
+2025,mean_overlap_share_code_14,20,20,0.6152,0.6217,
+2025,mean_overlap_any_code_14,20,20,0.8539,0.8674,
+2025,share_prs_overlap_ge_half_code_14,20,20,0.6882,0.6882,
+2025,mean_overlap_share_code_14_excl_integration,20,20,0.602,0.6104,
+2025,mean_overlap_share_code_14_first_half,20,20,0.575,0.6078,
+2025,mean_overlap_share_code_14_second_half,20,20,0.6209,0.6244,
+2025,n_defined_code_28,20,20,174.5,166.8,
+2025,mean_overlap_share_code_28,20,20,0.6668,0.682,
+2025,mean_overlap_any_code_28,20,20,0.8883,0.8939,
+2025,share_prs_overlap_ge_half_code_28,20,20,0.7594,0.7552,
+2025,mean_overlap_share_code_28_excl_integration,20,20,0.6634,0.6718,
+2025,mean_overlap_share_code_28_first_half,20,20,0.63,0.6529,
+2025,mean_overlap_share_code_28_second_half,20,20,0.6769,0.6942,
+2025,n_defined_all_14,20,20,276.5,263.1,
+2025,mean_overlap_share_all_14,20,20,0.5489,0.55,
+2025,mean_overlap_any_all_14,20,20,0.8238,0.8154,
+2025,share_prs_overlap_ge_half_all_14,20,20,0.6277,0.6249,
+2025,mean_overlap_share_all_14_excl_integration,20,20,0.5475,0.5413,
+2025,mean_overlap_share_all_14_first_half,20,20,0.5373,0.5468,
+2025,mean_overlap_share_all_14_second_half,20,20,0.5571,0.5491,
+2025,n_defined_all_28,20,20,276.5,263.1,
+2025,mean_overlap_share_all_28,20,20,0.6195,0.6164,
+2025,mean_overlap_any_all_28,20,20,0.8626,0.8673,
+2025,share_prs_overlap_ge_half_all_28,20,20,0.7034,0.7074,
+2025,mean_overlap_share_all_28_excl_integration,20,20,0.6062,0.6088,
+2025,mean_overlap_share_all_28_first_half,20,20,0.5858,0.5931,
+2025,mean_overlap_share_all_28_second_half,20,20,0.6235,0.6319,
+2026,n_merged_prs,1,1,206.0,206.0,n=1 repo (the capstone). Descriptive only.
+2026,n_excluded_bot,1,1,0.0,0.0,n=1 repo (the capstone). Descriptive only.
+2026,n_excluded_bot_beyond_spec,1,1,0.0,0.0,n=1 repo (the capstone). Descriptive only.
+2026,n_excluded_no_files,1,1,0.0,0.0,n=1 repo (the capstone). Descriptive only.
+2026,span_days,1,1,79.5,79.5,n=1 repo (the capstone). Descriptive only.
+2026,n_weeks,1,1,13.0,13.0,n=1 repo (the capstone). Descriptive only.
+2026,median_files_all,1,1,7.0,7.0,n=1 repo (the capstone). Descriptive only.
+2026,median_files_code,1,1,6.0,6.0,n=1 repo (the capstone). Descriptive only.
+2026,share_prs_no_code_files,1,1,0.4078,0.4078,n=1 repo (the capstone). Descriptive only.
+2026,share_files_incomplete,1,1,0.0146,0.0146,n=1 repo (the capstone). Descriptive only.
+2026,share_non_default_base,1,1,0.5777,0.5777,n=1 repo (the capstone). Descriptive only.
+2026,share_ai_agent_author,1,1,0.0,0.0,n=1 repo (the capstone). Descriptive only.
+2026,n_integration_prs,1,1,3.0,3.0,n=1 repo (the capstone). Descriptive only.
+2026,prs_first_half,1,1,86.0,86.0,n=1 repo (the capstone). Descriptive only.
+2026,prs_second_half,1,1,120.0,120.0,n=1 repo (the capstone). Descriptive only.
+2026,half_ratio,1,1,1.3953,1.3953,n=1 repo (the capstone). Descriptive only.
+2026,weekly_pr_count_slope,1,1,0.2857,0.2857,n=1 repo (the capstone). Descriptive only.
+2026,n_defined_code_14,1,1,122.0,122.0,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_14,1,1,0.6841,0.6841,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_any_code_14,1,1,0.9836,0.9836,n=1 repo (the capstone). Descriptive only.
+2026,share_prs_overlap_ge_half_code_14,1,1,0.8115,0.8115,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_14_excl_integration,1,1,0.6789,0.6789,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_14_first_half,1,1,0.6571,0.6571,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_14_second_half,1,1,0.6988,0.6988,n=1 repo (the capstone). Descriptive only.
+2026,n_defined_code_28,1,1,122.0,122.0,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_28,1,1,0.6999,0.6999,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_any_code_28,1,1,0.9836,0.9836,n=1 repo (the capstone). Descriptive only.
+2026,share_prs_overlap_ge_half_code_28,1,1,0.8197,0.8197,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_28_excl_integration,1,1,0.6949,0.6949,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_28_first_half,1,1,0.6584,0.6584,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_code_28_second_half,1,1,0.7225,0.7225,n=1 repo (the capstone). Descriptive only.
+2026,n_defined_all_14,1,1,206.0,206.0,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_14,1,1,0.4584,0.4584,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_any_all_14,1,1,0.6893,0.6893,n=1 repo (the capstone). Descriptive only.
+2026,share_prs_overlap_ge_half_all_14,1,1,0.5437,0.5437,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_14_excl_integration,1,1,0.4504,0.4504,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_14_first_half,1,1,0.4187,0.4187,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_14_second_half,1,1,0.4869,0.4869,n=1 repo (the capstone). Descriptive only.
+2026,n_defined_all_28,1,1,206.0,206.0,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_28,1,1,0.4675,0.4675,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_any_all_28,1,1,0.6893,0.6893,n=1 repo (the capstone). Descriptive only.
+2026,share_prs_overlap_ge_half_all_28,1,1,0.5534,0.5534,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_28_excl_integration,1,1,0.4597,0.4597,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_28_first_half,1,1,0.4211,0.4211,n=1 repo (the capstone). Descriptive only.
+2026,mean_overlap_share_all_28_second_half,1,1,0.5008,0.5008,n=1 repo (the capstone). Descriptive only.
