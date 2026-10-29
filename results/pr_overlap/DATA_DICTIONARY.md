@@ -44,5 +44,8 @@ One row per ISO week from the week of the repo's first kept merge to the week of
 ## validation_changedfiles.csv
 Raw file count (before hygiene) against GitHub's `changedFiles`, only for PRs whose commit list is complete. Rows per year, per repo and pooled (`repo` = ALL, `year` = ALL), for `scope` = `all_prs` (any state) and `merged_prs`. `share_exact`, `share_within_1`, `share_union_larger` / `share_union_smaller` (our count above / below GitHub's), `median_ratio`, `ratio_p25/p75`, `median_diff`, `share_incomplete` (PRs left out for an incomplete list).
 
+## year_comparison.csv
+Per year, variant (`code`, `all`), window (14, 28) and basis (`all_kept`; `excl_integration` = release PRs neither measured nor in any reference set): `n_repos`, `n_prs_defined` (PRs with a defined share), `pooled_mean` (mean over PRs), `repo_median` and `repo_mean` (over the repos' own means), and `ci95_low` / `ci95_high`, the 2.5 and 97.5 percentiles of the pooled mean over 2,000 resamples of whole repos (seed 448). Empty for a year with one repo. With 2-3 repos the interval is not informative.
+
 ## year_summary.csv
 Long format: per year and per numeric `repo_level.csv` column, `n_repos_defined`, `n_repos`, `median`, `mean` over repos. `note` repeats that 2022 is n=4 (database has 1 PR, hot-desking-deploy 8) and 2026 is n=1. Descriptive only; no tests.
